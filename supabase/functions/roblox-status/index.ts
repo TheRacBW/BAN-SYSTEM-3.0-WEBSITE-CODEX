@@ -47,9 +47,9 @@ async function getRobloxCookie(): Promise<string> {
       .select('cookie')
       .eq('id', 'global')
       .single();
-    return data?.cookie || envCookie || '';
+    return (data?.cookie || envCookie || '').trim();
   } catch (_err) {
-    return envCookie || '';
+    return (envCookie || '').trim();
   }
 }
 
