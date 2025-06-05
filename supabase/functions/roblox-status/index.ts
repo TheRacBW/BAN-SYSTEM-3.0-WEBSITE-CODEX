@@ -104,26 +104,34 @@ async function fetchWithRetry(url: string, options: RequestInit = {}, retries = 
   }
 }
 
-const PRESENCE_API_URL = 'https://presence.roproxy.com/v1/presence/users';
+const PRESENCE_API_PRIMARY =
+  'https://roblox-proxy.theraccoonmolester.workers.dev/presence/v1/presence/users';
+const PRESENCE_API_FALLBACK = 'https://presence.roproxy.com/v1/presence/users';
 
 async function getUserPresence(userId: number): Promise<UserPresence> {
   const cookie = await getRobloxCookie();
-  const response = await fetchWithRetry(PRESENCE_API_URL, {
+  const options = {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
       ...(cookie ? { 'Cookie': '.ROBLOSECURITY=' + cookie } : {})
     },
-    body: JSON.stringify({
-      userIds: [userId]
-    })
-  });
+    body: JSON.stringify({ userIds: [userId] })
+  } as const;
 
-  const data = await response.json();
-  if (!data.userPresences?.[0]) {
-    throw new Error(`No presence data found for user ID ${userId}`);
+  for (const url of [PRESENCE_API_PRIMARY, PRESENCE_API_FALLBACK]) {
+    try {
+      const response = await fetchWithRetry(url, options);
+      const data = await response.json();
+      if (data.userPresences?.[0]) {
+        return data.userPresences[0];
+      }
+    } catch {
+      // try next url
+    }
   }
-  return data.userPresences[0];
+
+  throw new Error(`No presence data found for user ID ${userId}`);
 }
 
 async function getUsernameFromId(userId: number): Promise<string> {
