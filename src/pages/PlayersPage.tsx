@@ -49,7 +49,14 @@ export default function PlayersPage() {
                     ...acc,
                     status: {
                       isOnline: data.isOnline,
-                      inBedwars: data.inBedwars,
+                      isInGame: data.isInGame ?? false,
+                      inBedwars: typeof data.inBedwars === 'boolean'
+                        ? data.inBedwars
+                        : (data.isInGame ?? false) && (
+                            data.placeId === BEDWARS_PLACE_ID ||
+                            data.rootPlaceId === BEDWARS_PLACE_ID ||
+                            data.universeId === BEDWARS_UNIVERSE_ID
+                          ),
                       placeId: data.placeId,
                       rootPlaceId: data.rootPlaceId,
                       universeId: data.universeId,

@@ -39,7 +39,7 @@ export default function RobloxStatus({ userId }: RobloxStatusProps) {
             className={status.isOnline ? 'text-green-500' : 'text-gray-400'}
           />
           <span className={status.isOnline ? 'text-green-600 dark:text-green-400' : 'text-gray-500'}>
-            {status.username} ({status.isOnline ? 'Online' : 'Offline'})
+            {status.username} ({status.isInGame ? 'In Game' : status.isOnline ? 'Online' : 'Offline'})
           </span>
         </div>
         

@@ -16,6 +16,7 @@ export interface UserStatus {
   userId: number;
   username: string;
   isOnline: boolean;
+  isInGame: boolean;
   inBedwars: boolean;
   placeId: number | null;
   rootPlaceId: number | null;
@@ -40,8 +41,10 @@ async function fetchJson(url: string, options: RequestInit = {}) {
   return res.json();
 }
 
+const PRESENCE_API_URL = 'https://presence.roproxy.com/v1/presence/users';
+
 async function getUserPresence(userId: number, cookie?: string): Promise<UserPresence> {
-  const data = await fetchJson('https://presence.roblox.com/v1/presence/users', {
+  const data = await fetchJson(PRESENCE_API_URL, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
@@ -76,10 +79,12 @@ export async function getUserStatus(userId: number, cookie?: string): Promise<Us
     userId,
     username,
     isOnline: [1, 2].includes(presence.userPresenceType),
+    isInGame: presence.userPresenceType === 2,
     inBedwars:
-      Number(presence.placeId) === BEDWARS_PLACE_ID ||
-      Number(presence.rootPlaceId) === BEDWARS_PLACE_ID ||
-      Number(presence.universeId) === BEDWARS_UNIVERSE_ID,
+      presence.userPresenceType === 2 &&
+      (Number(presence.placeId) === BEDWARS_PLACE_ID ||
+        Number(presence.rootPlaceId) === BEDWARS_PLACE_ID ||
+        Number(presence.universeId) === BEDWARS_UNIVERSE_ID),
     placeId: presence.placeId ? Number(presence.placeId) : null,
     rootPlaceId: presence.rootPlaceId ? Number(presence.rootPlaceId) : null,
     universeId: presence.universeId ? Number(presence.universeId) : null,

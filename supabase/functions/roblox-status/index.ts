@@ -21,6 +21,7 @@ interface UserStatus {
   userId: number;
   username: string;
   isOnline: boolean;
+  isInGame: boolean;
   inBedwars: boolean;
   placeId: number | null;
   rootPlaceId: number | null;
@@ -103,9 +104,11 @@ async function fetchWithRetry(url: string, options: RequestInit = {}, retries = 
   }
 }
 
+const PRESENCE_API_URL = 'https://presence.roproxy.com/v1/presence/users';
+
 async function getUserPresence(userId: number): Promise<UserPresence> {
   const cookie = await getRobloxCookie();
-  const response = await fetchWithRetry('https://presence.roblox.com/v1/presence/users', {
+  const response = await fetchWithRetry(PRESENCE_API_URL, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
@@ -175,7 +178,8 @@ async function getUserStatus(userId: number): Promise<UserStatus> {
       userId,
       username,
       isOnline: presence ? [1, 2].includes(presence.userPresenceType) : false,
-      inBedwars: presence
+      isInGame: presence ? presence.userPresenceType === 2 : false,
+      inBedwars: presence && presence.userPresenceType === 2
         ? Number(presence.placeId) === BEDWARS_PLACE_ID ||
           Number(presence.rootPlaceId) === BEDWARS_PLACE_ID ||
           Number(presence.universeId) === BEDWARS_UNIVERSE_ID

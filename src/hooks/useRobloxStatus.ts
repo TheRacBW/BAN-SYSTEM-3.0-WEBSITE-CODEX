@@ -4,6 +4,7 @@ import { BEDWARS_PLACE_ID, BEDWARS_UNIVERSE_ID } from '../constants/bedwars';
 
 interface RobloxStatus {
   isOnline: boolean;
+  isInGame: boolean;
   inBedwars: boolean;
   lastUpdated: number;
   username: string;
@@ -98,11 +99,14 @@ export function useRobloxStatus(userId: number) {
           if (mounted) {
             setStatus({
               isOnline: data.isOnline,
+              isInGame: data.isInGame ?? (typeof data.placeId === 'number' || typeof data.universeId === 'number'),
               inBedwars: typeof data.inBedwars === 'boolean'
                 ? data.inBedwars
-                : data.placeId === BEDWARS_PLACE_ID ||
-                  data.rootPlaceId === BEDWARS_PLACE_ID ||
-                  data.universeId === BEDWARS_UNIVERSE_ID,
+                : (data.isInGame ?? false) && (
+                    data.placeId === BEDWARS_PLACE_ID ||
+                    data.rootPlaceId === BEDWARS_PLACE_ID ||
+                    data.universeId === BEDWARS_UNIVERSE_ID
+                  ),
               lastUpdated: data.lastUpdated || Date.now(),
               username: data.username || `User ${userId}`,
               placeId: data.placeId,
