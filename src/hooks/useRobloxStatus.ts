@@ -96,7 +96,9 @@ export function useRobloxStatus(userId: number) {
           if (mounted) {
             setStatus({
               isOnline: data.isOnline,
-              inBedwars: data.placeId === BEDWARS_PLACE_ID,
+              inBedwars: typeof data.inBedwars === 'boolean'
+                ? data.inBedwars
+                : data.placeId === BEDWARS_PLACE_ID,
               lastUpdated: data.lastUpdated || Date.now(),
               username: data.username || `User ${userId}`,
               placeId: data.placeId
