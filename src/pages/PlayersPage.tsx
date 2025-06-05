@@ -47,17 +47,18 @@ export default function PlayersPage() {
                 });
                 if (res.ok) {
                   const data = await res.json();
-                  return {
-                    ...acc,
-                    status: {
-                      isOnline: data.isOnline,
-                      inBedwars: data.inBedwars,
-                      placeId: data.placeId,
-                      universeId: data.universeId,
-                      username: data.username,
-                      lastUpdated: data.lastUpdated,
-                    },
-                  };
+                    return {
+                      ...acc,
+                      status: {
+                        isOnline: data.isOnline,
+                        inBedwars: data.inBedwars,
+                        placeId: data.placeId,
+                        rootPlaceId: data.rootPlaceId,
+                        universeId: data.universeId,
+                        username: data.username,
+                        lastUpdated: data.lastUpdated,
+                      },
+                    };
                 }
               } catch (err) {
                 console.error('Status fetch error', err);
@@ -213,13 +214,14 @@ export default function PlayersPage() {
       account.status?.isOnline
     );
 
-    const hasInBedwarsAccount =
-      !showInBedwarsOnly ||
-      player.accounts?.some(account =>
-        account.status?.inBedwars ||
-        account.status?.placeId === BEDWARS_PLACE_ID ||
-        account.status?.universeId === BEDWARS_UNIVERSE_ID
-      );
+      const hasInBedwarsAccount =
+        !showInBedwarsOnly ||
+        player.accounts?.some(account =>
+          account.status?.inBedwars ||
+          account.status?.placeId === BEDWARS_PLACE_ID ||
+          account.status?.rootPlaceId === BEDWARS_PLACE_ID ||
+          account.status?.universeId === BEDWARS_UNIVERSE_ID
+        );
 
     return matchesSearch && hasOnlineAccount && hasInBedwarsAccount;
   });

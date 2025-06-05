@@ -47,6 +47,7 @@ export default function RobloxStatus({ userId }: RobloxStatusProps) {
         
         {(status.inBedwars ||
           status.placeId === BEDWARS_PLACE_ID ||
+          status.rootPlaceId === BEDWARS_PLACE_ID ||
           status.universeId === BEDWARS_UNIVERSE_ID) && (
           <div className="flex items-center gap-1 text-blue-600 dark:text-blue-400">
             <Gamepad2 size={12} />

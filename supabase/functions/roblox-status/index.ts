@@ -23,6 +23,7 @@ interface UserStatus {
   isOnline: boolean;
   inBedwars: boolean;
   placeId: string | null;
+  rootPlaceId: string | null;
   universeId: string | null;
   lastUpdated: number;
 }
@@ -171,6 +172,7 @@ async function getUserStatus(userId: number): Promise<UserStatus> {
           presence.universeId === BEDWARS_UNIVERSE_ID
         : false,
       placeId: presence ? presence.placeId : null,
+      rootPlaceId: presence ? presence.rootPlaceId : null,
       universeId: presence ? presence.universeId : null,
       lastUpdated: Date.now()
     };

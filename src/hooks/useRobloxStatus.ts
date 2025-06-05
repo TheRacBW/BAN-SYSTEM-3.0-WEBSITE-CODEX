@@ -7,6 +7,7 @@ interface RobloxStatus {
   lastUpdated: number;
   username: string;
   placeId?: string;
+  rootPlaceId?: string;
   universeId?: string;
 }
 
@@ -101,10 +102,12 @@ export function useRobloxStatus(userId: number) {
               inBedwars: typeof data.inBedwars === 'boolean'
                 ? data.inBedwars
                 : data.placeId === BEDWARS_PLACE_ID ||
+                  data.rootPlaceId === BEDWARS_PLACE_ID ||
                   data.universeId === BEDWARS_UNIVERSE_ID,
               lastUpdated: data.lastUpdated || Date.now(),
               username: data.username || `User ${userId}`,
               placeId: data.placeId,
+              rootPlaceId: data.rootPlaceId,
               universeId: data.universeId
             });
             setError(null);
