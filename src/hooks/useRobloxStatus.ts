@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
+import { BEDWARS_PLACE_ID, BEDWARS_UNIVERSE_ID } from '../constants/bedwars';
 
 interface RobloxStatus {
   isOnline: boolean;
@@ -7,6 +8,7 @@ interface RobloxStatus {
   lastUpdated: number;
   username: string;
   placeId?: number;
+  rootPlaceId?: number;
   universeId?: number;
 }
 
@@ -17,8 +19,6 @@ export function useRobloxStatus(userId: number) {
   const [retryCount, setRetryCount] = useState(0);
   const MAX_RETRIES = 3;
   const RETRY_DELAY = 2000;
-  const BEDWARS_PLACE_ID = 6872265039;
-  const BEDWARS_UNIVERSE_ID = 2619619496;
 
   useEffect(() => {
     let timeoutId: ReturnType<typeof setTimeout> | undefined;
@@ -101,10 +101,12 @@ export function useRobloxStatus(userId: number) {
               inBedwars: typeof data.inBedwars === 'boolean'
                 ? data.inBedwars
                 : data.placeId === BEDWARS_PLACE_ID ||
+                  data.rootPlaceId === BEDWARS_PLACE_ID ||
                   data.universeId === BEDWARS_UNIVERSE_ID,
               lastUpdated: data.lastUpdated || Date.now(),
               username: data.username || `User ${userId}`,
               placeId: data.placeId,
+              rootPlaceId: data.rootPlaceId,
               universeId: data.universeId
             });
             setError(null);
