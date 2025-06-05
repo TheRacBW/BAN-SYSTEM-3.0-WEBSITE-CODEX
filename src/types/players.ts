@@ -20,6 +20,7 @@ export interface PlayerAccount {
   rank?: AccountRank;
   status?: {
     isOnline: boolean;
+    isInGame: boolean;
     inBedwars: boolean;
     placeId?: number;
     rootPlaceId?: number;
