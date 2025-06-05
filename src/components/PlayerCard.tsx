@@ -421,9 +421,9 @@ function PlayerCard({ player, onDelete, isAdmin }: PlayerCardProps) {
                   />
                 )}
                 {(account.status?.inBedwars ||
-                  account.status?.placeId === BEDWARS_PLACE_ID ||
-                  account.status?.rootPlaceId === BEDWARS_PLACE_ID ||
-                  account.status?.universeId === BEDWARS_UNIVERSE_ID) && (
+                  Number(account.status?.placeId) === BEDWARS_PLACE_ID ||
+                  Number(account.status?.rootPlaceId) === BEDWARS_PLACE_ID ||
+                  Number(account.status?.universeId) === BEDWARS_UNIVERSE_ID) && (
                   <img
                     src={BEDWARS_ICON_URL}
                     alt="BedWars"
@@ -547,9 +547,9 @@ function PlayerCard({ player, onDelete, isAdmin }: PlayerCardProps) {
                       </div>
                     )}
                     {(account.status?.inBedwars ||
-                      account.status?.placeId === BEDWARS_PLACE_ID ||
-                      account.status?.rootPlaceId === BEDWARS_PLACE_ID ||
-                      account.status?.universeId === BEDWARS_UNIVERSE_ID) && (
+                      Number(account.status?.placeId) === BEDWARS_PLACE_ID ||
+                      Number(account.status?.rootPlaceId) === BEDWARS_PLACE_ID ||
+                      Number(account.status?.universeId) === BEDWARS_UNIVERSE_ID) && (
                       <img
                         src={BEDWARS_ICON_URL}
                         alt="BedWars"
