@@ -1,4 +1,5 @@
 import { BEDWARS_PLACE_ID, BEDWARS_UNIVERSE_ID } from '../constants/bedwars';
+import { ROBLOX_HEADERS } from '../constants/robloxHeaders';
 
 interface UserPresence {
   userPresenceType: number;
@@ -26,7 +27,13 @@ const CACHE_DURATION = 60; // seconds
 const statusCache = new Map<number, UserStatus>();
 
 async function fetchJson(url: string, options: RequestInit = {}) {
-  const res = await fetch(url, options);
+  const res = await fetch(url, {
+    ...options,
+    headers: {
+      ...ROBLOX_HEADERS,
+      ...(options.headers || {})
+    }
+  });
   if (!res.ok) {
     throw new Error(`HTTP ${res.status}`);
   }
