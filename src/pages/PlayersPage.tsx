@@ -51,6 +51,7 @@ export default function PlayersPage() {
                       isOnline: data.isOnline,
                       inBedwars: data.inBedwars,
                       placeId: data.placeId,
+                      rootPlaceId: data.rootPlaceId,
                       universeId: data.universeId,
                       username: data.username,
                       lastUpdated: data.lastUpdated,
