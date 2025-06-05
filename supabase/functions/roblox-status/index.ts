@@ -1,4 +1,3 @@
-import { createClient } from 'npm:@supabase/supabase-js@2.39.7';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -24,6 +23,7 @@ interface UserStatus {
   isOnline: boolean;
   inBedwars: boolean;
   placeId: string | null;
+  universeId: string | null;
   lastUpdated: number;
 }
 
@@ -31,6 +31,8 @@ const CACHE_DURATION = 60; // Cache for 1 minute
 const MAX_RETRIES = 3;
 const INITIAL_RETRY_DELAY = 1000;
 const BEDWARS_PLACE_ID = '6872265039';
+const BEDWARS_UNIVERSE_ID = '2619619496';
+const ROBLOX_COOKIE = Deno.env.get('ROBLOX_COOKIE') || '';
 const REQUEST_TIMEOUT = 15000; // Increased to 15 seconds
 
 const statusCache = new Map<number, UserStatus>();
@@ -87,6 +89,7 @@ async function getUserPresence(userId: number): Promise<UserPresence> {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json'
+      , ...(ROBLOX_COOKIE ? { 'Cookie': '.ROBLOSECURITY=' + ROBLOX_COOKIE } : {})
     },
     body: JSON.stringify({
       userIds: [userId]
@@ -141,12 +144,14 @@ async function getUserStatus(userId: number): Promise<UserStatus> {
     const status: UserStatus = {
       userId,
       username,
-      isOnline: presence ? presence.userPresenceType !== 0 : false,
+      isOnline: presence ? [1, 2].includes(presence.userPresenceType) : false,
       inBedwars: presence
         ? presence.placeId === BEDWARS_PLACE_ID ||
-          presence.rootPlaceId === BEDWARS_PLACE_ID
+          presence.rootPlaceId === BEDWARS_PLACE_ID ||
+          presence.universeId === BEDWARS_UNIVERSE_ID
         : false,
       placeId: presence ? presence.placeId : null,
+      universeId: presence ? presence.universeId : null,
       lastUpdated: Date.now()
     };
 
