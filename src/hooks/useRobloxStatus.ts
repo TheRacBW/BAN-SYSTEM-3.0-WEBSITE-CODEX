@@ -19,7 +19,7 @@ export function useRobloxStatus(userId: number) {
   const BEDWARS_PLACE_ID = '6872265039';
 
   useEffect(() => {
-    let timeoutId: number;
+    let timeoutId: ReturnType<typeof setTimeout> | undefined;
     let mounted = true;
 
     const checkStatus = async () => {
@@ -45,7 +45,7 @@ export function useRobloxStatus(userId: number) {
         
         const controller = new AbortController();
         const timeoutDuration = 20000; // Increased to 20 seconds
-        let timeoutId = setTimeout(() => controller.abort(), timeoutDuration);
+        timeoutId = setTimeout(() => controller.abort(), timeoutDuration);
 
         try {
           const response = await fetch(`${apiUrl}?userId=${userId}`, {
