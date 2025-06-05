@@ -9,10 +9,10 @@ const corsHeaders = {
 interface UserPresence {
   userPresenceType: number;
   lastLocation: string;
-  placeId: string | null;
-  rootPlaceId: string | null;
+  placeId: string | number | null;
+  rootPlaceId: string | number | null;
   gameId: string | null;
-  universeId: string | null;
+  universeId: string | number | null;
   userId: number;
   lastOnline: string;
 }
@@ -32,14 +32,20 @@ const MAX_RETRIES = 3;
 const INITIAL_RETRY_DELAY = 1000;
 const BEDWARS_PLACE_ID = '6872265039';
 const BEDWARS_UNIVERSE_ID = '2619619496';
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+import { createClient } from '@supabase/supabase-js';
 
-const supabaseUrl = Deno.env.get('SUPABASE_URL') || '';
-const serviceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
+const supabaseUrl = typeof Deno !== 'undefined'
+  ? Deno.env.get('SUPABASE_URL') || ''
+  : process.env.SUPABASE_URL || '';
+const serviceKey = typeof Deno !== 'undefined'
+  ? Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || ''
+  : process.env.SUPABASE_SERVICE_ROLE_KEY || '';
 const supabase = createClient(supabaseUrl, serviceKey);
 
 async function getRobloxCookie(): Promise<string> {
-  const envCookie = Deno.env.get('ROBLOX_COOKIE');
+  const envCookie = typeof Deno !== 'undefined'
+    ? Deno.env.get('ROBLOX_COOKIE')
+    : process.env.ROBLOX_COOKIE;
   try {
     const { data } = await supabase
       .from('roblox_settings')
@@ -133,7 +139,7 @@ async function getUsernameFromId(userId: number): Promise<string> {
   return data.name;
 }
 
-async function getUserStatus(userId: number): Promise<UserStatus> {
+export async function getUserStatus(userId: number): Promise<UserStatus> {
   try {
     if (!userId || typeof userId !== 'number') {
       throw new Error('Invalid user ID provided');
@@ -161,17 +167,21 @@ async function getUserStatus(userId: number): Promise<UserStatus> {
       throw new Error(`Unable to find Roblox user with ID ${userId}`);
     }
 
+    const placeId = presence?.placeId != null ? String(presence.placeId) : null;
+    const rootPlaceId = presence?.rootPlaceId != null ? String(presence.rootPlaceId) : null;
+    const universeId = presence?.universeId != null ? String(presence.universeId) : null;
+
     const status: UserStatus = {
       userId,
       username,
       isOnline: presence ? [1, 2].includes(presence.userPresenceType) : false,
       inBedwars: presence
-        ? presence.placeId === BEDWARS_PLACE_ID ||
-          presence.rootPlaceId === BEDWARS_PLACE_ID ||
-          presence.universeId === BEDWARS_UNIVERSE_ID
+        ? placeId === BEDWARS_PLACE_ID ||
+          rootPlaceId === BEDWARS_PLACE_ID ||
+          universeId === BEDWARS_UNIVERSE_ID
         : false,
-      placeId: presence ? presence.placeId : null,
-      universeId: presence ? presence.universeId : null,
+      placeId,
+      universeId,
       lastUpdated: Date.now()
     };
 
@@ -184,7 +194,8 @@ async function getUserStatus(userId: number): Promise<UserStatus> {
   }
 }
 
-Deno.serve(async (req) => {
+if (typeof Deno !== 'undefined' && typeof Deno.serve === 'function') {
+  Deno.serve(async (req) => {
   // Handle CORS preflight
   if (req.method === 'OPTIONS') {
     return new Response(null, { 
@@ -252,4 +263,5 @@ Deno.serve(async (req) => {
       }
     );
   }
-});
+  });
+}
