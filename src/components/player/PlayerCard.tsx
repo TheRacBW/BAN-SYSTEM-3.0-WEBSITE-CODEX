@@ -11,6 +11,7 @@ import AddStrategyModal from './modals/AddStrategyModal';
 import RankClaimModal from './modals/RankClaimModal';
 import TeammateModal from './modals/TeammateModal';
 import EditPlayerModal from './modals/EditPlayerModal';
+import { useKits } from '../../context/KitContext';
 
 interface PlayerCardProps {
   player: Player;
@@ -20,8 +21,8 @@ interface PlayerCardProps {
 
 function PlayerCard({ player, onDelete, isAdmin }: PlayerCardProps) {
   const { user } = useAuth();
-  const { 
-    playerData, 
+  const {
+    playerData,
     refreshPlayerData,
     getAccountRank,
     handleDeleteAccount,
@@ -30,6 +31,7 @@ function PlayerCard({ player, onDelete, isAdmin }: PlayerCardProps) {
     handleAddTeammate,
     handleRemoveTeammate
   } = usePlayerData(player);
+  const { kits } = useKits();
 
   const [showModal, setShowModal] = useState(false);
   const [showAddAccountModal, setShowAddAccountModal] = useState(false);
@@ -37,6 +39,28 @@ function PlayerCard({ player, onDelete, isAdmin }: PlayerCardProps) {
   const [showRankClaimModal, setShowRankClaimModal] = useState(false);
   const [showTeammateModal, setShowTeammateModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
+
+  const getCommonKits = () => {
+    const kitUsage = new Map<string, number>();
+
+    playerData.strategies?.forEach(strategy => {
+      if (strategy.starred_kit_id) {
+        const count = kitUsage.get(strategy.starred_kit_id) || 0;
+        kitUsage.set(strategy.starred_kit_id, count + 1);
+      }
+    });
+
+    return Array.from(kitUsage.entries())
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 3)
+      .map(([kitId, count]) => ({
+        kit: kits.find(k => k.id === kitId)!,
+        count
+      }))
+      .filter(item => item.kit);
+  };
+
+  const commonKits = getCommonKits();
 
   if (!user) return null;
 
