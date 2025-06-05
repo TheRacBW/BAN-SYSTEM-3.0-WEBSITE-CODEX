@@ -25,8 +25,8 @@ import {
 
 const BEDWARS_ICON_URL =
   'https://cdn2.steamgriddb.com/icon/3ad9ecf4b4a26b7671e09283f001d626.png';
-const BEDWARS_PLACE_ID = '6872265039';
-const BEDWARS_UNIVERSE_ID = '2619619496';
+const BEDWARS_PLACE_ID = 6872265039;
+const BEDWARS_UNIVERSE_ID = 2619619496;
 
 interface PlayerCardProps {
   player: Player;

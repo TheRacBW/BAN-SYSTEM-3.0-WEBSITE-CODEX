@@ -21,8 +21,8 @@ export interface PlayerAccount {
   status?: {
     isOnline: boolean;
     inBedwars: boolean;
-    placeId?: string;
-    universeId?: string;
+    placeId?: number;
+    universeId?: number;
     username: string;
     lastUpdated: number;
   };

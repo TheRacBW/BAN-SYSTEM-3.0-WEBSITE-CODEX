@@ -2,8 +2,8 @@ import { useState, useEffect } from 'react';
 import { useRobloxStatus } from '../hooks/useRobloxStatus';
 import { CircleDot, CircleSlash, Gamepad2 } from 'lucide-react';
 
-const BEDWARS_PLACE_ID = '6872265039';
-const BEDWARS_UNIVERSE_ID = '2619619496';
+const BEDWARS_PLACE_ID = 6872265039;
+const BEDWARS_UNIVERSE_ID = 2619619496;
 
 interface RobloxStatusProps {
   userId: number;

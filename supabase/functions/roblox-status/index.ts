@@ -9,10 +9,10 @@ const corsHeaders = {
 interface UserPresence {
   userPresenceType: number;
   lastLocation: string;
-  placeId: string | null;
-  rootPlaceId: string | null;
+  placeId: number | null;
+  rootPlaceId: number | null;
   gameId: string | null;
-  universeId: string | null;
+  universeId: number | null;
   userId: number;
   lastOnline: string;
 }
@@ -22,16 +22,16 @@ interface UserStatus {
   username: string;
   isOnline: boolean;
   inBedwars: boolean;
-  placeId: string | null;
-  universeId: string | null;
+  placeId: number | null;
+  universeId: number | null;
   lastUpdated: number;
 }
 
 const CACHE_DURATION = 60; // Cache for 1 minute
 const MAX_RETRIES = 3;
 const INITIAL_RETRY_DELAY = 1000;
-const BEDWARS_PLACE_ID = '6872265039';
-const BEDWARS_UNIVERSE_ID = '2619619496';
+const BEDWARS_PLACE_ID = 6872265039;
+const BEDWARS_UNIVERSE_ID = 2619619496;
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 
 const supabaseUrl = Deno.env.get('SUPABASE_URL') || '';
@@ -166,12 +166,12 @@ async function getUserStatus(userId: number): Promise<UserStatus> {
       username,
       isOnline: presence ? [1, 2].includes(presence.userPresenceType) : false,
       inBedwars: presence
-        ? presence.placeId === BEDWARS_PLACE_ID ||
-          presence.rootPlaceId === BEDWARS_PLACE_ID ||
-          presence.universeId === BEDWARS_UNIVERSE_ID
+        ? Number(presence.placeId) === BEDWARS_PLACE_ID ||
+          Number(presence.rootPlaceId) === BEDWARS_PLACE_ID ||
+          Number(presence.universeId) === BEDWARS_UNIVERSE_ID
         : false,
-      placeId: presence ? presence.placeId : null,
-      universeId: presence ? presence.universeId : null,
+      placeId: presence ? Number(presence.placeId) : null,
+      universeId: presence ? Number(presence.universeId) : null,
       lastUpdated: Date.now()
     };
 

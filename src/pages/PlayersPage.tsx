@@ -6,8 +6,8 @@ import { Player, SortOption, RANK_VALUES } from '../types/players';
 import { Plus, Search, Users, Gamepad2, ArrowUpDown } from 'lucide-react';
 import PlayerCard from '../components/PlayerCard';
 
-const BEDWARS_PLACE_ID = '6872265039';
-const BEDWARS_UNIVERSE_ID = '2619619496';
+const BEDWARS_PLACE_ID = 6872265039;
+const BEDWARS_UNIVERSE_ID = 2619619496;
 
 export default function PlayersPage() {
   const navigate = useNavigate();
