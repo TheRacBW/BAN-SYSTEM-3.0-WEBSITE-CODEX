@@ -32,7 +32,26 @@ const MAX_RETRIES = 3;
 const INITIAL_RETRY_DELAY = 1000;
 const BEDWARS_PLACE_ID = '6872265039';
 const BEDWARS_UNIVERSE_ID = '2619619496';
-const ROBLOX_COOKIE = Deno.env.get('ROBLOX_COOKIE') || '';
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+
+const supabaseUrl = Deno.env.get('SUPABASE_URL') || '';
+const serviceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
+const supabase = createClient(supabaseUrl, serviceKey);
+
+async function getRobloxCookie(): Promise<string> {
+  const envCookie = Deno.env.get('ROBLOX_COOKIE');
+  try {
+    const { data } = await supabase
+      .from('roblox_settings')
+      .select('cookie')
+      .eq('id', 'global')
+      .single();
+    return data?.cookie || envCookie || '';
+  } catch (_err) {
+    return envCookie || '';
+  }
+}
+
 const REQUEST_TIMEOUT = 15000; // Increased to 15 seconds
 
 const statusCache = new Map<number, UserStatus>();
@@ -85,11 +104,12 @@ async function fetchWithRetry(url: string, options: RequestInit = {}, retries = 
 }
 
 async function getUserPresence(userId: number): Promise<UserPresence> {
+  const cookie = await getRobloxCookie();
   const response = await fetchWithRetry('https://presence.roblox.com/v1/presence/users', {
     method: 'POST',
     headers: {
-      'Content-Type': 'application/json'
-      , ...(ROBLOX_COOKIE ? { 'Cookie': '.ROBLOSECURITY=' + ROBLOX_COOKIE } : {})
+      'Content-Type': 'application/json',
+      ...(cookie ? { 'Cookie': '.ROBLOSECURITY=' + cookie } : {})
     },
     body: JSON.stringify({
       userIds: [userId]
