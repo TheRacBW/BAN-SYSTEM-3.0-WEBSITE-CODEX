@@ -6,6 +6,7 @@ import { Shield, Users, Swords, Settings, Plus, X, Edit2 } from 'lucide-react';
 import { Kit, KitType } from '../types';
 import KitCard from '../components/KitCard';
 import AdSettingsPanel from '../components/AdSettingsPanel';
+import RobloxCookiePanel from '../components/RobloxCookiePanel';
 
 interface AdminStats {
   totalUsers: number;
@@ -26,6 +27,7 @@ const AdminPage = () => {
   const [showKitModal, setShowKitModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
   const [kits, setKits] = useState<Kit[]>([]);
+  const [kitSearch, setKitSearch] = useState('');
   const [newKit, setNewKit] = useState<Partial<Kit>>({
     name: '',
     imageUrl: '',
@@ -190,6 +192,10 @@ const AdminPage = () => {
     setShowEditModal(true);
   };
 
+  const filteredKits = kits.filter(k =>
+    k.name.toLowerCase().includes(kitSearch.toLowerCase())
+  );
+
   if (!user || !isAdmin) {
     return <Navigate to="/" replace />;
   }
@@ -256,6 +262,10 @@ const AdminPage = () => {
 
       <div className="space-y-8">
         <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
+          <RobloxCookiePanel />
+        </div>
+
+        <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
           <AdSettingsPanel />
         </div>
 
@@ -283,8 +293,18 @@ const AdminPage = () => {
             </div>
           )}
 
+          <div className="mb-4">
+            <input
+              type="text"
+              value={kitSearch}
+              onChange={(e) => setKitSearch(e.target.value)}
+              placeholder="Search kits..."
+              className="w-full p-2 border rounded dark:bg-gray-700 dark:border-gray-600"
+            />
+          </div>
+
           <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4">
-            {kits.map(kit => (
+            {filteredKits.map(kit => (
               <div key={kit.id} className="relative group">
                 <KitCard kit={kit} />
                 <div className="absolute top-2 right-2 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
