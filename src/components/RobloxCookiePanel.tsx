@@ -27,20 +27,37 @@ const RobloxCookiePanel: React.FC = () => {
     fetchCookie();
   }, []);
 
+  const verifyCookie = async (value: string): Promise<string> => {
+    const res = await fetch('https://users.roblox.com/v1/users/authenticated', {
+      headers: {
+        Cookie: `.ROBLOSECURITY=${value}`,
+        'User-Agent': 'Roblox/WinInet'
+      }
+    });
+    if (!res.ok) {
+      throw new Error(`Cookie verification failed (${res.status})`);
+    }
+    const data = await res.json();
+    return data.name as string;
+  };
+
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
     setSuccess(null);
+    const trimmed = cookie.trim();
     try {
+      const username = await verifyCookie(trimmed);
       const { error } = await supabase
         .from('roblox_settings')
-        .upsert({ id: 'global', cookie, updated_at: new Date().toISOString() });
+        .upsert({ id: 'global', cookie: trimmed, updated_at: new Date().toISOString() });
       if (error) throw error;
-      setSuccess('Cookie saved successfully');
+      setSuccess(`Cookie saved for ${username}`);
       setTimeout(() => setSuccess(null), 3000);
     } catch (err) {
       console.error('Error saving cookie:', err);
-      setError('Failed to save cookie');
+      const message = err instanceof Error ? err.message : 'Failed to save cookie';
+      setError(message);
     }
   };
 

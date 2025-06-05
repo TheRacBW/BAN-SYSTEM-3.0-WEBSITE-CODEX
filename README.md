@@ -13,3 +13,23 @@ Set the cookie in your deployment environment using the `ROBLOX_COOKIE` variable
 ```bash
 export ROBLOX_COOKIE=your_roblox_cookie_here
 ```
+
+### Verify your cookie
+
+Before saving, you can ensure the `.ROBLOSECURITY` cookie works by hitting the
+`https://users.roblox.com/v1/users/authenticated` endpoint with the `Roblox/WinInet`
+user agent. A quick Node snippet:
+
+```typescript
+import axios from 'axios';
+
+axios.get('https://users.roblox.com/v1/users/authenticated', {
+  headers: {
+    Cookie: `.ROBLOSECURITY=${yourCookie}`,
+    'User-Agent': 'Roblox/WinInet'
+  }
+}).then(r => console.log('Logged in as', r.data.name))
+  .catch(e => console.log('Failed -', e.response?.status));
+```
+
+The cookie must start with `_|WARNING:` and be copied exactly from your browser.
