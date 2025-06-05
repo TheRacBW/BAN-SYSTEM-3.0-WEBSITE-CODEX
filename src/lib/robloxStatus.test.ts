@@ -36,6 +36,7 @@ describe('getUserStatus', () => {
     expect(fetchMock.mock.calls[0][0]).toContain('roblox-proxy.theraccoonmolester.workers.dev');
     expect(status.isInGame).toBe(true);
     expect(status.inBedwars).toBe(true);
+    expect(status.presenceMethod).toBe('primary');
     expect(status.placeId).toBe(BEDWARS_PLACE_ID);
     expect(status.rootPlaceId).toBe(BEDWARS_PLACE_ID);
     expect(status.universeId).toBe(BEDWARS_UNIVERSE_ID);

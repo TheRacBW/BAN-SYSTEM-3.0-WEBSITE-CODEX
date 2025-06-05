@@ -420,10 +420,11 @@ function PlayerCard({ player, onDelete, isAdmin }: PlayerCardProps) {
                     title="Rank unknown"
                   />
                 )}
-                {(account.status?.inBedwars ||
-                  Number(account.status?.placeId) === BEDWARS_PLACE_ID ||
-                  Number(account.status?.rootPlaceId) === BEDWARS_PLACE_ID ||
-                  Number(account.status?.universeId) === BEDWARS_UNIVERSE_ID) && (
+                {account.status?.isInGame &&
+                  (account.status?.inBedwars ||
+                    Number(account.status?.placeId) === BEDWARS_PLACE_ID ||
+                    Number(account.status?.rootPlaceId) === BEDWARS_PLACE_ID ||
+                    Number(account.status?.universeId) === BEDWARS_UNIVERSE_ID) && (
                   <img
                     src={BEDWARS_ICON_URL}
                     alt="BedWars"
@@ -546,10 +547,11 @@ function PlayerCard({ player, onDelete, isAdmin }: PlayerCardProps) {
                         <span className="text-sm">Rank unknown</span>
                       </div>
                     )}
-                    {(account.status?.inBedwars ||
-                      Number(account.status?.placeId) === BEDWARS_PLACE_ID ||
-                      Number(account.status?.rootPlaceId) === BEDWARS_PLACE_ID ||
-                      Number(account.status?.universeId) === BEDWARS_UNIVERSE_ID) && (
+                    {account.status?.isInGame &&
+                      (account.status?.inBedwars ||
+                        Number(account.status?.placeId) === BEDWARS_PLACE_ID ||
+                        Number(account.status?.rootPlaceId) === BEDWARS_PLACE_ID ||
+                        Number(account.status?.universeId) === BEDWARS_UNIVERSE_ID) && (
                       <img
                         src={BEDWARS_ICON_URL}
                         alt="BedWars"
