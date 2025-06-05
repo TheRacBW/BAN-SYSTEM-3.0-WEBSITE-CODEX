@@ -69,7 +69,7 @@ const RobloxCookiePanel: React.FC = () => {
     setTesting(true);
     setTestResult(null);
     setTestError(null);
-    const TEST_USER_ID = 1;
+    const TEST_USER_ID = 77146135;
     try {
       const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
       const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
