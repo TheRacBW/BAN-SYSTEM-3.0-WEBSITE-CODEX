@@ -51,6 +51,8 @@ export default function PlayersPage() {
                       inBedwars: data.inBedwars,
                       username: data.username,
                       lastUpdated: data.lastUpdated,
+                      placeId: data.placeId,
+                      universeId: data.universeId,
                     },
                   };
                 }

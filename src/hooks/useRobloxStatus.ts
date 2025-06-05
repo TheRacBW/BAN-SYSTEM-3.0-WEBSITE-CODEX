@@ -7,6 +7,7 @@ interface RobloxStatus {
   lastUpdated: number;
   username: string;
   placeId?: string;
+  universeId?: string;
 }
 
 export function useRobloxStatus(userId: number) {
@@ -17,6 +18,7 @@ export function useRobloxStatus(userId: number) {
   const MAX_RETRIES = 3;
   const RETRY_DELAY = 2000;
   const BEDWARS_PLACE_ID = '6872265039';
+  const BEDWARS_UNIVERSE_ID = '2619619496';
 
   useEffect(() => {
     let timeoutId: ReturnType<typeof setTimeout> | undefined;
@@ -96,10 +98,14 @@ export function useRobloxStatus(userId: number) {
           if (mounted) {
             setStatus({
               isOnline: data.isOnline,
-              inBedwars: data.placeId === BEDWARS_PLACE_ID,
+              inBedwars: typeof data.inBedwars === 'boolean'
+                ? data.inBedwars
+                : data.placeId === BEDWARS_PLACE_ID ||
+                  data.universeId === BEDWARS_UNIVERSE_ID,
               lastUpdated: data.lastUpdated || Date.now(),
               username: data.username || `User ${userId}`,
-              placeId: data.placeId
+              placeId: data.placeId,
+              universeId: data.universeId
             });
             setError(null);
             setRetryCount(0);
