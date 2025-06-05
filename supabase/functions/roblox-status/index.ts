@@ -32,6 +32,7 @@ const CACHE_DURATION = 60; // Cache for 1 minute
 const MAX_RETRIES = 3;
 const INITIAL_RETRY_DELAY = 1000;
 import { BEDWARS_PLACE_ID, BEDWARS_UNIVERSE_ID } from '../../src/constants/bedwars.ts';
+import { ROBLOX_HEADERS } from '../../src/constants/robloxHeaders.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 
 const supabaseUrl = Deno.env.get('SUPABASE_URL') || '';
@@ -65,9 +66,8 @@ async function fetchWithTimeout(url: string, options: RequestInit = {}): Promise
       ...options,
       signal: controller.signal,
       headers: {
-        ...options.headers,
-        'User-Agent': 'Roblox/Status/Checker',
-        'Accept': 'application/json'
+        ...ROBLOX_HEADERS,
+        ...(options.headers || {})
       }
     });
     clearTimeout(id);
