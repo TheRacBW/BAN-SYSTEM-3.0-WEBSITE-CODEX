@@ -2,6 +2,9 @@ import { useState, useEffect } from 'react';
 import { useRobloxStatus } from '../hooks/useRobloxStatus';
 import { CircleDot, CircleSlash, Gamepad2 } from 'lucide-react';
 
+const BEDWARS_PLACE_ID = '6872265039';
+const BEDWARS_UNIVERSE_ID = '2619619496';
+
 interface RobloxStatusProps {
   userId: number;
 }
@@ -42,7 +45,9 @@ export default function RobloxStatus({ userId }: RobloxStatusProps) {
           </span>
         </div>
         
-        {status.inBedwars && (
+        {(status.inBedwars ||
+          status.placeId === BEDWARS_PLACE_ID ||
+          status.universeId === BEDWARS_UNIVERSE_ID) && (
           <div className="flex items-center gap-1 text-blue-600 dark:text-blue-400">
             <Gamepad2 size={12} />
             <span>In Bedwars</span>
