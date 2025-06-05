@@ -33,7 +33,7 @@ describe('getUserStatus', () => {
     global.fetch = fetchMock;
 
     const status = await getUserStatus(1);
-    expect(fetchMock.mock.calls[0][0]).toContain('presence.roproxy.com');
+    expect(fetchMock.mock.calls[0][0]).toContain('roblox-proxy.theraccoonmolester.workers.dev');
     expect(status.isInGame).toBe(true);
     expect(status.inBedwars).toBe(true);
     expect(status.placeId).toBe(BEDWARS_PLACE_ID);

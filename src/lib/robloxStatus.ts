@@ -41,21 +41,33 @@ async function fetchJson(url: string, options: RequestInit = {}) {
   return res.json();
 }
 
-const PRESENCE_API_URL = 'https://presence.roproxy.com/v1/presence/users';
+const PRESENCE_API_PRIMARY =
+  'https://roblox-proxy.theraccoonmolester.workers.dev/presence/v1/presence/users';
+const PRESENCE_API_FALLBACK =
+  'https://presence.roproxy.com/v1/presence/users';
 
 async function getUserPresence(userId: number, cookie?: string): Promise<UserPresence> {
-  const data = await fetchJson(PRESENCE_API_URL, {
+  const options = {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
       ...(cookie ? { Cookie: '.ROBLOSECURITY=' + cookie } : {})
     },
     body: JSON.stringify({ userIds: [userId] })
-  });
-  if (!data.userPresences?.[0]) {
-    throw new Error('No presence data');
+  } as const;
+
+  for (const url of [PRESENCE_API_PRIMARY, PRESENCE_API_FALLBACK]) {
+    try {
+      const data = await fetchJson(url, options);
+      if (data.userPresences?.[0]) {
+        return data.userPresences[0];
+      }
+    } catch {
+      // try next url
+    }
   }
-  return data.userPresences[0];
+
+  throw new Error('No presence data');
 }
 
 async function getUsernameFromId(userId: number): Promise<string> {
