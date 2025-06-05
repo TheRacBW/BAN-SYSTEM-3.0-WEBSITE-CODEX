@@ -23,6 +23,8 @@ export interface PlayerAccount {
     inBedwars: boolean;
     username: string;
     lastUpdated: number;
+    placeId?: string | null;
+    universeId?: string | null;
   };
 }
 

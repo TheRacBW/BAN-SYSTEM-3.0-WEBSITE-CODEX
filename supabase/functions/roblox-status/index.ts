@@ -24,6 +24,7 @@ interface UserStatus {
   isOnline: boolean;
   inBedwars: boolean;
   placeId: string | null;
+  universeId: string | null;
   lastUpdated: number;
 }
 
@@ -31,6 +32,7 @@ const CACHE_DURATION = 60; // Cache for 1 minute
 const MAX_RETRIES = 3;
 const INITIAL_RETRY_DELAY = 1000;
 const BEDWARS_PLACE_ID = '6872265039';
+const BEDWARS_UNIVERSE_ID = '2619619496';
 const REQUEST_TIMEOUT = 15000; // Increased to 15 seconds
 
 const statusCache = new Map<number, UserStatus>();
@@ -144,9 +146,11 @@ async function getUserStatus(userId: number): Promise<UserStatus> {
       isOnline: presence ? presence.userPresenceType !== 0 : false,
       inBedwars: presence
         ? presence.placeId === BEDWARS_PLACE_ID ||
-          presence.rootPlaceId === BEDWARS_PLACE_ID
+          presence.rootPlaceId === BEDWARS_PLACE_ID ||
+          presence.universeId === BEDWARS_UNIVERSE_ID
         : false,
       placeId: presence ? presence.placeId : null,
+      universeId: presence ? presence.universeId : null,
       lastUpdated: Date.now()
     };
 
