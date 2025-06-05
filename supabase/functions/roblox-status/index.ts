@@ -30,8 +30,7 @@ interface UserStatus {
 const CACHE_DURATION = 60; // Cache for 1 minute
 const MAX_RETRIES = 3;
 const INITIAL_RETRY_DELAY = 1000;
-const BEDWARS_PLACE_ID = '6872265039';
-const BEDWARS_UNIVERSE_ID = '2619619496';
+import { BEDWARS_PLACE_ID, BEDWARS_UNIVERSE_ID } from '../../src/constants/bedwars.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 
 const supabaseUrl = Deno.env.get('SUPABASE_URL') || '';

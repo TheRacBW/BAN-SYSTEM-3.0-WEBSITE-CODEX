@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
+import { BEDWARS_PLACE_ID, BEDWARS_UNIVERSE_ID } from '../constants/bedwars';
 
 interface RobloxStatus {
   isOnline: boolean;
@@ -17,8 +18,6 @@ export function useRobloxStatus(userId: number) {
   const [retryCount, setRetryCount] = useState(0);
   const MAX_RETRIES = 3;
   const RETRY_DELAY = 2000;
-  const BEDWARS_PLACE_ID = '6872265039';
-  const BEDWARS_UNIVERSE_ID = '2619619496';
 
   useEffect(() => {
     let timeoutId: ReturnType<typeof setTimeout> | undefined;
