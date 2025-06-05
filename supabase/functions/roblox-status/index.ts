@@ -23,6 +23,7 @@ interface UserStatus {
   isOnline: boolean;
   inBedwars: boolean;
   placeId: number | null;
+  rootPlaceId: number | null;
   universeId: number | null;
   lastUpdated: number;
 }
@@ -30,8 +31,7 @@ interface UserStatus {
 const CACHE_DURATION = 60; // Cache for 1 minute
 const MAX_RETRIES = 3;
 const INITIAL_RETRY_DELAY = 1000;
-const BEDWARS_PLACE_ID = 6872265039;
-const BEDWARS_UNIVERSE_ID = 2619619496;
+import { BEDWARS_PLACE_ID, BEDWARS_UNIVERSE_ID } from '../../src/constants/bedwars.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 
 const supabaseUrl = Deno.env.get('SUPABASE_URL') || '';
@@ -181,6 +181,7 @@ async function getUserStatus(userId: number): Promise<UserStatus> {
           Number(presence.universeId) === BEDWARS_UNIVERSE_ID
         : false,
       placeId: presence ? Number(presence.placeId) : null,
+      rootPlaceId: presence ? Number(presence.rootPlaceId) : null,
       universeId: presence ? Number(presence.universeId) : null,
       lastUpdated: Date.now()
     };
@@ -194,7 +195,8 @@ async function getUserStatus(userId: number): Promise<UserStatus> {
   }
 }
 
-Deno.serve(async (req) => {
+if (import.meta.main) {
+  Deno.serve(async (req) => {
   // Handle CORS preflight
   if (req.method === 'OPTIONS') {
     return new Response(null, { 
@@ -262,4 +264,7 @@ Deno.serve(async (req) => {
       }
     );
   }
-});
+  });
+}
+
+export { getUserStatus };
