@@ -23,6 +23,9 @@ import {
   Star
 } from 'lucide-react';
 
+const BEDWARS_ICON_URL =
+  'https://cdn2.steamgriddb.com/icon/3ad9ecf4b4a26b7671e09283f001d626.png';
+
 interface PlayerCardProps {
   player: Player;
   onDelete?: (playerId: string) => void;
@@ -39,6 +42,9 @@ function PlayerCard({ player, onDelete, isAdmin }: PlayerCardProps) {
   const [showTeammateModal, setShowTeammateModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
   const [editingAlias, setEditingAlias] = useState(player.alias);
+  const [editingYoutubeChannel, setEditingYoutubeChannel] = useState(
+    player.youtube_channel || ''
+  );
   const [newUserId, setNewUserId] = useState('');
   const [selectedKits, setSelectedKits] = useState<string[]>([]);
   const [starredKitId, setStarredKitId] = useState<string | null>(null);
@@ -365,7 +371,10 @@ function PlayerCard({ player, onDelete, isAdmin }: PlayerCardProps) {
     try {
       const { error } = await supabase
         .from('players')
-        .update({ alias: editingAlias.trim() })
+        .update({
+          alias: editingAlias.trim(),
+          youtube_channel: editingYoutubeChannel.trim() || null,
+        })
         .eq('id', player.id);
 
       if (error) throw error;
@@ -397,17 +406,25 @@ function PlayerCard({ player, onDelete, isAdmin }: PlayerCardProps) {
               <div key={account.id} className="flex items-center gap-2">
                 <RobloxStatus userId={account.user_id} />
                 {getAccountRank(account) ? (
-                  <img 
-                    src={getAccountRank(account)?.image_url} 
+                  <img
+                    src={getAccountRank(account)?.image_url}
                     alt={getAccountRank(account)?.name}
                     className="w-6 h-6"
                     title={getAccountRank(account)?.name}
                   />
                 ) : (
-                  <HelpCircle 
-                    size={16} 
+                  <HelpCircle
+                    size={16}
                     className="text-gray-400"
                     title="Rank unknown"
+                  />
+                )}
+                {account.status?.inBedwars && (
+                  <img
+                    src={BEDWARS_ICON_URL}
+                    alt="BedWars"
+                    className="w-6 h-6"
+                    title="In Bedwars"
                   />
                 )}
               </div>
@@ -513,8 +530,8 @@ function PlayerCard({ player, onDelete, isAdmin }: PlayerCardProps) {
                       <RobloxStatus userId={account.user_id} />
                     </div>
                     {getAccountRank(account) ? (
-                      <img 
-                        src={getAccountRank(account)?.image_url} 
+                      <img
+                        src={getAccountRank(account)?.image_url}
                         alt={getAccountRank(account)?.name}
                         className="w-8 h-8"
                         title={getAccountRank(account)?.name}
@@ -524,6 +541,14 @@ function PlayerCard({ player, onDelete, isAdmin }: PlayerCardProps) {
                         <HelpCircle size={18} />
                         <span className="text-sm">Rank unknown</span>
                       </div>
+                    )}
+                    {account.status?.inBedwars && (
+                      <img
+                        src={BEDWARS_ICON_URL}
+                        alt="BedWars"
+                        className="w-8 h-8"
+                        title="In Bedwars"
+                      />
                     )}
                   </div>
 
@@ -1009,13 +1034,25 @@ function PlayerCard({ player, onDelete, isAdmin }: PlayerCardProps) {
             <label className="block text-sm font-medium mb-1">
               Player Alias
             </label>
-            <input
-              type="text"
-              value={editingAlias}
-              onChange={(e) => setEditingAlias(e.target.value)}
-              className="w-full p-2 border rounded dark:bg-gray-700 dark:border-gray-600"
-            />
-          </div>
+          <input
+            type="text"
+            value={editingAlias}
+            onChange={(e) => setEditingAlias(e.target.value)}
+            className="w-full p-2 border rounded dark:bg-gray-700 dark:border-gray-600"
+          />
+        </div>
+
+        <div>
+          <label className="block text-sm font-medium mb-1">
+            YouTube Channel (Optional)
+          </label>
+          <input
+            type="text"
+            value={editingYoutubeChannel}
+            onChange={(e) => setEditingYoutubeChannel(e.target.value)}
+            className="w-full p-2 border rounded dark:bg-gray-700 dark:border-gray-600"
+          />
+        </div>
 
           <div className="flex justify-end gap-3">
             <button

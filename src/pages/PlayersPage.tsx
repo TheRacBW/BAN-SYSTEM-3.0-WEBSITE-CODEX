@@ -27,6 +27,50 @@ export default function PlayersPage() {
     }
   }, [user]);
 
+  const fetchAccountStatuses = async (playersList: Player[]) => {
+    try {
+      const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+      const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+      if (!supabaseUrl || !supabaseKey) return playersList;
+      const apiUrl = `${supabaseUrl}/functions/v1/roblox-status`;
+
+      const updatedPlayers = await Promise.all(
+        playersList.map(async player => {
+          const updatedAccounts = await Promise.all(
+            (player.accounts || []).map(async acc => {
+              try {
+                const res = await fetch(`${apiUrl}?userId=${acc.user_id}`, {
+                  headers: { Authorization: `Bearer ${supabaseKey}` },
+                });
+                if (res.ok) {
+                  const data = await res.json();
+                  return {
+                    ...acc,
+                    status: {
+                      isOnline: data.isOnline,
+                      inBedwars: data.inBedwars,
+                      username: data.username,
+                      lastUpdated: data.lastUpdated,
+                    },
+                  };
+                }
+              } catch (err) {
+                console.error('Status fetch error', err);
+              }
+              return acc;
+            })
+          );
+          return { ...player, accounts: updatedAccounts };
+        })
+      );
+
+      return updatedPlayers;
+    } catch (error) {
+      console.error('Error fetching statuses', error);
+      return playersList;
+    }
+  };
+
   const fetchPlayers = async () => {
     try {
       const { data: playersData, error: playersError } = await supabase
@@ -56,16 +100,18 @@ export default function PlayersPage() {
 
       if (playersError) throw playersError;
 
-      const formattedPlayers = playersData?.map(player => ({
-        ...player,
-        created_at: new Date(player.created_at),
-        updated_at: new Date(player.updated_at),
-        accounts: player.accounts || [],
-        teammates: player.teammates || [],
-        strategies: player.strategies || []
-      })) || [];
+      const formattedPlayers =
+        playersData?.map(player => ({
+          ...player,
+          created_at: new Date(player.created_at),
+          updated_at: new Date(player.updated_at),
+          accounts: player.accounts || [],
+          teammates: player.teammates || [],
+          strategies: player.strategies || [],
+        })) || [];
 
-      setPlayers(formattedPlayers);
+      const playersWithStatus = await fetchAccountStatuses(formattedPlayers);
+      setPlayers(playersWithStatus);
     } catch (error) {
       console.error('Error fetching players:', error);
       setError('Failed to load players');
