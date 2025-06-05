@@ -161,6 +161,16 @@ async function getUserStatus(userId: number): Promise<UserStatus> {
       throw new Error(`Unable to find Roblox user with ID ${userId}`);
     }
 
+    if (
+      presence &&
+      [1, 2].includes(presence.userPresenceType) &&
+      (!presence.placeId || !presence.universeId)
+    ) {
+      console.warn(
+        'Presence API response lacked placeId or universeId; ROBLOX_COOKIE may be invalid.'
+      );
+    }
+
     const status: UserStatus = {
       userId,
       username,
