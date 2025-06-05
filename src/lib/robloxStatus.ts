@@ -12,6 +12,11 @@ interface UserPresence {
   lastOnline: string;
 }
 
+interface PresenceResult {
+  presence: UserPresence;
+  method: 'primary' | 'fallback';
+}
+
 export interface UserStatus {
   userId: number;
   username: string;
@@ -22,6 +27,7 @@ export interface UserStatus {
   rootPlaceId: number | null;
   universeId: number | null;
   lastUpdated: number;
+  presenceMethod: 'primary' | 'fallback';
 }
 
 const CACHE_DURATION = 60; // seconds
@@ -46,7 +52,7 @@ const PRESENCE_API_PRIMARY =
 const PRESENCE_API_FALLBACK =
   'https://presence.roproxy.com/v1/presence/users';
 
-async function getUserPresence(userId: number, cookie?: string): Promise<UserPresence> {
+async function getUserPresence(userId: number, cookie?: string): Promise<PresenceResult> {
   const options = {
     method: 'POST',
     headers: {
@@ -56,11 +62,16 @@ async function getUserPresence(userId: number, cookie?: string): Promise<UserPre
     body: JSON.stringify({ userIds: [userId] })
   } as const;
 
-  for (const url of [PRESENCE_API_PRIMARY, PRESENCE_API_FALLBACK]) {
+  const urls: [string, 'primary' | 'fallback'][] = [
+    [PRESENCE_API_PRIMARY, 'primary'],
+    [PRESENCE_API_FALLBACK, 'fallback']
+  ];
+
+  for (const [url, method] of urls) {
     try {
       const data = await fetchJson(url, options);
       if (data.userPresences?.[0]) {
-        return data.userPresences[0];
+        return { presence: data.userPresences[0], method };
       }
     } catch {
       // try next url
@@ -82,10 +93,13 @@ export async function getUserStatus(userId: number, cookie?: string): Promise<Us
     return cached;
   }
 
-  const [presence, username] = await Promise.all([
+  const [presenceResult, username] = await Promise.all([
     getUserPresence(userId, cookie),
     getUsernameFromId(userId)
   ]);
+
+  const presence = presenceResult.presence;
+  const presenceMethod = presenceResult.method;
 
   const status: UserStatus = {
     userId,
@@ -100,7 +114,8 @@ export async function getUserStatus(userId: number, cookie?: string): Promise<Us
     placeId: presence.placeId ? Number(presence.placeId) : null,
     rootPlaceId: presence.rootPlaceId ? Number(presence.rootPlaceId) : null,
     universeId: presence.universeId ? Number(presence.universeId) : null,
-    lastUpdated: Date.now()
+    lastUpdated: Date.now(),
+    presenceMethod
   };
   statusCache.set(userId, status);
   return status;

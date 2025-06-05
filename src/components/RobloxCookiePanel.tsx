@@ -173,9 +173,14 @@ const RobloxCookiePanel: React.FC = () => {
                 {testError}
               </div>
             ) : (
-              <pre className="text-sm whitespace-pre-wrap break-all">
-                {JSON.stringify(testResult, null, 2)}
-              </pre>
+              <div className="space-y-2">
+                {testResult?.presenceMethod && (
+                  <p className="text-sm">Used API: {testResult.presenceMethod}</p>
+                )}
+                <pre className="text-sm whitespace-pre-wrap break-all">
+                  {JSON.stringify(testResult, null, 2)}
+                </pre>
+              </div>
             )}
           </div>
         </div>
