@@ -176,12 +176,18 @@ const RobloxCookiePanel: React.FC = () => {
               <div className="space-y-2">
                 {testResult?.presenceMethod && (
                   <p className="text-sm">
-                    Used API:{' '}
-                    {testResult.presenceMethod === 'primary'
-                      ? 'roblox-proxy.theraccoonmolester.workers.dev'
-                      : testResult.presenceMethod === 'fallback'
-                      ? 'presence.roproxy.com'
-                      : testResult.presenceMethod}
+                    <span
+                      className="underline decoration-dotted cursor-help"
+                      title={`Used API: ${
+                        testResult.presenceMethod === 'primary'
+                          ? 'roblox-proxy.theraccoonmolester.workers.dev'
+                          : testResult.presenceMethod === 'fallback'
+                          ? 'presence.roproxy.com'
+                          : 'presence.roblox.com'
+                      }`}
+                    >
+                      API Method: {testResult.presenceMethod}
+                    </span>
                   </p>
                 )}
                 <pre className="text-sm whitespace-pre-wrap break-all">

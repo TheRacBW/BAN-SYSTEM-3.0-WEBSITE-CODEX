@@ -19,7 +19,7 @@ interface UserPresence {
 
 interface PresenceResult {
   presence: UserPresence;
-  method: 'primary' | 'fallback';
+  method: 'primary' | 'fallback' | 'direct';
 }
 
 interface UserStatus {
@@ -32,7 +32,7 @@ interface UserStatus {
   rootPlaceId: number | null;
   universeId: number | null;
   lastUpdated: number;
-  presenceMethod: 'primary' | 'fallback';
+  presenceMethod: 'primary' | 'fallback' | 'direct';
 }
 
 const CACHE_DURATION = 60; // Cache for 1 minute
@@ -113,6 +113,7 @@ async function fetchWithRetry(url: string, options: RequestInit = {}, retries = 
 const PRESENCE_API_PRIMARY =
   'https://roblox-proxy.theraccoonmolester.workers.dev/presence/v1/presence/users';
 const PRESENCE_API_FALLBACK = 'https://presence.roproxy.com/v1/presence/users';
+const PRESENCE_API_DIRECT = 'https://presence.roblox.com/v1/presence/users';
 
 async function getUserPresence(userId: number): Promise<PresenceResult> {
   const cookie = await getRobloxCookie();
@@ -125,9 +126,10 @@ async function getUserPresence(userId: number): Promise<PresenceResult> {
     body: JSON.stringify({ userIds: [userId] })
   } as const;
 
-  const urls: [string, 'primary' | 'fallback'][] = [
+  const urls: [string, 'primary' | 'fallback' | 'direct'][] = [
     [PRESENCE_API_PRIMARY, 'primary'],
-    [PRESENCE_API_FALLBACK, 'fallback']
+    [PRESENCE_API_FALLBACK, 'fallback'],
+    [PRESENCE_API_DIRECT, 'direct']
   ];
 
   for (const [url, method] of urls) {
