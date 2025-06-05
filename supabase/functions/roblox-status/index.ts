@@ -17,6 +17,11 @@ interface UserPresence {
   lastOnline: string;
 }
 
+interface PresenceResult {
+  presence: UserPresence;
+  method: 'primary' | 'fallback';
+}
+
 interface UserStatus {
   userId: number;
   username: string;
@@ -27,6 +32,7 @@ interface UserStatus {
   rootPlaceId: number | null;
   universeId: number | null;
   lastUpdated: number;
+  presenceMethod: 'primary' | 'fallback';
 }
 
 const CACHE_DURATION = 60; // Cache for 1 minute
@@ -108,7 +114,7 @@ const PRESENCE_API_PRIMARY =
   'https://roblox-proxy.theraccoonmolester.workers.dev/presence/v1/presence/users';
 const PRESENCE_API_FALLBACK = 'https://presence.roproxy.com/v1/presence/users';
 
-async function getUserPresence(userId: number): Promise<UserPresence> {
+async function getUserPresence(userId: number): Promise<PresenceResult> {
   const cookie = await getRobloxCookie();
   const options = {
     method: 'POST',
@@ -119,12 +125,17 @@ async function getUserPresence(userId: number): Promise<UserPresence> {
     body: JSON.stringify({ userIds: [userId] })
   } as const;
 
-  for (const url of [PRESENCE_API_PRIMARY, PRESENCE_API_FALLBACK]) {
+  const urls: [string, 'primary' | 'fallback'][] = [
+    [PRESENCE_API_PRIMARY, 'primary'],
+    [PRESENCE_API_FALLBACK, 'fallback']
+  ];
+
+  for (const [url, method] of urls) {
     try {
       const response = await fetchWithRetry(url, options);
       const data = await response.json();
       if (data.userPresences?.[0]) {
-        return data.userPresences[0];
+        return { presence: data.userPresences[0], method };
       }
     } catch {
       // try next url
@@ -157,7 +168,7 @@ async function getUserStatus(userId: number): Promise<UserStatus> {
     }
 
     // Get presence data and username in parallel
-    const [presence, username] = await Promise.all([
+    const [presenceResult, username] = await Promise.all([
       getUserPresence(userId).catch(error => {
         console.error('Presence fetch error:', error);
         return null;
@@ -167,6 +178,9 @@ async function getUserStatus(userId: number): Promise<UserStatus> {
         return null;
       })
     ]);
+
+    const presence = presenceResult ? presenceResult.presence : null;
+    const presenceMethod = presenceResult ? presenceResult.method : 'primary';
 
     if (!username) {
       throw new Error(`Unable to find Roblox user with ID ${userId}`);
@@ -195,7 +209,8 @@ async function getUserStatus(userId: number): Promise<UserStatus> {
       placeId: presence ? Number(presence.placeId) : null,
       rootPlaceId: presence ? Number(presence.rootPlaceId) : null,
       universeId: presence ? Number(presence.universeId) : null,
-      lastUpdated: Date.now()
+      lastUpdated: Date.now(),
+      presenceMethod
     };
 
     // Update cache
