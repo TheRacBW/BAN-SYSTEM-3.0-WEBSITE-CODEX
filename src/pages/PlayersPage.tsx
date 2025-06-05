@@ -53,9 +53,9 @@ export default function PlayersPage() {
                       inBedwars: typeof data.inBedwars === 'boolean'
                         ? data.inBedwars
                         : (data.isInGame ?? false) && (
-                            data.placeId === BEDWARS_PLACE_ID ||
-                            data.rootPlaceId === BEDWARS_PLACE_ID ||
-                            data.universeId === BEDWARS_UNIVERSE_ID
+                            Number(data.placeId) === BEDWARS_PLACE_ID ||
+                            Number(data.rootPlaceId) === BEDWARS_PLACE_ID ||
+                            Number(data.universeId) === BEDWARS_UNIVERSE_ID
                           ),
                       placeId: data.placeId,
                       rootPlaceId: data.rootPlaceId,

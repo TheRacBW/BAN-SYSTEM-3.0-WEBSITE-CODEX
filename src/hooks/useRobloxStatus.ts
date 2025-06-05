@@ -103,9 +103,9 @@ export function useRobloxStatus(userId: number) {
               inBedwars: typeof data.inBedwars === 'boolean'
                 ? data.inBedwars
                 : (data.isInGame ?? false) && (
-                    data.placeId === BEDWARS_PLACE_ID ||
-                    data.rootPlaceId === BEDWARS_PLACE_ID ||
-                    data.universeId === BEDWARS_UNIVERSE_ID
+                    Number(data.placeId) === BEDWARS_PLACE_ID ||
+                    Number(data.rootPlaceId) === BEDWARS_PLACE_ID ||
+                    Number(data.universeId) === BEDWARS_UNIVERSE_ID
                   ),
               lastUpdated: data.lastUpdated || Date.now(),
               username: data.username || `User ${userId}`,
