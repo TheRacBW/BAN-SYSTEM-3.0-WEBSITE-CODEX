@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { supabase } from '../lib/supabase';
 import { AlertCircle, Save, Play, X } from 'lucide-react';
+import { BEDWARS_PLACE_ID, BEDWARS_UNIVERSE_ID } from '../constants/bedwars';
 
 const RobloxCookiePanel: React.FC = () => {
   const [cookie, setCookie] = useState('');
@@ -175,20 +176,56 @@ const RobloxCookiePanel: React.FC = () => {
             ) : (
               <div className="space-y-2">
                 {testResult?.presenceMethod && (
-                  <p className="text-sm">
-                    <span
-                      className="underline decoration-dotted cursor-help"
-                      title={`Used API: ${
-                        testResult.presenceMethod === 'primary'
-                          ? 'roblox-proxy.theraccoonmolester.workers.dev'
-                          : testResult.presenceMethod === 'fallback'
-                          ? 'presence.roproxy.com'
-                          : 'presence.roblox.com'
+                  <div className="text-sm space-y-1">
+                    <p>
+                      <span
+                        className="underline decoration-dotted cursor-help"
+                        title={`Used API: ${
+                          testResult.presenceMethod === 'primary'
+                            ? 'roblox-proxy.theraccoonmolester.workers.dev'
+                            : testResult.presenceMethod === 'fallback'
+                            ? 'presence.roproxy.com'
+                            : 'presence.roblox.com'
+                        }`}
+                      >
+                        API Method: {testResult.presenceMethod}
+                      </span>
+                    </p>
+                    {Array.isArray(testResult.attemptLog) && (
+                      <p className="flex gap-2">
+                        {testResult.attemptLog.map((a: any, idx: number) => (
+                          <span key={idx} className="flex items-center gap-1">
+                            {a.success ? '✅' : '❌'}{' '}
+                            {a.method === 'primary'
+                              ? 'theraccoonmolester'
+                              : a.method === 'fallback'
+                              ? 'roproxy'
+                              : 'roblox'}
+                          </span>
+                        ))}
+                      </p>
+                    )}
+                    <div
+                      className="text-xs text-gray-500"
+                      title={`presenceType=${testResult.userPresenceType}; inGame=${testResult.userPresenceType===2}; bedwarsMatch=${
+                        testResult.inBedwars ||
+                        Number(testResult.placeId) === BEDWARS_PLACE_ID ||
+                        Number(testResult.rootPlaceId) === BEDWARS_PLACE_ID ||
+                        Number(testResult.universeId) === BEDWARS_UNIVERSE_ID
                       }`}
                     >
-                      API Method: {testResult.presenceMethod}
-                    </span>
-                  </p>
+                      <ul className="list-disc ml-4">
+                        <li>userPresenceType: {testResult.userPresenceType}</li>
+                        <li>In Bedwars: {testResult.inBedwars ? 'yes' : 'no'}</li>
+                        <li>
+                          Missing IDs:{' '}
+                          {!testResult.placeId || !testResult.universeId
+                            ? 'yes'
+                            : 'no'}
+                        </li>
+                      </ul>
+                    </div>
+                  </div>
                 )}
                 <pre className="text-sm whitespace-pre-wrap break-all">
                   {JSON.stringify(testResult, null, 2)}

@@ -37,8 +37,12 @@ describe('getUserStatus', () => {
     expect(status.isInGame).toBe(true);
     expect(status.inBedwars).toBe(true);
     expect(status.presenceMethod).toBe('primary');
+    expect(status.userPresenceType).toBe(2);
     expect(status.placeId).toBe(BEDWARS_PLACE_ID);
     expect(status.rootPlaceId).toBe(BEDWARS_PLACE_ID);
     expect(status.universeId).toBe(BEDWARS_UNIVERSE_ID);
+    expect(status.attemptLog).toEqual([
+      { method: 'primary', success: true }
+    ]);
   });
 });

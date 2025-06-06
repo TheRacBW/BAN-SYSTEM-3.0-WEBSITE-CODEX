@@ -17,9 +17,17 @@ interface UserPresence {
   lastOnline: string;
 }
 
+interface PresenceAttempt {
+  method: 'primary' | 'fallback' | 'direct';
+  success: boolean;
+  status?: number;
+  error?: string;
+}
+
 interface PresenceResult {
   presence: UserPresence;
   method: 'primary' | 'fallback' | 'direct';
+  attempts: PresenceAttempt[];
 }
 
 interface UserStatus {
@@ -28,11 +36,13 @@ interface UserStatus {
   isOnline: boolean;
   isInGame: boolean;
   inBedwars: boolean;
+  userPresenceType: number | null;
   placeId: number | null;
   rootPlaceId: number | null;
   universeId: number | null;
   lastUpdated: number;
   presenceMethod: 'primary' | 'fallback' | 'direct';
+  attemptLog: PresenceAttempt[];
 }
 
 const CACHE_DURATION = 60; // Cache for 1 minute
@@ -132,15 +142,23 @@ async function getUserPresence(userId: number): Promise<PresenceResult> {
     [PRESENCE_API_DIRECT, 'direct']
   ];
 
+  const attemptLog: PresenceAttempt[] = [];
+
   for (const [url, method] of urls) {
     try {
       const response = await fetchWithRetry(url, options);
       const data = await response.json();
       if (data.userPresences?.[0]) {
-        return { presence: data.userPresences[0], method };
+        attemptLog.push({ method, success: true, status: response.status });
+        return { presence: data.userPresences[0], method, attempts: attemptLog };
       }
-    } catch {
-      // try next url
+      attemptLog.push({ method, success: false, status: response.status });
+    } catch (err) {
+      attemptLog.push({
+        method,
+        success: false,
+        error: err instanceof Error ? err.message : String(err)
+      });
     }
   }
 
@@ -183,6 +201,7 @@ async function getUserStatus(userId: number): Promise<UserStatus> {
 
     const presence = presenceResult ? presenceResult.presence : null;
     const presenceMethod = presenceResult ? presenceResult.method : 'primary';
+    const attemptLog = presenceResult ? presenceResult.attempts : [];
 
     if (!username) {
       throw new Error(`Unable to find Roblox user with ID ${userId}`);
@@ -208,11 +227,13 @@ async function getUserStatus(userId: number): Promise<UserStatus> {
           Number(presence.rootPlaceId) === BEDWARS_PLACE_ID ||
           Number(presence.universeId) === BEDWARS_UNIVERSE_ID
         : false,
+      userPresenceType: presence ? presence.userPresenceType : null,
       placeId: presence ? Number(presence.placeId) : null,
       rootPlaceId: presence ? Number(presence.rootPlaceId) : null,
       universeId: presence ? Number(presence.universeId) : null,
       lastUpdated: Date.now(),
-      presenceMethod
+      presenceMethod,
+      attemptLog
     };
 
     // Update cache
