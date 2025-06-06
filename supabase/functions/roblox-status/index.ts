@@ -72,7 +72,7 @@ async function getRobloxCookie(): Promise<string> {
 
 const REQUEST_TIMEOUT = 15000; // Increased to 15 seconds
 
-const statusCache = new Map<number, UserStatus>();
+const statusCache = new Map<string, UserStatus>();
 
 async function fetchWithTimeout(url: string, options: RequestInit = {}): Promise<Response> {
   const controller = new AbortController();
@@ -125,7 +125,10 @@ const PRESENCE_API_PRIMARY =
 const PRESENCE_API_FALLBACK = 'https://presence.roproxy.com/v1/presence/users';
 const PRESENCE_API_DIRECT = 'https://presence.roblox.com/v1/presence/users';
 
-async function getUserPresence(userId: number): Promise<PresenceResult> {
+async function getUserPresence(
+  userId: number,
+  methodFilter?: 'primary' | 'fallback' | 'direct'
+): Promise<PresenceResult> {
   const cookie = await getRobloxCookie();
   const options = {
     method: 'POST',
@@ -136,11 +139,19 @@ async function getUserPresence(userId: number): Promise<PresenceResult> {
     body: JSON.stringify({ userIds: [userId] })
   } as const;
 
-  const urls: [string, 'primary' | 'fallback' | 'direct'][] = [
-    [PRESENCE_API_PRIMARY, 'primary'],
-    [PRESENCE_API_FALLBACK, 'fallback'],
-    [PRESENCE_API_DIRECT, 'direct']
-  ];
+  const urlMap = {
+    primary: PRESENCE_API_PRIMARY,
+    fallback: PRESENCE_API_FALLBACK,
+    direct: PRESENCE_API_DIRECT
+  } as const;
+
+  const urls: [string, 'primary' | 'fallback' | 'direct'][] = methodFilter
+    ? [[urlMap[methodFilter], methodFilter]]
+    : [
+        [PRESENCE_API_PRIMARY, 'primary'],
+        [PRESENCE_API_FALLBACK, 'fallback'],
+        [PRESENCE_API_DIRECT, 'direct']
+      ];
 
   const attemptLog: PresenceAttempt[] = [];
 
@@ -175,21 +186,25 @@ async function getUsernameFromId(userId: number): Promise<string> {
   return data.name;
 }
 
-async function getUserStatus(userId: number): Promise<UserStatus> {
+async function getUserStatus(
+  userId: number,
+  methodFilter?: 'primary' | 'fallback' | 'direct'
+): Promise<UserStatus> {
   try {
     if (!userId || typeof userId !== 'number') {
       throw new Error('Invalid user ID provided');
     }
 
     // Check cache first
-    const cached = statusCache.get(userId);
+    const cacheKey = `${userId}-${methodFilter || 'auto'}`;
+    const cached = statusCache.get(cacheKey);
     if (cached && Date.now() - cached.lastUpdated < CACHE_DURATION * 1000) {
       return cached;
     }
 
     // Get presence data and username in parallel
     const [presenceResult, username] = await Promise.all([
-      getUserPresence(userId).catch(error => {
+      getUserPresence(userId, methodFilter).catch(error => {
         console.error('Presence fetch error:', error);
         return null;
       }),
@@ -237,7 +252,7 @@ async function getUserStatus(userId: number): Promise<UserStatus> {
     };
 
     // Update cache
-    statusCache.set(userId, status);
+    statusCache.set(cacheKey, status);
     return status;
   } catch (error) {
     console.error('Error in getUserStatus:', error);
@@ -258,6 +273,11 @@ if (import.meta.main) {
   try {
     const url = new URL(req.url);
     const userIdParam = url.searchParams.get('userId');
+    const methodParam = url.searchParams.get('method') as
+      | 'primary'
+      | 'fallback'
+      | 'direct'
+      | null;
 
     if (!userIdParam) {
       return new Response(
@@ -280,7 +300,7 @@ if (import.meta.main) {
       );
     }
 
-    const status = await getUserStatus(userId);
+    const status = await getUserStatus(userId, methodParam || undefined);
     
     return new Response(
       JSON.stringify(status),

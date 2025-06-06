@@ -12,6 +12,7 @@ const RobloxCookiePanel: React.FC = () => {
   const [testResult, setTestResult] = useState<any | null>(null);
   const [testError, setTestError] = useState<string | null>(null);
   const [showTestModal, setShowTestModal] = useState(false);
+  const [testMethod, setTestMethod] = useState<'auto' | 'primary' | 'fallback' | 'direct'>('auto');
 
   useEffect(() => {
     const fetchCookie = async () => {
@@ -77,7 +78,8 @@ const RobloxCookiePanel: React.FC = () => {
       if (!supabaseUrl || !supabaseKey) {
         throw new Error('Missing Supabase configuration');
       }
-      const apiUrl = `${supabaseUrl}/functions/v1/roblox-status?userId=${TEST_USER_ID}`;
+      const methodQuery = testMethod === 'auto' ? '' : `&method=${testMethod}`;
+      const apiUrl = `${supabaseUrl}/functions/v1/roblox-status?userId=${TEST_USER_ID}${methodQuery}`;
       const res = await fetch(apiUrl, {
         headers: {
           Authorization: `Bearer ${supabaseKey}`,
@@ -137,6 +139,19 @@ const RobloxCookiePanel: React.FC = () => {
           rows={3}
           placeholder="Paste .ROBLOSECURITY cookie here"
         />
+        <div>
+          <label className="block text-sm mb-1">Presence API</label>
+          <select
+            value={testMethod}
+            onChange={(e) => setTestMethod(e.target.value as any)}
+            className="p-2 border rounded dark:bg-gray-700 dark:border-gray-600"
+          >
+            <option value="auto">Auto</option>
+            <option value="primary">RAC Proxy</option>
+            <option value="fallback">RoProxy</option>
+            <option value="direct">Roblox API</option>
+          </select>
+        </div>
         <div className="flex gap-2">
           <button type="submit" className="btn btn-primary flex items-center gap-2">
             <Save size={18} />
@@ -223,8 +238,13 @@ const RobloxCookiePanel: React.FC = () => {
                             ? 'yes'
                             : 'no'}
                         </li>
+                        <li>Game ID: {testResult.gameId || 'n/a'}</li>
+                        <li>Universe ID: {testResult.universeId ?? 'n/a'}</li>
                       </ul>
                     </div>
+                    <p className="text-xs mt-1">
+                      [ A collection of User Presences Roblox.Presence.Api.Models.Response.UserPresence ]
+                    </p>
                   </div>
                 )}
                 <pre className="text-sm whitespace-pre-wrap break-all">

@@ -41,7 +41,7 @@ export interface UserStatus {
 }
 
 const CACHE_DURATION = 60; // seconds
-const statusCache = new Map<number, UserStatus>();
+const statusCache = new Map<string, UserStatus>();
 
 async function fetchJson(url: string, options: RequestInit = {}) {
   const res = await fetch(url, {
@@ -63,7 +63,11 @@ const PRESENCE_API_FALLBACK =
   'https://presence.roproxy.com/v1/presence/users';
 const PRESENCE_API_DIRECT = 'https://presence.roblox.com/v1/presence/users';
 
-async function getUserPresence(userId: number, cookie?: string): Promise<PresenceResult> {
+async function getUserPresence(
+  userId: number,
+  cookie?: string,
+  methodFilter?: 'primary' | 'fallback' | 'direct'
+): Promise<PresenceResult> {
   const options = {
     method: 'POST',
     headers: {
@@ -73,11 +77,19 @@ async function getUserPresence(userId: number, cookie?: string): Promise<Presenc
     body: JSON.stringify({ userIds: [userId] })
   } as const;
 
-  const urls: [string, 'primary' | 'fallback' | 'direct'][] = [
-    [PRESENCE_API_PRIMARY, 'primary'],
-    [PRESENCE_API_FALLBACK, 'fallback'],
-    [PRESENCE_API_DIRECT, 'direct']
-  ];
+  const urlMap = {
+    primary: PRESENCE_API_PRIMARY,
+    fallback: PRESENCE_API_FALLBACK,
+    direct: PRESENCE_API_DIRECT
+  } as const;
+
+  const urls: [string, 'primary' | 'fallback' | 'direct'][] = methodFilter
+    ? [[urlMap[methodFilter], methodFilter]]
+    : [
+        [PRESENCE_API_PRIMARY, 'primary'],
+        [PRESENCE_API_FALLBACK, 'fallback'],
+        [PRESENCE_API_DIRECT, 'direct']
+      ];
 
   const attemptLog: PresenceAttempt[] = [];
 
@@ -103,14 +115,19 @@ async function getUsernameFromId(userId: number): Promise<string> {
   return data.name;
 }
 
-export async function getUserStatus(userId: number, cookie?: string): Promise<UserStatus> {
-  const cached = statusCache.get(userId);
+export async function getUserStatus(
+  userId: number,
+  cookie?: string,
+  methodFilter?: 'primary' | 'fallback' | 'direct'
+): Promise<UserStatus> {
+  const cacheKey = `${userId}-${methodFilter || 'auto'}`;
+  const cached = statusCache.get(cacheKey);
   if (cached && Date.now() - cached.lastUpdated < CACHE_DURATION * 1000) {
     return cached;
   }
 
   const [presenceResult, username] = await Promise.all([
-    getUserPresence(userId, cookie),
+    getUserPresence(userId, cookie, methodFilter),
     getUsernameFromId(userId)
   ]);
 
@@ -136,6 +153,6 @@ export async function getUserStatus(userId: number, cookie?: string): Promise<Us
     presenceMethod,
     attemptLog
   };
-  statusCache.set(userId, status);
+  statusCache.set(cacheKey, status);
   return status;
 }
