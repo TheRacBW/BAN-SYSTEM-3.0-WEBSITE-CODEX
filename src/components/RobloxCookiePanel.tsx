@@ -58,28 +58,14 @@ const RobloxCookiePanel: React.FC = () => {
 
   const verifyCookie = async (value: string): Promise<string> => {
     try {
-      const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
-      const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
-
-      const res = await fetch(`${supabaseUrl}/functions/v1/verify-cookie`, {
-        method: 'POST',
-        headers: {
-          Authorization: `Bearer ${supabaseKey}`,
-          'Content-Type': 'application/json'
-        },
-        mode: 'cors',
-        credentials: 'omit',
-        body: JSON.stringify({ cookie: value })
+      const { data, error } = await supabase.functions.invoke('verify-cookie', {
+        body: { cookie: value }
       });
-
-      if (!res.ok) {
-        const text = await res.text();
-        console.error('verify-cookie response error:', res.status, text);
+      if (error) {
+        console.error('verify-cookie response error:', error);
         throw new Error('Failed to verify cookie');
       }
-
-      const data = await res.json();
-      return data.name as string;
+      return (data as any).name as string;
     } catch (err) {
       const message =
         err instanceof Error ? err.message : 'Network error contacting verify-cookie';
@@ -95,10 +81,8 @@ const RobloxCookiePanel: React.FC = () => {
     const trimmed = cookie.trim();
     try {
       const username = await verifyCookie(trimmed);
-      const { error } = await supabase
-        .from('roblox_settings')
-        .upsert({ id: 'global', cookie: trimmed, updated_at: new Date().toISOString() });
-      if (error) throw error;
+      // verify-cookie persists the value using a service key, so no direct
+      // table update is required here
       setSuccess(`Cookie saved for ${username}`);
       setTimeout(() => setSuccess(null), 3000);
     } catch (err) {
