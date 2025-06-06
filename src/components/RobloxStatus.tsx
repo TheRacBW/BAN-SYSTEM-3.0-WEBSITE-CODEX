@@ -43,10 +43,11 @@ export default function RobloxStatus({ userId }: RobloxStatusProps) {
           </span>
         </div>
         
-        {(status.inBedwars ||
-          Number(status.placeId) === BEDWARS_PLACE_ID ||
-          Number(status.rootPlaceId) === BEDWARS_PLACE_ID ||
-          Number(status.universeId) === BEDWARS_UNIVERSE_ID) && (
+        {status.userPresenceType === 2 &&
+          (status.inBedwars ||
+            Number(status.placeId) === BEDWARS_PLACE_ID ||
+            Number(status.rootPlaceId) === BEDWARS_PLACE_ID ||
+            Number(status.universeId) === BEDWARS_UNIVERSE_ID) && (
           <div className="flex items-center gap-1 text-blue-600 dark:text-blue-400">
             <Gamepad2 size={12} />
             <span>In Bedwars</span>
