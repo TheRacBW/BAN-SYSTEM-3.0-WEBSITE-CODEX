@@ -5,6 +5,8 @@ const corsHeaders = {
   'Access-Control-Max-Age': '86400'
 };
 
+import { ROBLOX_HEADERS } from '../../src/constants/robloxHeaders.ts';
+
 if (import.meta.main) {
   Deno.serve(async (req) => {
     if (req.method === 'OPTIONS') {
@@ -24,8 +26,8 @@ if (import.meta.main) {
       try {
         res = await fetch('https://users.roblox.com/v1/users/authenticated', {
           headers: {
-            Cookie: `.ROBLOSECURITY=${cookie}`,
-            'User-Agent': 'Roblox/WinInet'
+            ...ROBLOX_HEADERS,
+            Cookie: `.ROBLOSECURITY=${cookie}`
           }
         });
       } catch (fetchErr) {
