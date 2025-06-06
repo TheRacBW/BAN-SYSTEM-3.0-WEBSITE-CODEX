@@ -228,6 +228,11 @@ const RobloxCookiePanel: React.FC = () => {
                         ))}
                       </p>
                     )}
+                    {!testResult.cookieProvided && (
+                      <p className="text-xs text-red-500">
+                        Cookie was missing or invalid
+                      </p>
+                    )}
                     <div
                       className="text-xs text-gray-500"
                       title={`presenceType=${testResult.userPresenceType}; inGame=${testResult.userPresenceType===2}; bedwarsMatch=${
@@ -245,6 +250,10 @@ const RobloxCookiePanel: React.FC = () => {
                           {!testResult.placeId || !testResult.universeId
                             ? 'yes'
                             : 'no'}
+                        </li>
+                        <li>
+                          Cookie Provided:{' '}
+                          {testResult.cookieProvided ? 'yes' : 'no'}
                         </li>
                         <li>Game ID: {testResult.gameId || 'n/a'}</li>
                         <li>Universe ID: {testResult.universeId ?? 'n/a'}</li>

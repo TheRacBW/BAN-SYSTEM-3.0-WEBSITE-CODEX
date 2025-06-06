@@ -22,12 +22,14 @@ interface PresenceAttempt {
   success: boolean;
   status?: number;
   error?: string;
+  cookie?: boolean;
 }
 
 interface PresenceResult {
   presence: UserPresence;
   method: 'primary' | 'fallback' | 'direct';
   attempts: PresenceAttempt[];
+  cookieProvided: boolean;
 }
 
 interface UserStatus {
@@ -43,6 +45,7 @@ interface UserStatus {
   lastUpdated: number;
   presenceMethod: 'primary' | 'fallback' | 'direct';
   attemptLog: PresenceAttempt[];
+  cookieProvided: boolean;
 }
 
 const CACHE_DURATION = 60; // Cache for 1 minute
@@ -156,20 +159,38 @@ async function getUserPresence(
 
   const attemptLog: PresenceAttempt[] = [];
 
+  const cookieIncluded = !!cookie;
+
   for (const [url, method] of urls) {
     try {
       const response = await fetchWithRetry(url, options);
       const data = await response.json();
       if (data.userPresences?.[0]) {
-        attemptLog.push({ method, success: true, status: response.status });
-        return { presence: data.userPresences[0], method, attempts: attemptLog };
+        attemptLog.push({
+          method,
+          success: true,
+          status: response.status,
+          cookie: cookieIncluded
+        });
+        return {
+          presence: data.userPresences[0],
+          method,
+          attempts: attemptLog,
+          cookieProvided: cookieIncluded
+        };
       }
-      attemptLog.push({ method, success: false, status: response.status });
+      attemptLog.push({
+        method,
+        success: false,
+        status: response.status,
+        cookie: cookieIncluded
+      });
     } catch (err) {
       attemptLog.push({
         method,
         success: false,
-        error: err instanceof Error ? err.message : String(err)
+        error: err instanceof Error ? err.message : String(err),
+        cookie: cookieIncluded
       });
     }
   }
@@ -219,6 +240,7 @@ async function getUserStatus(
     const presence = presenceResult ? presenceResult.presence : null;
     const presenceMethod = presenceResult ? presenceResult.method : 'primary';
     const attemptLog = presenceResult ? presenceResult.attempts : [];
+    const cookieProvided = presenceResult ? presenceResult.cookieProvided : false;
 
     if (!username) {
       throw new Error(`Unable to find Roblox user with ID ${userId}`);
@@ -250,7 +272,8 @@ async function getUserStatus(
       universeId: presence ? Number(presence.universeId) : null,
       lastUpdated: Date.now(),
       presenceMethod,
-      attemptLog
+      attemptLog,
+      cookieProvided
     };
 
     // Update cache

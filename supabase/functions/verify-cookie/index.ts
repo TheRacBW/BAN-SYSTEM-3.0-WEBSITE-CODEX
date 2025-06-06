@@ -20,12 +20,21 @@ if (import.meta.main) {
         );
       }
 
-      const res = await fetch('https://users.roblox.com/v1/users/authenticated', {
-        headers: {
-          Cookie: `.ROBLOSECURITY=${cookie}`,
-          'User-Agent': 'Roblox/WinInet'
-        }
-      });
+      let res: Response;
+      try {
+        res = await fetch('https://users.roblox.com/v1/users/authenticated', {
+          headers: {
+            Cookie: `.ROBLOSECURITY=${cookie}`,
+            'User-Agent': 'Roblox/WinInet'
+          }
+        });
+      } catch (fetchErr) {
+        console.error('Cookie verify fetch failed:', fetchErr);
+        return new Response(
+          JSON.stringify({ error: 'Fetch failed', details: String(fetchErr) }),
+          { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
 
       if (!res.ok) {
         const text = await res.text();
@@ -41,6 +50,7 @@ if (import.meta.main) {
         { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     } catch (err) {
+      console.error('Verify-cookie error:', err);
       const message = err instanceof Error ? err.message : 'Unknown error';
       return new Response(
         JSON.stringify({ error: message }),
