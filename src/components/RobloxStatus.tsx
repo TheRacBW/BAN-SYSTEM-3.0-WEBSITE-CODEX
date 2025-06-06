@@ -54,6 +54,15 @@ export default function RobloxStatus({ userId }: RobloxStatusProps) {
           </div>
         )}
       </div>
+      {status.presenceMethod && (
+        <span className="text-gray-500" title="Presence API method">
+          via {status.presenceMethod === 'primary'
+            ? 'roblox-proxy'
+            : status.presenceMethod === 'fallback'
+            ? 'roproxy'
+            : 'roblox'}
+        </span>
+      )}
     </div>
   );
 }
