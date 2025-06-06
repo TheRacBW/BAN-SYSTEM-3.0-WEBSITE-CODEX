@@ -1,7 +1,8 @@
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
-  'Access-Control-Allow-Headers': '*',
+  'Access-Control-Allow-Headers':
+    'authorization, x-client-info, apikey, content-type',
   'Access-Control-Max-Age': '86400'
 };
 
@@ -22,6 +23,12 @@ if (import.meta.main) {
         );
       }
 
+      const supabaseUrl = Deno.env.get('SUPABASE_URL') || '';
+      const serviceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
+      if (!supabaseUrl || !serviceKey) {
+        console.error('Supabase environment variables are missing');
+      }
+
       let res: Response;
       try {
         res = await fetch('https://users.roblox.com/v1/users/authenticated', {
@@ -40,6 +47,7 @@ if (import.meta.main) {
 
       if (!res.ok) {
         const text = await res.text();
+        console.error('Roblox verification failed:', res.status, text);
         return new Response(
           JSON.stringify({ error: 'Verification failed', status: res.status, details: text }),
           { status: res.status, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
@@ -47,9 +55,6 @@ if (import.meta.main) {
       }
 
       const data = await res.json();
-
-      const supabaseUrl = Deno.env.get('SUPABASE_URL') || '';
-      const serviceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
       if (supabaseUrl && serviceKey) {
         const supabase = createClient(supabaseUrl, serviceKey);
         const { error } = await supabase

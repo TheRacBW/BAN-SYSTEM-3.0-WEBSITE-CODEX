@@ -54,6 +54,7 @@ const RobloxCookiePanel: React.FC = () => {
     const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
     const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
     if (!supabaseUrl || !supabaseKey) {
+      console.error('Missing Supabase env values', { supabaseUrl, supabaseKeyPresent: !!supabaseKey });
       throw new Error('Missing Supabase configuration');
     }
     let res: Response;
@@ -64,6 +65,8 @@ const RobloxCookiePanel: React.FC = () => {
           Authorization: `Bearer ${supabaseKey}`,
           'Content-Type': 'application/json'
         },
+        mode: 'cors',
+        credentials: 'omit',
         body: JSON.stringify({ cookie: value })
       });
     } catch (err) {
@@ -121,6 +124,7 @@ const RobloxCookiePanel: React.FC = () => {
       const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
       const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
       if (!supabaseUrl || !supabaseKey) {
+        console.error('Missing Supabase env values', { supabaseUrl, supabaseKeyPresent: !!supabaseKey });
         throw new Error('Missing Supabase configuration');
       }
       const methodQuery = testMethod === 'auto' ? '' : `&method=${testMethod}`;
