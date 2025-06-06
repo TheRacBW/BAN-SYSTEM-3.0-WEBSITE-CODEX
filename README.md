@@ -22,8 +22,8 @@ export ROBLOX_COOKIE=your_roblox_cookie_here
 ### Verify your cookie
 
 Before saving, you can ensure the `.ROBLOSECURITY` cookie works by hitting the
-`https://users.roblox.com/v1/users/authenticated` endpoint with the `Roblox/WinInet`
-user agent. A quick Node snippet:
+`https://users.roblox.com/v1/users/authenticated` endpoint with the
+`Roblox/WinInet` user agent. A quick Node snippet:
 
 ```typescript
 import axios from 'axios';
@@ -38,3 +38,12 @@ axios.get('https://users.roblox.com/v1/users/authenticated', {
 ```
 
 The cookie must start with `_|WARNING:` and be copied exactly from your browser.
+
+You can also hit the Supabase `verify-cookie` function directly:
+
+```bash
+curl -X POST "${VITE_SUPABASE_URL}/functions/v1/verify-cookie" \
+  -H "Authorization: Bearer ${VITE_SUPABASE_ANON_KEY}" \
+  -H "Content-Type: application/json" \
+  -d '{"cookie": "your_cookie"}'
+```

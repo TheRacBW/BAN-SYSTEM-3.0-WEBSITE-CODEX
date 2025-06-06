@@ -34,14 +34,22 @@ const RobloxCookiePanel: React.FC = () => {
   }, []);
 
   const verifyCookie = async (value: string): Promise<string> => {
-    const res = await fetch('https://users.roblox.com/v1/users/authenticated', {
+    const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+    const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+    if (!supabaseUrl || !supabaseKey) {
+      throw new Error('Missing Supabase configuration');
+    }
+    const res = await fetch(`${supabaseUrl}/functions/v1/verify-cookie`, {
+      method: 'POST',
       headers: {
-        Cookie: `.ROBLOSECURITY=${value}`,
-        'User-Agent': 'Roblox/WinInet'
-      }
+        Authorization: `Bearer ${supabaseKey}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({ cookie: value })
     });
     if (!res.ok) {
-      throw new Error(`Cookie verification failed (${res.status})`);
+      const text = await res.text();
+      throw new Error(`Cookie verification failed (${res.status}): ${text}`);
     }
     const data = await res.json();
     return data.name as string;
