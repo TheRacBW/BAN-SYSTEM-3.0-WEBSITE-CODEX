@@ -48,6 +48,17 @@ curl -X POST "${VITE_SUPABASE_URL}/functions/v1/verify-cookie" \
   -d '{"cookie": "your_cookie"}'
 ```
 
+### Deploying Supabase Functions
+
+Ensure that the `verify-cookie` function is deployed so the admin panel can
+reach it. From the project root run:
+
+```bash
+supabase functions deploy verify-cookie
+```
+
+Deploy any other functions, such as `roblox-status`, in the same way.
+
 ### Debugging Presence
 
 If players appear online but the response lacks `placeId` or `universeId`, the
