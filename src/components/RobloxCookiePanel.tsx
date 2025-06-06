@@ -26,6 +26,12 @@ const RobloxCookiePanel: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
   const [testing, setTesting] = useState(false);
+  // Quick sanity check that env variables are loaded in the browser
+  console.log(
+    'Supabase ENV',
+    import.meta.env.VITE_SUPABASE_URL,
+    import.meta.env.VITE_SUPABASE_ANON_KEY
+  );
   const [testResult, setTestResult] = useState<PresenceTestResult | null>(null);
   const [testError, setTestError] = useState<string | null>(null);
   const [showTestModal, setShowTestModal] = useState(false);
@@ -52,17 +58,28 @@ const RobloxCookiePanel: React.FC = () => {
 
   const verifyCookie = async (value: string): Promise<string> => {
     try {
-      const { data, error } = await supabase.functions.invoke('verify-cookie', {
-        body: { cookie: value }
+      const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+      const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+
+      const res = await fetch(`${supabaseUrl}/functions/v1/verify-cookie`, {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${supabaseKey}`,
+          'Content-Type': 'application/json'
+        },
+        mode: 'cors',
+        credentials: 'omit',
+        body: JSON.stringify({ cookie: value })
       });
 
-      if (error) {
-        console.error('verify-cookie error:', error);
-        const msg = error.message || 'Failed to verify cookie';
-        throw new Error(msg);
+      if (!res.ok) {
+        const text = await res.text();
+        console.error('verify-cookie response error:', res.status, text);
+        throw new Error('Failed to verify cookie');
       }
 
-      return (data as any).name as string;
+      const data = await res.json();
+      return data.name as string;
     } catch (err) {
       const message =
         err instanceof Error ? err.message : 'Network error contacting verify-cookie';
