@@ -5,6 +5,8 @@ const corsHeaders = {
   'Access-Control-Max-Age': '86400'
 };
 
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+
 if (import.meta.main) {
   Deno.serve(async (req) => {
     if (req.method === 'OPTIONS') {
@@ -32,7 +34,7 @@ if (import.meta.main) {
         console.error('Cookie verify fetch failed:', fetchErr);
         return new Response(
           JSON.stringify({ error: 'Fetch failed', details: String(fetchErr) }),
-          { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+          { status: 502, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
         );
       }
 
@@ -45,6 +47,19 @@ if (import.meta.main) {
       }
 
       const data = await res.json();
+
+      const supabaseUrl = Deno.env.get('SUPABASE_URL') || '';
+      const serviceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
+      if (supabaseUrl && serviceKey) {
+        const supabase = createClient(supabaseUrl, serviceKey);
+        const { error } = await supabase
+          .from('roblox_settings')
+          .upsert({ id: 'global', cookie, updated_at: new Date().toISOString() });
+        if (error) {
+          console.error('Failed to store cookie:', error);
+        }
+      }
+
       return new Response(
         JSON.stringify({ name: data.name }),
         { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
