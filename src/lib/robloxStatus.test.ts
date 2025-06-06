@@ -42,7 +42,8 @@ describe('getUserStatus', () => {
     expect(status.rootPlaceId).toBe(BEDWARS_PLACE_ID);
     expect(status.universeId).toBe(BEDWARS_UNIVERSE_ID);
     expect(status.attemptLog).toEqual([
-      { method: 'primary', success: true }
+      { method: 'primary', success: true, cookie: false }
     ]);
+    expect(status.cookieProvided).toBe(false);
   });
 });
