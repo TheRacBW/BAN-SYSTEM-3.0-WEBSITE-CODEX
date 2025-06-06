@@ -51,48 +51,24 @@ const RobloxCookiePanel: React.FC = () => {
   }, []);
 
   const verifyCookie = async (value: string): Promise<string> => {
-    const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
-    const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
-    if (!supabaseUrl || !supabaseKey) {
-      console.error('Missing Supabase env values', { supabaseUrl, supabaseKeyPresent: !!supabaseKey });
-      throw new Error('Missing Supabase configuration');
-    }
-    let res: Response;
     try {
-      res = await fetch(`${supabaseUrl}/functions/v1/verify-cookie`, {
-        method: 'POST',
-        headers: {
-          Authorization: `Bearer ${supabaseKey}`,
-          'Content-Type': 'application/json'
-        },
-        mode: 'cors',
-        credentials: 'omit',
-        body: JSON.stringify({ cookie: value })
+      const { data, error } = await supabase.functions.invoke('verify-cookie', {
+        body: { cookie: value }
       });
-    } catch (err) {
-      console.error('verify-cookie network error:', err);
-      throw new Error('Network error contacting verify-cookie');
-    }
 
-    if (!res.ok) {
-      let message = `${res.status}`;
-      try {
-        const json = await res.json();
-        if (json?.error) message += `: ${json.error}`;
-      } catch {
-        const text = await res.text();
-        if (text) message += `: ${text}`;
+      if (error) {
+        console.error('verify-cookie error:', error);
+        const msg = error.message || 'Failed to verify cookie';
+        throw new Error(msg);
       }
-      if (res.status === 403) {
-        message = 'Invalid or expired cookie';
-      } else if (res.status === 400) {
-        message = 'Missing cookie';
-      }
+
+      return (data as any).name as string;
+    } catch (err) {
+      const message =
+        err instanceof Error ? err.message : 'Network error contacting verify-cookie';
+      console.error('verify-cookie network error:', err);
       throw new Error(message);
     }
-
-    const data = await res.json();
-    return data.name as string;
   };
 
   const handleSave = async (e: React.FormEvent) => {
@@ -121,28 +97,11 @@ const RobloxCookiePanel: React.FC = () => {
     setTestError(null);
     const TEST_USER_ID = 77146135;
     try {
-      const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
-      const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
-      if (!supabaseUrl || !supabaseKey) {
-        console.error('Missing Supabase env values', { supabaseUrl, supabaseKeyPresent: !!supabaseKey });
-        throw new Error('Missing Supabase configuration');
-      }
       const methodQuery = testMethod === 'auto' ? '' : `&method=${testMethod}`;
-      const apiUrl = `${supabaseUrl}/functions/v1/roblox-status?userId=${TEST_USER_ID}${methodQuery}`;
-      const res = await fetch(apiUrl, {
-        headers: {
-          Authorization: `Bearer ${supabaseKey}`,
-          'Content-Type': 'application/json'
-        },
-        mode: 'cors',
-        credentials: 'omit'
-      });
-      if (!res.ok) {
-        const text = await res.text();
-        throw new Error(`Request failed (${res.status}): ${text}`);
-      }
-      const data = await res.json();
-      setTestResult(data);
+      const path = `roblox-status?userId=${TEST_USER_ID}${methodQuery}`;
+      const { data, error } = await supabase.functions.invoke(path);
+      if (error) throw error;
+      setTestResult(data as any);
     } catch (err) {
       const msg = err instanceof Error ? err.message : 'Presence test failed';
       setTestError(msg);
