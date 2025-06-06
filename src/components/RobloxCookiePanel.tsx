@@ -3,13 +3,30 @@ import { supabase } from '../lib/supabase';
 import { AlertCircle, Save, Play, X } from 'lucide-react';
 import { BEDWARS_PLACE_ID, BEDWARS_UNIVERSE_ID } from '../constants/bedwars';
 
+interface PresenceAttempt {
+  method: 'primary' | 'fallback' | 'direct';
+  success: boolean;
+}
+
+interface PresenceTestResult {
+  presenceMethod?: 'primary' | 'fallback' | 'direct';
+  attemptLog?: PresenceAttempt[];
+  cookieProvided?: boolean;
+  userPresenceType?: number;
+  placeId?: number | null;
+  rootPlaceId?: number | null;
+  universeId?: number | null;
+  inBedwars?: boolean;
+  gameId?: string | null;
+}
+
 const RobloxCookiePanel: React.FC = () => {
   const [cookie, setCookie] = useState('');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
   const [testing, setTesting] = useState(false);
-  const [testResult, setTestResult] = useState<any | null>(null);
+  const [testResult, setTestResult] = useState<PresenceTestResult | null>(null);
   const [testError, setTestError] = useState<string | null>(null);
   const [showTestModal, setShowTestModal] = useState(false);
   const [testMethod, setTestMethod] = useState<'auto' | 'primary' | 'fallback' | 'direct'>('auto');
@@ -39,18 +56,38 @@ const RobloxCookiePanel: React.FC = () => {
     if (!supabaseUrl || !supabaseKey) {
       throw new Error('Missing Supabase configuration');
     }
-    const res = await fetch(`${supabaseUrl}/functions/v1/verify-cookie`, {
-      method: 'POST',
-      headers: {
-        Authorization: `Bearer ${supabaseKey}`,
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({ cookie: value })
-    });
-    if (!res.ok) {
-      const text = await res.text();
-      throw new Error(`Cookie verification failed (${res.status}): ${text}`);
+    let res: Response;
+    try {
+      res = await fetch(`${supabaseUrl}/functions/v1/verify-cookie`, {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${supabaseKey}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ cookie: value })
+      });
+    } catch (err) {
+      console.error('verify-cookie network error:', err);
+      throw new Error('Network error contacting verify-cookie');
     }
+
+    if (!res.ok) {
+      let message = `${res.status}`;
+      try {
+        const json = await res.json();
+        if (json?.error) message += `: ${json.error}`;
+      } catch {
+        const text = await res.text();
+        if (text) message += `: ${text}`;
+      }
+      if (res.status === 403) {
+        message = 'Invalid or expired cookie';
+      } else if (res.status === 400) {
+        message = 'Missing cookie';
+      }
+      throw new Error(message);
+    }
+
     const data = await res.json();
     return data.name as string;
   };
@@ -151,7 +188,9 @@ const RobloxCookiePanel: React.FC = () => {
           <label className="block text-sm mb-1">Presence API</label>
           <select
             value={testMethod}
-            onChange={(e) => setTestMethod(e.target.value as any)}
+            onChange={(e) =>
+              setTestMethod(e.target.value as 'auto' | 'primary' | 'fallback' | 'direct')
+            }
             className="p-2 border rounded dark:bg-gray-700 dark:border-gray-600"
           >
             <option value="auto">Auto</option>
@@ -216,7 +255,7 @@ const RobloxCookiePanel: React.FC = () => {
                     </p>
                     {Array.isArray(testResult.attemptLog) && (
                       <p className="flex gap-2">
-                        {testResult.attemptLog.map((a: any, idx: number) => (
+                        {(testResult.attemptLog || []).map((a: PresenceAttempt, idx: number) => (
                           <span key={idx} className="flex items-center gap-1">
                             {a.success ? '✅' : '❌'}{' '}
                             {a.method === 'primary'
