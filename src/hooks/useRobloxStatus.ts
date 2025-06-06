@@ -6,11 +6,13 @@ interface RobloxStatus {
   isOnline: boolean;
   isInGame: boolean;
   inBedwars: boolean;
+  userPresenceType?: number;
   lastUpdated: number;
   username: string;
   placeId?: number;
   rootPlaceId?: number;
   universeId?: number;
+  presenceMethod?: 'primary' | 'fallback' | 'direct';
 }
 
 export function useRobloxStatus(userId: number) {
@@ -107,11 +109,13 @@ export function useRobloxStatus(userId: number) {
                     Number(data.rootPlaceId) === BEDWARS_PLACE_ID ||
                     Number(data.universeId) === BEDWARS_UNIVERSE_ID
                   ),
+              userPresenceType: data.userPresenceType,
               lastUpdated: data.lastUpdated || Date.now(),
               username: data.username || `User ${userId}`,
               placeId: data.placeId,
               rootPlaceId: data.rootPlaceId,
-              universeId: data.universeId
+              universeId: data.universeId,
+              presenceMethod: data.presenceMethod
             });
             setError(null);
             setRetryCount(0);

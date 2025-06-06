@@ -127,9 +127,10 @@ const PRESENCE_API_DIRECT = 'https://presence.roblox.com/v1/presence/users';
 
 async function getUserPresence(
   userId: number,
-  methodFilter?: 'primary' | 'fallback' | 'direct'
+  methodFilter?: 'primary' | 'fallback' | 'direct',
+  cookieOverride?: string
 ): Promise<PresenceResult> {
-  const cookie = await getRobloxCookie();
+  const cookie = cookieOverride || (await getRobloxCookie());
   const options = {
     method: 'POST',
     headers: {
@@ -188,7 +189,8 @@ async function getUsernameFromId(userId: number): Promise<string> {
 
 async function getUserStatus(
   userId: number,
-  methodFilter?: 'primary' | 'fallback' | 'direct'
+  methodFilter?: 'primary' | 'fallback' | 'direct',
+  cookieOverride?: string
 ): Promise<UserStatus> {
   try {
     if (!userId || typeof userId !== 'number') {
@@ -204,7 +206,7 @@ async function getUserStatus(
 
     // Get presence data and username in parallel
     const [presenceResult, username] = await Promise.all([
-      getUserPresence(userId, methodFilter).catch(error => {
+      getUserPresence(userId, methodFilter, cookieOverride).catch(error => {
         console.error('Presence fetch error:', error);
         return null;
       }),
@@ -300,7 +302,15 @@ if (import.meta.main) {
       );
     }
 
-    const status = await getUserStatus(userId, methodParam || undefined);
+    const cookieHeader = req.headers.get('cookie') || '';
+    const cookieMatch = cookieHeader.match(/\.ROBLOSECURITY=([^;]+)/);
+    const requestCookie = cookieMatch ? cookieMatch[1] : undefined;
+
+    const status = await getUserStatus(
+      userId,
+      methodParam || undefined,
+      requestCookie
+    );
     
     return new Response(
       JSON.stringify(status),

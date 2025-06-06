@@ -420,7 +420,7 @@ function PlayerCard({ player, onDelete, isAdmin }: PlayerCardProps) {
                     title="Rank unknown"
                   />
                 )}
-                {account.status?.isInGame &&
+                {account.status?.userPresenceType === 2 &&
                   (account.status?.inBedwars ||
                     Number(account.status?.placeId) === BEDWARS_PLACE_ID ||
                     Number(account.status?.rootPlaceId) === BEDWARS_PLACE_ID ||
@@ -547,7 +547,7 @@ function PlayerCard({ player, onDelete, isAdmin }: PlayerCardProps) {
                         <span className="text-sm">Rank unknown</span>
                       </div>
                     )}
-                    {account.status?.isInGame &&
+                    {account.status?.userPresenceType === 2 &&
                       (account.status?.inBedwars ||
                         Number(account.status?.placeId) === BEDWARS_PLACE_ID ||
                         Number(account.status?.rootPlaceId) === BEDWARS_PLACE_ID ||

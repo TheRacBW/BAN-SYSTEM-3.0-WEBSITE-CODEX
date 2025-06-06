@@ -57,9 +57,11 @@ export default function PlayersPage() {
                             Number(data.rootPlaceId) === BEDWARS_PLACE_ID ||
                             Number(data.universeId) === BEDWARS_UNIVERSE_ID
                           ),
+                      userPresenceType: data.userPresenceType,
                       placeId: data.placeId,
                       rootPlaceId: data.rootPlaceId,
                       universeId: data.universeId,
+                      presenceMethod: data.presenceMethod,
                       username: data.username,
                       lastUpdated: data.lastUpdated,
                     },

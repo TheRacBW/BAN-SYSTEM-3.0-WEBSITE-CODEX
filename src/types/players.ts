@@ -22,9 +22,11 @@ export interface PlayerAccount {
     isOnline: boolean;
     isInGame: boolean;
     inBedwars: boolean;
+    userPresenceType?: number;
     placeId?: number;
     rootPlaceId?: number;
     universeId?: number;
+    presenceMethod?: 'primary' | 'fallback' | 'direct';
     username: string;
     lastUpdated: number;
   };
