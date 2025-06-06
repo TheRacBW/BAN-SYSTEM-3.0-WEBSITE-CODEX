@@ -12,9 +12,17 @@ interface UserPresence {
   lastOnline: string;
 }
 
+interface PresenceAttempt {
+  method: 'primary' | 'fallback' | 'direct';
+  success: boolean;
+  status?: number;
+  error?: string;
+}
+
 interface PresenceResult {
   presence: UserPresence;
   method: 'primary' | 'fallback' | 'direct';
+  attempts: PresenceAttempt[];
 }
 
 export interface UserStatus {
@@ -23,11 +31,13 @@ export interface UserStatus {
   isOnline: boolean;
   isInGame: boolean;
   inBedwars: boolean;
+  userPresenceType: number | null;
   placeId: number | null;
   rootPlaceId: number | null;
   universeId: number | null;
   lastUpdated: number;
   presenceMethod: 'primary' | 'fallback' | 'direct';
+  attemptLog: PresenceAttempt[];
 }
 
 const CACHE_DURATION = 60; // seconds
@@ -69,14 +79,18 @@ async function getUserPresence(userId: number, cookie?: string): Promise<Presenc
     [PRESENCE_API_DIRECT, 'direct']
   ];
 
+  const attemptLog: PresenceAttempt[] = [];
+
   for (const [url, method] of urls) {
     try {
       const data = await fetchJson(url, options);
       if (data.userPresences?.[0]) {
-        return { presence: data.userPresences[0], method };
+        attemptLog.push({ method, success: true });
+        return { presence: data.userPresences[0], method, attempts: attemptLog };
       }
-    } catch {
-      // try next url
+      attemptLog.push({ method, success: false });
+    } catch (err) {
+      attemptLog.push({ method, success: false, error: err instanceof Error ? err.message : String(err) });
     }
   }
 
@@ -102,6 +116,7 @@ export async function getUserStatus(userId: number, cookie?: string): Promise<Us
 
   const presence = presenceResult.presence;
   const presenceMethod = presenceResult.method;
+  const attemptLog = presenceResult.attempts;
 
   const status: UserStatus = {
     userId,
@@ -113,11 +128,13 @@ export async function getUserStatus(userId: number, cookie?: string): Promise<Us
       (Number(presence.placeId) === BEDWARS_PLACE_ID ||
         Number(presence.rootPlaceId) === BEDWARS_PLACE_ID ||
         Number(presence.universeId) === BEDWARS_UNIVERSE_ID),
+    userPresenceType: presence.userPresenceType,
     placeId: presence.placeId ? Number(presence.placeId) : null,
     rootPlaceId: presence.rootPlaceId ? Number(presence.rootPlaceId) : null,
     universeId: presence.universeId ? Number(presence.universeId) : null,
     lastUpdated: Date.now(),
-    presenceMethod
+    presenceMethod,
+    attemptLog
   };
   statusCache.set(userId, status);
   return status;
