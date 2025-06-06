@@ -17,12 +17,14 @@ interface PresenceAttempt {
   success: boolean;
   status?: number;
   error?: string;
+  cookie?: boolean;
 }
 
 interface PresenceResult {
   presence: UserPresence;
   method: 'primary' | 'fallback' | 'direct';
   attempts: PresenceAttempt[];
+  cookieProvided: boolean;
 }
 
 export interface UserStatus {
@@ -38,6 +40,7 @@ export interface UserStatus {
   lastUpdated: number;
   presenceMethod: 'primary' | 'fallback' | 'direct';
   attemptLog: PresenceAttempt[];
+  cookieProvided: boolean;
 }
 
 const CACHE_DURATION = 60; // seconds
@@ -92,17 +95,28 @@ async function getUserPresence(
       ];
 
   const attemptLog: PresenceAttempt[] = [];
+  const cookieIncluded = !!cookie;
 
   for (const [url, method] of urls) {
     try {
       const data = await fetchJson(url, options);
       if (data.userPresences?.[0]) {
-        attemptLog.push({ method, success: true });
-        return { presence: data.userPresences[0], method, attempts: attemptLog };
+        attemptLog.push({ method, success: true, cookie: cookieIncluded });
+        return {
+          presence: data.userPresences[0],
+          method,
+          attempts: attemptLog,
+          cookieProvided: cookieIncluded
+        };
       }
-      attemptLog.push({ method, success: false });
+      attemptLog.push({ method, success: false, cookie: cookieIncluded });
     } catch (err) {
-      attemptLog.push({ method, success: false, error: err instanceof Error ? err.message : String(err) });
+      attemptLog.push({
+        method,
+        success: false,
+        error: err instanceof Error ? err.message : String(err),
+        cookie: cookieIncluded
+      });
     }
   }
 
@@ -134,6 +148,7 @@ export async function getUserStatus(
   const presence = presenceResult.presence;
   const presenceMethod = presenceResult.method;
   const attemptLog = presenceResult.attempts;
+  const cookieProvided = presenceResult.cookieProvided;
 
   const status: UserStatus = {
     userId,
@@ -151,7 +166,8 @@ export async function getUserStatus(
     universeId: presence.universeId ? Number(presence.universeId) : null,
     lastUpdated: Date.now(),
     presenceMethod,
-    attemptLog
+    attemptLog,
+    cookieProvided
   };
   statusCache.set(cacheKey, status);
   return status;
