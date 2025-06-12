@@ -54,13 +54,9 @@ const MAX_RETRIES = 3;
 const INITIAL_RETRY_DELAY = 1000;
 import { BEDWARS_PLACE_ID, BEDWARS_UNIVERSE_ID } from '../../src/constants/bedwars.ts';
 import { ROBLOX_HEADERS } from '../../src/constants/robloxHeaders.ts';
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+import { createClient, SupabaseClient } from 'https://esm.sh/@supabase/supabase-js@2';
 
-const supabaseUrl = Deno.env.get('SUPABASE_URL') || '';
-const serviceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
-const supabase = createClient(supabaseUrl, serviceKey);
-
-async function getRobloxCookie(): Promise<string> {
+async function getRobloxCookie(supabase: SupabaseClient): Promise<string> {
   const envCookie = Deno.env.get('ROBLOX_COOKIE');
   try {
     const { data } = await supabase
@@ -69,10 +65,11 @@ async function getRobloxCookie(): Promise<string> {
       .eq('id', 'global')
       .single();
     return (data?.cookie || envCookie || '').trim();
-  } catch (_err) {
+  } catch {
     return (envCookie || '').trim();
   }
 }
+
 
 const REQUEST_TIMEOUT = 15000; // Increased to 15 seconds
 
@@ -131,10 +128,11 @@ const PRESENCE_API_DIRECT = 'https://presence.roblox.com/v1/presence/users';
 
 async function getUserPresence(
   userId: number,
-  methodFilter?: 'primary' | 'fallback' | 'direct',
-  cookieOverride?: string
+  methodFilter: 'primary' | 'fallback' | 'direct' | undefined,
+  cookieOverride: string | undefined,
+  supabase: SupabaseClient
 ): Promise<PresenceResult> {
-  const cookie = cookieOverride || (await getRobloxCookie());
+  const cookie = cookieOverride || (await getRobloxCookie(supabase));
   const options = {
     method: 'POST',
     headers: {
@@ -217,8 +215,9 @@ async function getUsernameFromId(userId: number): Promise<string> {
 
 async function getUserStatus(
   userId: number,
-  methodFilter?: 'primary' | 'fallback' | 'direct',
-  cookieOverride?: string
+  methodFilter: 'primary' | 'fallback' | 'direct' | undefined,
+  cookieOverride: string | undefined,
+  supabase: SupabaseClient
 ): Promise<UserStatus> {
   try {
     if (!userId || typeof userId !== 'number') {
@@ -234,7 +233,7 @@ async function getUserStatus(
 
     // Get presence data and username in parallel
     const [presenceResult, username] = await Promise.all([
-      getUserPresence(userId, methodFilter, cookieOverride).catch(error => {
+      getUserPresence(userId, methodFilter, cookieOverride, supabase).catch(error => {
         console.error('Presence fetch error:', error);
         return null;
       }),
@@ -336,10 +335,22 @@ if (import.meta.main) {
     const cookieMatch = cookieHeader.match(/\.ROBLOSECURITY=([^;]+)/);
     const requestCookie = cookieMatch ? cookieMatch[1] : undefined;
 
+    const supabaseUrl = Deno.env.get('SUPABASE_URL') || '';
+    const serviceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
+    if (!supabaseUrl || !serviceKey) {
+      return new Response(
+        JSON.stringify({ error: 'Missing Supabase configuration' }),
+        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    const supabase = createClient(supabaseUrl, serviceKey);
+
     const status = await getUserStatus(
       userId,
       methodParam || undefined,
-      requestCookie
+      requestCookie,
+      supabase
     );
     
     return new Response(
