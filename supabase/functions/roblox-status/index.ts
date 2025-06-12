@@ -161,12 +161,18 @@ async function getUserPresence(
   const attemptLog: PresenceAttempt[] = [];
 
   const cookieIncluded = !!cookie;
+  if (!cookieIncluded) {
+    console.warn('No .ROBLOSECURITY cookie supplied for presence request');
+  }
 
   for (const [url, method] of urls) {
     try {
       const response = await fetchWithRetry(url, options);
       const data = await response.json();
       if (data.userPresences?.[0]) {
+        if (method !== 'primary') {
+          console.warn(`Presence API fallback method used: ${method}`);
+        }
         attemptLog.push({
           method,
           success: true,

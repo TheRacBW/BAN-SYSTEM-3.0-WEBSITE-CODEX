@@ -56,7 +56,13 @@ const RobloxCookiePanel: React.FC = () => {
     fetchCookie();
   }, []);
 
-  const verifyCookie = async (value: string): Promise<string> => {
+  interface VerifyResponse {
+    success: boolean;
+    name?: string;
+    error?: string;
+  }
+
+  const verifyCookie = async (value: string): Promise<VerifyResponse> => {
     try {
       const { data, error } = await supabase.functions.invoke('verify-cookie', {
         body: { cookie: value }
@@ -65,7 +71,7 @@ const RobloxCookiePanel: React.FC = () => {
         console.error('verify-cookie response error:', error);
         throw new Error('Failed to verify cookie');
       }
-      return (data as any).name as string;
+      return data as VerifyResponse;
     } catch (err) {
       const message =
         err instanceof Error ? err.message : 'Network error contacting verify-cookie';
@@ -80,11 +86,14 @@ const RobloxCookiePanel: React.FC = () => {
     setSuccess(null);
     const trimmed = cookie.trim();
     try {
-      const username = await verifyCookie(trimmed);
-      // verify-cookie persists the value using a service key, so no direct
-      // table update is required here
-      setSuccess(`Cookie saved for ${username}`);
-      setTimeout(() => setSuccess(null), 3000);
+      const result = await verifyCookie(trimmed);
+
+      if (result.success) {
+        setSuccess(`Cookie saved for ${result.name}`);
+        setTimeout(() => setSuccess(null), 3000);
+      } else {
+        setError(result.error || 'Verification failed');
+      }
     } catch (err) {
       console.error('Error saving cookie:', err);
       const message = err instanceof Error ? err.message : 'Failed to save cookie';
@@ -179,6 +188,20 @@ const RobloxCookiePanel: React.FC = () => {
         </div>
       </form>
 
+      {testResult && (
+        <div className="mt-2 text-sm text-gray-600 dark:text-gray-400">
+          <p>
+            Last Proxy Used:{' '}
+            {testResult.presenceMethod === 'primary'
+              ? 'roblox-proxy'
+              : testResult.presenceMethod === 'fallback'
+              ? 'roproxy'
+              : 'direct'}
+          </p>
+          <p>Cookie Applied: {testResult.cookieProvided ? 'yes' : 'no'}</p>
+        </div>
+      )}
+
       {showTestModal && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
           <div className="bg-white dark:bg-gray-800 rounded-lg p-6 max-w-md w-full mx-4">
@@ -216,6 +239,17 @@ const RobloxCookiePanel: React.FC = () => {
                       >
                         API Method: {testResult.presenceMethod}
                       </span>
+                    </p>
+                    <p>
+                      Proxy Used:{' '}
+                      {testResult.presenceMethod === 'primary'
+                        ? 'roblox-proxy'
+                        : testResult.presenceMethod === 'fallback'
+                        ? 'roproxy'
+                        : 'direct'}
+                    </p>
+                    <p>
+                      Cookie Applied: {testResult.cookieProvided ? 'yes' : 'no'}
                     </p>
                     {Array.isArray(testResult.attemptLog) && (
                       <p className="flex gap-2">

