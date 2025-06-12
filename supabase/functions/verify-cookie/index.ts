@@ -27,8 +27,13 @@ if (import.meta.main) {
       const supabaseUrl = Deno.env.get('SUPABASE_URL') || '';
       const serviceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
       if (!supabaseUrl || !serviceKey) {
-        console.error('Supabase environment variables are missing');
+        return new Response(
+          JSON.stringify({ error: 'Missing Supabase configuration' }),
+          { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
       }
+
+      const trimmedCookie = cookie.trim();
 
       let res: Response | null = null;
       let verifyError: string | null = null;
@@ -37,8 +42,9 @@ if (import.meta.main) {
       try {
         res = await fetch('https://users.roblox.com/v1/users/authenticated', {
           headers: {
-            Cookie: `.ROBLOSECURITY=${cookie}`,
-            'User-Agent': 'Roblox/WinInet'
+            Cookie: `.ROBLOSECURITY=${trimmedCookie}`,
+            'User-Agent': 'Roblox/WinInet',
+            'Referer': 'https://www.roblox.com/'
           }
         });
 
@@ -58,7 +64,7 @@ if (import.meta.main) {
         const supabase = createClient(supabaseUrl, serviceKey);
         const { error } = await supabase
           .from('roblox_settings')
-          .upsert({ id: 'global', cookie, updated_at: new Date().toISOString() });
+          .upsert({ id: 'global', cookie: trimmedCookie, updated_at: new Date().toISOString() });
         if (error) {
           console.error('Failed to store cookie:', error);
         }

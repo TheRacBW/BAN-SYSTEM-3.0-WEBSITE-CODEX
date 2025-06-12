@@ -57,6 +57,11 @@ reach it. From the project root run:
 supabase functions deploy verify-cookie
 ```
 
+Both `verify-cookie` and `roblox-status` require the environment variables
+`SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY` when running on the edge.
+Optionally provide `ROBLOX_COOKIE` to set a default cookie. Without these the
+functions will fail to store or load your Roblox cookie.
+
 Deploy any other functions, such as `roblox-status`, in the same way.
 
 ### Debugging Presence
