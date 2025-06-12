@@ -133,11 +133,16 @@ async function getUserPresence(
   supabase: SupabaseClient
 ): Promise<PresenceResult> {
   const cookie = cookieOverride || (await getRobloxCookie(supabase));
+  if (cookie) {
+    console.log('Using ROBLOX_COOKIE for presence request');
+  } else {
+    console.warn('No .ROBLOSECURITY cookie supplied for presence request');
+  }
   const options = {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
-      ...(cookie ? { 'Cookie': '.ROBLOSECURITY=' + cookie } : {})
+      ...(cookie ? { 'cookie': '.ROBLOSECURITY=' + cookie } : {})
     },
     body: JSON.stringify({ userIds: [userId] })
   } as const;
@@ -159,9 +164,6 @@ async function getUserPresence(
   const attemptLog: PresenceAttempt[] = [];
 
   const cookieIncluded = !!cookie;
-  if (!cookieIncluded) {
-    console.warn('No .ROBLOSECURITY cookie supplied for presence request');
-  }
 
   for (const [url, method] of urls) {
     try {
@@ -334,6 +336,7 @@ if (import.meta.main) {
     const cookieHeader = req.headers.get('cookie') || '';
     const cookieMatch = cookieHeader.match(/\.ROBLOSECURITY=([^;]+)/);
     const requestCookie = cookieMatch ? cookieMatch[1] : undefined;
+    console.log('Request included cookie:', !!requestCookie);
 
     const supabaseUrl = Deno.env.get('SUPABASE_URL') || '';
     const serviceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';

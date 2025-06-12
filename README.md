@@ -81,3 +81,6 @@ The `presenceMethod` indicates which API was used (`primary` for
 `roblox-proxy`, `fallback` for RoProxy and `direct` for Roblox). All methods
 still require a valid `.ROBLOSECURITY` cookie in order for the Presence API to
 return detailed information such as `placeId` and `universeId`.
+When invoking the function, the logs will now state whether a cookie was
+received and applied. Look for messages like `Request included cookie: true` to
+confirm the header was sent.

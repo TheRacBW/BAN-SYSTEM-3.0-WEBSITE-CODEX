@@ -75,10 +75,11 @@ async function getUserPresence(
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
-      ...(cookie ? { Cookie: '.ROBLOSECURITY=' + cookie } : {})
+      ...(cookie ? { cookie: '.ROBLOSECURITY=' + cookie } : {})
     },
     body: JSON.stringify({ userIds: [userId] })
   } as const;
+  console.log('Presence request using cookie:', !!cookie);
 
   const urlMap = {
     primary: PRESENCE_API_PRIMARY,
