@@ -112,7 +112,7 @@ const RobloxCookiePanel: React.FC = () => {
       const headers: Record<string, string> = {};
       const trimmedCookie = cookie.trim();
       if (trimmedCookie) {
-        headers['Cookie'] = `.ROBLOSECURITY=${trimmedCookie}`;
+        headers['cookie'] = `.ROBLOSECURITY=${trimmedCookie}`;
       }
       const { data, error } = await supabase.functions.invoke(path, {
         headers

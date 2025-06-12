@@ -74,7 +74,7 @@ and `attemptLog` fields:
 ```bash
 curl "${VITE_SUPABASE_URL}/functions/v1/roblox-status?userId=USER_ID" \
   -H "Authorization: Bearer ${VITE_SUPABASE_ANON_KEY}" \
-  -H "Cookie: .ROBLOSECURITY=${ROBLOX_COOKIE}"
+  -H "cookie: .ROBLOSECURITY=${ROBLOX_COOKIE}"
 ```
 
 The `presenceMethod` indicates which API was used (`primary` for
