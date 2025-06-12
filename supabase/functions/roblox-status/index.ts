@@ -333,9 +333,22 @@ if (import.meta.main) {
       );
     }
 
-    const cookieHeader = req.headers.get('cookie') || '';
-    const cookieMatch = cookieHeader.match(/\.ROBLOSECURITY=([^;]+)/);
-    const requestCookie = cookieMatch ? cookieMatch[1] : undefined;
+    let requestCookie: string | undefined;
+
+    try {
+      const { cookie } = await req.json();
+      if (cookie && typeof cookie === 'string') {
+        requestCookie = cookie.trim();
+      }
+    } catch {
+      // no JSON body or invalid JSON
+    }
+
+    if (!requestCookie) {
+      const cookieHeader = req.headers.get('cookie') || '';
+      const cookieMatch = cookieHeader.match(/\.ROBLOSECURITY=([^;]+)/);
+      requestCookie = cookieMatch ? cookieMatch[1] : undefined;
+    }
     console.log('Request included cookie:', !!requestCookie);
 
     const supabaseUrl = Deno.env.get('SUPABASE_URL') || '';
