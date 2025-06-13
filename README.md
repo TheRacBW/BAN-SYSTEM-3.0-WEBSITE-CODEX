@@ -71,11 +71,18 @@ cookie may be missing or invalid. You can quickly check by calling the
 `roblox-status` function with a test user and inspecting the `presenceMethod`
 and `attemptLog` fields:
 
-```bash
-curl "${VITE_SUPABASE_URL}/functions/v1/roblox-status?userId=USER_ID" \
-  -H "Authorization: Bearer ${VITE_SUPABASE_ANON_KEY}" \
-  -H "cookie: .ROBLOSECURITY=${ROBLOX_COOKIE}"
+```typescript
+const { data, error } = await supabase.functions.invoke('roblox-status', {
+  body: {
+    userId: USER_ID,
+    cookie: ROBLOX_COOKIE
+  }
+});
 ```
+
+When invoking `roblox-status`, include the `.ROBLOSECURITY` cookie inside the
+JSON body. The function reattaches it to outgoing requests server-side so that
+the Roblox API receives it correctly.
 
 The `presenceMethod` indicates which API was used (`primary` for
 `roblox-proxy`, `fallback` for RoProxy and `direct` for Roblox). All methods
