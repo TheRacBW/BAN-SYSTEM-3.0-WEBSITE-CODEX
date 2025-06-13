@@ -3,7 +3,7 @@ const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
   'Access-Control-Allow-Headers':
-    'authorization, x-client-info, apikey, content-type',
+    'authorization, x-client-info, apikey, content-type, cookie',
   'Access-Control-Max-Age': '86400'
 };
 
@@ -154,17 +154,17 @@ async function getUserPresence(
     direct: PRESENCE_API_DIRECT
   } as const;
 
+  const cookieIncluded = !!cookie;
+
   const urls: [string, 'primary' | 'fallback' | 'direct'][] = methodFilter
     ? [[urlMap[methodFilter], methodFilter]]
     : [
         [PRESENCE_API_PRIMARY, 'primary'],
         [PRESENCE_API_FALLBACK, 'fallback'],
-        [PRESENCE_API_DIRECT, 'direct']
+        ...(cookieIncluded ? [[PRESENCE_API_DIRECT, 'direct']] : [])
       ];
 
   const attemptLog: PresenceAttempt[] = [];
-
-  const cookieIncluded = !!cookie;
 
   for (const [url, method] of urls) {
     try {
@@ -309,7 +309,7 @@ if (import.meta.main) {
   try {
     const url = new URL(req.url);
     let userIdParam = url.searchParams.get('userId');
-    const methodParam = url.searchParams.get('method') as
+    let methodParam = url.searchParams.get('method') as
       | 'primary'
       | 'fallback'
       | 'direct'
@@ -320,9 +320,12 @@ if (import.meta.main) {
 
     try {
       reqBody = await req.json();
-      const { cookie, userId: bodyUserId } = reqBody;
+      const { cookie, userId: bodyUserId, method: bodyMethod } = reqBody;
       if (!userIdParam && typeof bodyUserId === 'number') {
         userIdParam = String(bodyUserId);
+      }
+      if (!methodParam && typeof bodyMethod === 'string') {
+        methodParam = bodyMethod as 'primary' | 'fallback' | 'direct';
       }
       if (cookie && typeof cookie === 'string') {
         requestCookie = cookie.trim();
@@ -331,6 +334,7 @@ if (import.meta.main) {
       reqBody = {};
       // no JSON body or invalid JSON
     }
+    console.log('Incoming body:', reqBody);
     console.log('Received cookie in body:', !!requestCookie, requestCookie?.slice(0, 10));
 
     if (!userIdParam) {
@@ -359,7 +363,7 @@ if (import.meta.main) {
       const cookieMatch = cookieHeader.match(/\.ROBLOSECURITY=([^;]+)/);
       requestCookie = cookieMatch ? cookieMatch[1] : undefined;
     }
-    console.log('Request included cookie:', !!requestCookie);
+    console.log('Request included cookie header:', !!requestCookie);
 
     const supabaseUrl = Deno.env.get('SUPABASE_URL') || '';
     const serviceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
@@ -372,10 +376,19 @@ if (import.meta.main) {
 
     const supabase = createClient(supabaseUrl, serviceKey);
 
+    const finalCookie = requestCookie || (await getRobloxCookie(supabase));
+    console.log('Final cookie to use:', !!finalCookie);
+    if (!finalCookie) {
+      return new Response(
+        JSON.stringify({ error: 'Cookie is required' }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
     const status = await getUserStatus(
       userId,
       methodParam || undefined,
-      requestCookie,
+      finalCookie,
       supabase
     );
     
