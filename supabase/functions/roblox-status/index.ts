@@ -326,14 +326,27 @@ if (import.meta.main) {
     }
 
     const trimmed = typeof cookie === 'string' ? cookie.trim() : '';
-    console.log('Cookie length:', trimmed.length);
+    let finalCookie = trimmed;
+
+    if (finalCookie.length === 0) {
+      const supabaseUrl = Deno.env.get('SUPABASE_URL') || '';
+      const serviceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
+      if (supabaseUrl && serviceKey) {
+        const supabase = createClient(supabaseUrl, serviceKey);
+        finalCookie = await getRobloxCookie(supabase);
+      } else {
+        finalCookie = (Deno.env.get('ROBLOX_COOKIE') || '').trim();
+      }
+    }
+
+    console.log('Cookie length:', finalCookie.length);
 
     const headers: Record<string, string> = {
       'Content-Type': 'application/json',
       'User-Agent': 'Roblox/WinInet'
     };
-    if (trimmed.length > 0) {
-      headers.Cookie = `.ROBLOSECURITY=${trimmed}`;
+    if (finalCookie.length > 0) {
+      headers.Cookie = `.ROBLOSECURITY=${finalCookie}`;
     }
     console.log('Fetch headers:', headers);
 
