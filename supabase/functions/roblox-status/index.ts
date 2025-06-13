@@ -142,7 +142,8 @@ async function getUserPresence(
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
-      ...(cookie ? { 'cookie': '.ROBLOSECURITY=' + cookie } : {})
+      ...(cookie ? { 'Cookie': '.ROBLOSECURITY=' + cookie } : {}),
+      'User-Agent': 'RobloxPresenceChecker/1.0'
     },
     body: JSON.stringify({ userIds: [userId] })
   } as const;
@@ -307,17 +308,35 @@ if (import.meta.main) {
 
   try {
     const url = new URL(req.url);
-    const userIdParam = url.searchParams.get('userId');
+    let userIdParam = url.searchParams.get('userId');
     const methodParam = url.searchParams.get('method') as
       | 'primary'
       | 'fallback'
       | 'direct'
       | null;
 
+    let requestCookie: string | undefined;
+    let reqBody: any = {};
+
+    try {
+      reqBody = await req.json();
+      const { cookie, userId: bodyUserId } = reqBody;
+      if (!userIdParam && typeof bodyUserId === 'number') {
+        userIdParam = String(bodyUserId);
+      }
+      if (cookie && typeof cookie === 'string') {
+        requestCookie = cookie.trim();
+      }
+    } catch {
+      reqBody = {};
+      // no JSON body or invalid JSON
+    }
+    console.log('Received cookie in body:', !!requestCookie, requestCookie?.slice(0, 10));
+
     if (!userIdParam) {
       return new Response(
         JSON.stringify({ error: 'User ID is required' }),
-        { 
+        {
           status: 400,
           headers: { ...corsHeaders, 'Content-Type': 'application/json' }
         }
@@ -328,27 +347,12 @@ if (import.meta.main) {
     if (isNaN(userId)) {
       return new Response(
         JSON.stringify({ error: 'Invalid user ID format' }),
-        { 
+        {
           status: 400,
           headers: { ...corsHeaders, 'Content-Type': 'application/json' }
         }
       );
     }
-
-    let requestCookie: string | undefined;
-    let reqBody: any = {};
-
-    try {
-      reqBody = await req.json();
-      const { cookie } = reqBody;
-      if (cookie && typeof cookie === 'string') {
-        requestCookie = cookie.trim();
-      }
-    } catch {
-      reqBody = {};
-      // no JSON body or invalid JSON
-    }
-    console.log('reqBody.cookie.length', reqBody.cookie ? reqBody.cookie.length : 0);
 
     if (!requestCookie) {
       const cookieHeader = req.headers.get('cookie') || '';
