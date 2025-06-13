@@ -154,6 +154,8 @@ async function getUserPresence(
     direct: PRESENCE_API_DIRECT
   } as const;
 
+  const cookieIncluded = !!cookie;
+
   const urls: [string, 'primary' | 'fallback' | 'direct'][] = methodFilter
     ? [[urlMap[methodFilter], methodFilter]]
     : [
@@ -163,8 +165,6 @@ async function getUserPresence(
       ];
 
   const attemptLog: PresenceAttempt[] = [];
-
-  const cookieIncluded = !!cookie;
 
   for (const [url, method] of urls) {
     try {
