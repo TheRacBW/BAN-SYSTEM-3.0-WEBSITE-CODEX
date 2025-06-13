@@ -409,10 +409,10 @@ if (import.meta.main) {
     );
   } catch (error) {
     console.error('Server error:', error);
-    
+
     const errorMessage = error instanceof Error ? error.message : 'Unknown error';
     let status = 500;
-    
+
     if (errorMessage.includes('not found')) {
       status = 404;
     } else if (errorMessage.includes('rate limit')) {
@@ -420,13 +420,23 @@ if (import.meta.main) {
     } else if (errorMessage.includes('timed out')) {
       status = 504;
     }
-    
+
+    const extra: Record<string, unknown> = {};
+    if (error && typeof error === 'object' && 'details' in error && (error as any).details) {
+      extra.details = (error as any).details;
+    } else {
+      const match = /status:\s*(\d+)/i.exec(errorMessage);
+      if (match) {
+        extra.fetchStatus = Number(match[1]);
+      }
+    }
+
     return new Response(
-      JSON.stringify({ 
+      JSON.stringify({
         error: errorMessage,
-        details: error instanceof Error ? error.stack : 'No details available'
+        ...extra
       }),
-      { 
+      {
         status,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' }
       }

@@ -68,27 +68,24 @@ export function useRobloxStatus(userId: number) {
 
           if (!response.ok) {
             const errorData = await response.json().catch(() => ({}));
-            
+            const serverMsg = errorData.error || errorData.details;
+
             switch (response.status) {
               case 404:
-                throw new Error(`Roblox user ID ${userId} not found`);
+                throw new Error(serverMsg || `Roblox user ID ${userId} not found`);
               case 429:
                 if (retryCount < MAX_RETRIES) {
                   setRetryCount(count => count + 1);
                   timeoutId = setTimeout(checkStatus, RETRY_DELAY * Math.pow(2, retryCount));
                   return;
                 }
-                throw new Error('Rate limited. Please try again later');
+                throw new Error(serverMsg || 'Rate limited. Please try again later');
               case 500:
-                throw new Error(errorData.error || 'Unable to check Roblox status right now');
+                throw new Error(serverMsg || 'Unable to check Roblox status right now');
               case 503:
-                throw new Error('Roblox API is temporarily unavailable');
+                throw new Error(serverMsg || 'Roblox API is temporarily unavailable');
               default:
-                throw new Error(
-                  errorData.error || 
-                  errorData.details || 
-                  'Unable to check player status'
-                );
+                throw new Error(serverMsg || 'Unable to check player status');
             }
           }
 
