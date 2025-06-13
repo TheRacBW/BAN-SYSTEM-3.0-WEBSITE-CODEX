@@ -178,8 +178,10 @@ async function getUserPresence(
       console.log('Fetch Headers:', options.headers);
       console.log('Fetch Body:', body);
       const response = await fetchWithRetry(url, options);
-      const data = await response.json();
-      console.log('Presence API Response:', data);
+      const text = await response.text();
+      console.log('Presence API Status:', response.status);
+      console.log('Presence API Body:', text);
+      const data = JSON.parse(text);
       if (data.userPresences?.[0]) {
         if (method !== 'primary') {
           console.warn(`Presence API fallback method used: ${method}`);
@@ -297,7 +299,7 @@ async function getUserStatus(
 
     // Update cache
     statusCache.set(cacheKey, status);
-    return status;
+    return { ...status, presence };
   } catch (error) {
     console.error('Error in getUserStatus:', error);
     throw error;
@@ -343,7 +345,7 @@ if (import.meta.main) {
       // no JSON body or invalid JSON
     }
     console.log('Incoming body:', reqBody);
-    console.log('Received cookie in body:', !!requestCookie, requestCookie?.slice(0, 10));
+    console.log('Received cookie in body length:', requestCookie?.length || 0);
 
     if (!userIdParam) {
       return new Response(
@@ -385,7 +387,7 @@ if (import.meta.main) {
     const supabase = createClient(supabaseUrl, serviceKey);
 
     const finalCookie = requestCookie || (await getRobloxCookie(supabase));
-    console.log('Final cookie to use:', !!finalCookie);
+    console.log('Final cookie length:', finalCookie ? finalCookie.length : 0);
     if (!finalCookie) {
       return new Response(
         JSON.stringify({ error: 'Cookie is required' }),
