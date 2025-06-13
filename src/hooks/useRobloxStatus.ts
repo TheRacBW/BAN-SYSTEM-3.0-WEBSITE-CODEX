@@ -39,38 +39,21 @@ export function useRobloxStatus(userId: number) {
         setLoading(true);
         setError(null);
 
-        const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
-        const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
-
-        if (!supabaseUrl || !supabaseKey) {
-          throw new Error('Missing Supabase configuration');
-        }
-
-        const apiUrl = `${supabaseUrl}/functions/v1/roblox-status`;
-        
         const controller = new AbortController();
         const timeoutDuration = 20000; // Increased to 20 seconds
         timeoutId = setTimeout(() => controller.abort(), timeoutDuration);
 
         try {
-          const response = await fetch(`${apiUrl}?userId=${userId}`, {
-            headers: {
-              Authorization: `Bearer ${supabaseKey}`,
-              'Content-Type': 'application/json',
-              'Accept': 'application/json'
-            },
-            signal: controller.signal,
-            mode: 'cors',
-            credentials: 'omit'
+          const { data, error: fnError } = await supabase.functions.invoke('roblox-status', {
+            body: { userId },
+            signal: controller.signal
           });
 
           clearTimeout(timeoutId);
 
-          if (!response.ok) {
-            const errorData = await response.json().catch(() => ({}));
-            const serverMsg = errorData.error || errorData.details;
-
-            switch (response.status) {
+          if (fnError) {
+            const serverMsg = fnError.message || fnError.details;
+            switch (fnError.status) {
               case 404:
                 throw new Error(serverMsg || `Roblox user ID ${userId} not found`);
               case 429:
@@ -89,8 +72,6 @@ export function useRobloxStatus(userId: number) {
             }
           }
 
-          const data = await response.json();
-          
           if (!data || typeof data.isOnline !== 'boolean') {
             throw new Error('Invalid response from status check');
           }
