@@ -317,7 +317,7 @@ if (import.meta.main) {
   }
 
   try {
-    const { userId, cookie } = await req.json();
+    const { userId, cookie, method } = await req.json();
     if (typeof userId !== 'number') {
       return new Response(
         JSON.stringify({ error: 'User ID is required' }),
@@ -325,58 +325,19 @@ if (import.meta.main) {
       );
     }
 
-    const trimmed = typeof cookie === 'string' ? cookie.trim() : '';
-    let finalCookie = trimmed;
+    const supabaseUrl = Deno.env.get('SUPABASE_URL') || '';
+    const serviceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
+    const supabase = createClient(supabaseUrl, serviceKey);
 
-    if (finalCookie.length === 0) {
-      const supabaseUrl = Deno.env.get('SUPABASE_URL') || '';
-      const serviceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
-      if (supabaseUrl && serviceKey) {
-        const supabase = createClient(supabaseUrl, serviceKey);
-        finalCookie = await getRobloxCookie(supabase);
-      } else {
-        finalCookie = (Deno.env.get('ROBLOX_COOKIE') || '').trim();
-      }
-    }
-
-    console.log('Cookie length:', finalCookie.length);
-
-    const headers: Record<string, string> = {
-      'Content-Type': 'application/json',
-      'User-Agent': 'Roblox/WinInet'
-    };
-    if (finalCookie.length > 0) {
-      headers.Cookie = `.ROBLOSECURITY=${finalCookie}`;
-    }
-    console.log('Fetch headers:', headers);
-
-    const body = JSON.stringify({ userIds: [userId] });
-    const response = await fetch('https://presence.roblox.com/v1/presence/users', {
-      method: 'POST',
-      headers,
-      body
-    });
-    const text = await response.text();
-    console.log('Presence API Status:', response.status);
-    console.log('Presence API Body:', text);
-
-    if (response.status !== 200) {
-      return new Response(
-        JSON.stringify({ error: 'Presence fetch failed', status: response.status, body: text }),
-        { status: response.status, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
-    }
-
-    let presence = null;
-    try {
-      const data = JSON.parse(text);
-      presence = data.userPresences?.[0] || null;
-    } catch (err) {
-      console.error('JSON parse failed:', err);
-    }
+    const status = await getUserStatus(
+      userId,
+      method === 'auto' ? undefined : method,
+      typeof cookie === 'string' ? cookie.trim() : undefined,
+      supabase
+    );
 
     return new Response(
-      JSON.stringify({ presence }),
+      JSON.stringify(status),
       { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
   } catch (error) {
