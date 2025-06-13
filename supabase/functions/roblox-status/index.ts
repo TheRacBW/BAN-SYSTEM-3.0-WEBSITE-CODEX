@@ -142,8 +142,7 @@ async function getUserPresence(
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
-      ...(cookie ? { 'Cookie': '.ROBLOSECURITY=' + cookie } : {}),
-      'User-Agent': 'RobloxPresenceChecker/1.0'
+      ...(cookie ? { 'Cookie': '.ROBLOSECURITY=' + cookie } : {})
     },
     body: JSON.stringify({ userIds: [userId] })
   } as const;
@@ -154,17 +153,18 @@ async function getUserPresence(
     direct: PRESENCE_API_DIRECT
   } as const;
 
+  const cookieIncluded = !!cookie;
+
   const urls: [string, 'primary' | 'fallback' | 'direct'][] = methodFilter
     ? [[urlMap[methodFilter], methodFilter]]
-    : [
+    : cookieIncluded
+    ? [
         [PRESENCE_API_PRIMARY, 'primary'],
         [PRESENCE_API_FALLBACK, 'fallback'],
         [PRESENCE_API_DIRECT, 'direct']
-      ];
-
+      ]
+    : [[PRESENCE_API_DIRECT, 'direct']];
   const attemptLog: PresenceAttempt[] = [];
-
-  const cookieIncluded = !!cookie;
 
   for (const [url, method] of urls) {
     try {
