@@ -169,6 +169,8 @@ async function getUserPresence(
     try {
       const response = await fetchWithRetry(url, options);
       const data = await response.json();
+      console.log('Roblox fetch headers:', options.headers);
+      console.log('Roblox response data:', data);
       if (data.userPresences?.[0]) {
         if (method !== 'primary') {
           console.warn(`Presence API fallback method used: ${method}`);
@@ -334,15 +336,19 @@ if (import.meta.main) {
     }
 
     let requestCookie: string | undefined;
+    let reqBody: any = {};
 
     try {
-      const { cookie } = await req.json();
+      reqBody = await req.json();
+      const { cookie } = reqBody;
       if (cookie && typeof cookie === 'string') {
         requestCookie = cookie.trim();
       }
     } catch {
+      reqBody = {};
       // no JSON body or invalid JSON
     }
+    console.log('reqBody.cookie.length', reqBody.cookie ? reqBody.cookie.length : 0);
 
     if (!requestCookie) {
       const cookieHeader = req.headers.get('cookie') || '';

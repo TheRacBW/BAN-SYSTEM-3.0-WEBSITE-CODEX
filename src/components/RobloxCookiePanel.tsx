@@ -110,6 +110,7 @@ const RobloxCookiePanel: React.FC = () => {
       const methodQuery = testMethod === 'auto' ? '' : `&method=${testMethod}`;
       const path = `roblox-status?userId=${TEST_USER_ID}${methodQuery}`;
       const trimmedCookie = cookie.trim();
+      console.log('Sending cookie:', cookie);
       const { data, error } = await supabase.functions.invoke(path, {
         body: trimmedCookie ? { cookie: trimmedCookie } : {}
       });
