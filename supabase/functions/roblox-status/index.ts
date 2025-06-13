@@ -138,14 +138,18 @@ async function getUserPresence(
   } else {
     console.warn('No .ROBLOSECURITY cookie supplied for presence request');
   }
+  const headers: Record<string, string> = {
+    'Content-Type': 'application/json',
+    'User-Agent': 'Roblox/WinInet'
+  };
+  if (cookie) {
+    headers['Cookie'] = `.ROBLOSECURITY=${cookie}`;
+  }
+  const body = JSON.stringify({ userIds: [userId] });
   const options = {
     method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      ...(cookie ? { 'Cookie': '.ROBLOSECURITY=' + cookie } : {}),
-      'User-Agent': 'RobloxPresenceChecker/1.0'
-    },
-    body: JSON.stringify({ userIds: [userId] })
+    headers,
+    body
   } as const;
 
   const urlMap = {
@@ -158,20 +162,24 @@ async function getUserPresence(
 
   const urls: [string, 'primary' | 'fallback' | 'direct'][] = methodFilter
     ? [[urlMap[methodFilter], methodFilter]]
-    : [
-        [PRESENCE_API_PRIMARY, 'primary'],
-        [PRESENCE_API_FALLBACK, 'fallback'],
-        ...(cookieIncluded ? [[PRESENCE_API_DIRECT, 'direct']] : [])
-      ];
+    : cookieIncluded
+      ? [[PRESENCE_API_DIRECT, 'direct']]
+      : [
+          [PRESENCE_API_PRIMARY, 'primary'],
+          [PRESENCE_API_FALLBACK, 'fallback']
+        ];
 
   const attemptLog: PresenceAttempt[] = [];
 
   for (const [url, method] of urls) {
     try {
+      console.log('Presence Request Inputs:', { cookieLength: cookie?.length, userId, method });
+      console.log('Fetch URL:', url);
+      console.log('Fetch Headers:', options.headers);
+      console.log('Fetch Body:', body);
       const response = await fetchWithRetry(url, options);
       const data = await response.json();
-      console.log('Roblox fetch headers:', options.headers);
-      console.log('Roblox response data:', data);
+      console.log('Presence API Response:', data);
       if (data.userPresences?.[0]) {
         if (method !== 'primary') {
           console.warn(`Presence API fallback method used: ${method}`);
