@@ -174,6 +174,13 @@ async function getUserPresence(
   for (const [url, method] of urls) {
     try {
       console.log('Presence Request Inputs:', { cookieLength: cookie?.length, userId, method });
+      const endpoint =
+        method === 'direct'
+          ? 'direct'
+          : method === 'primary'
+            ? 'roblox-proxy'
+            : 'roproxy';
+      console.log('Presence API endpoint:', endpoint, 'cookie attached:', cookieIncluded);
       console.log('Fetch URL:', url);
       console.log('Fetch Headers:', options.headers);
       console.log('Fetch Body:', body);
