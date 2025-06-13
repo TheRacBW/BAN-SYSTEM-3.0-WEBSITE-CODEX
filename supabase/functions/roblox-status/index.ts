@@ -317,97 +317,54 @@ if (import.meta.main) {
   }
 
   try {
-    const url = new URL(req.url);
-    let userIdParam = url.searchParams.get('userId');
-    let methodParam = url.searchParams.get('method') as
-      | 'primary'
-      | 'fallback'
-      | 'direct'
-      | null;
-
-    let requestCookie: string | undefined;
-    let reqBody: any = {};
-
-    try {
-      reqBody = await req.json();
-      const { cookie, userId: bodyUserId, method: bodyMethod } = reqBody;
-      if (!userIdParam && typeof bodyUserId === 'number') {
-        userIdParam = String(bodyUserId);
-      }
-      if (!methodParam && typeof bodyMethod === 'string') {
-        methodParam = bodyMethod as 'primary' | 'fallback' | 'direct';
-      }
-      if (cookie && typeof cookie === 'string') {
-        requestCookie = cookie.trim();
-      }
-    } catch {
-      reqBody = {};
-      // no JSON body or invalid JSON
-    }
-    console.log('Incoming body:', reqBody);
-    console.log('Received cookie in body length:', requestCookie?.length || 0);
-
-    if (!userIdParam) {
+    const { userId, cookie } = await req.json();
+    if (typeof userId !== 'number') {
       return new Response(
         JSON.stringify({ error: 'User ID is required' }),
-        {
-          status: 400,
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-        }
-      );
-    }
-
-    const userId = parseInt(userIdParam, 10);
-    if (isNaN(userId)) {
-      return new Response(
-        JSON.stringify({ error: 'Invalid user ID format' }),
-        {
-          status: 400,
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-        }
-      );
-    }
-
-    if (!requestCookie) {
-      const cookieHeader = req.headers.get('cookie') || '';
-      const cookieMatch = cookieHeader.match(/\.ROBLOSECURITY=([^;]+)/);
-      requestCookie = cookieMatch ? cookieMatch[1] : undefined;
-    }
-    console.log('Request included cookie header:', !!requestCookie);
-
-    const supabaseUrl = Deno.env.get('SUPABASE_URL') || '';
-    const serviceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
-    if (!supabaseUrl || !serviceKey) {
-      return new Response(
-        JSON.stringify({ error: 'Missing Supabase configuration' }),
-        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
-    }
-
-    const supabase = createClient(supabaseUrl, serviceKey);
-
-    const finalCookie = requestCookie || (await getRobloxCookie(supabase));
-    console.log('Final cookie length:', finalCookie ? finalCookie.length : 0);
-    if (!finalCookie) {
-      return new Response(
-        JSON.stringify({ error: 'Cookie is required' }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
-    const status = await getUserStatus(
-      userId,
-      methodParam || undefined,
-      finalCookie,
-      supabase
-    );
-    
+    const trimmed = typeof cookie === 'string' ? cookie.trim() : '';
+    console.log('Cookie length:', trimmed.length);
+
+    const headers: Record<string, string> = {
+      'Content-Type': 'application/json',
+      'User-Agent': 'Roblox/WinInet'
+    };
+    if (trimmed.length > 0) {
+      headers.Cookie = `.ROBLOSECURITY=${trimmed}`;
+    }
+    console.log('Fetch headers:', headers);
+
+    const body = JSON.stringify({ userIds: [userId] });
+    const response = await fetch('https://presence.roblox.com/v1/presence/users', {
+      method: 'POST',
+      headers,
+      body
+    });
+    const text = await response.text();
+    console.log('Presence API Status:', response.status);
+    console.log('Presence API Body:', text);
+
+    if (response.status !== 200) {
+      return new Response(
+        JSON.stringify({ error: 'Presence fetch failed', status: response.status, body: text }),
+        { status: response.status, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    let presence = null;
+    try {
+      const data = JSON.parse(text);
+      presence = data.userPresences?.[0] || null;
+    } catch (err) {
+      console.error('JSON parse failed:', err);
+    }
+
     return new Response(
-      JSON.stringify(status),
-      { 
-        status: 200,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-      }
+      JSON.stringify({ presence }),
+      { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
   } catch (error) {
     console.error('Server error:', error);
