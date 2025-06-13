@@ -30,40 +30,35 @@ export default function PlayersPage() {
 
   const fetchAccountStatuses = async (playersList: Player[]) => {
     try {
-      const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
-      const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
-      if (!supabaseUrl || !supabaseKey) return playersList;
-      const apiUrl = `${supabaseUrl}/functions/v1/roblox-status`;
-
       const updatedPlayers = await Promise.all(
         playersList.map(async player => {
           const updatedAccounts = await Promise.all(
             (player.accounts || []).map(async acc => {
               try {
-                const res = await fetch(`${apiUrl}?userId=${acc.user_id}`, {
-                  headers: { Authorization: `Bearer ${supabaseKey}` },
+                const { data, error } = await supabase.functions.invoke('roblox-status', {
+                  body: { userId: acc.user_id }
                 });
-                if (res.ok) {
-                  const data = await res.json();
+                if (!error && data) {
+                  const resp: any = data;
                   return {
                     ...acc,
                     status: {
-                      isOnline: data.isOnline,
-                      isInGame: data.isInGame ?? false,
-                      inBedwars: typeof data.inBedwars === 'boolean'
-                        ? data.inBedwars
-                        : (data.isInGame ?? false) && (
-                            Number(data.placeId) === BEDWARS_PLACE_ID ||
-                            Number(data.rootPlaceId) === BEDWARS_PLACE_ID ||
-                            Number(data.universeId) === BEDWARS_UNIVERSE_ID
+                      isOnline: resp.isOnline,
+                      isInGame: resp.isInGame ?? false,
+                      inBedwars: typeof resp.inBedwars === 'boolean'
+                        ? resp.inBedwars
+                        : (resp.isInGame ?? false) && (
+                            Number(resp.placeId) === BEDWARS_PLACE_ID ||
+                            Number(resp.rootPlaceId) === BEDWARS_PLACE_ID ||
+                            Number(resp.universeId) === BEDWARS_UNIVERSE_ID
                           ),
-                      userPresenceType: data.userPresenceType,
-                      placeId: data.placeId,
-                      rootPlaceId: data.rootPlaceId,
-                      universeId: data.universeId,
-                      presenceMethod: data.presenceMethod,
-                      username: data.username,
-                      lastUpdated: data.lastUpdated,
+                      userPresenceType: resp.userPresenceType,
+                      placeId: resp.placeId,
+                      rootPlaceId: resp.rootPlaceId,
+                      universeId: resp.universeId,
+                      presenceMethod: resp.presenceMethod,
+                      username: resp.username,
+                      lastUpdated: resp.lastUpdated,
                     },
                   };
                 }
