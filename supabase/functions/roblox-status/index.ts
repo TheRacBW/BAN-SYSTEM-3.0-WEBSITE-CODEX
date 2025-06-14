@@ -324,7 +324,20 @@ if (import.meta.main) {
   }
 
   try {
-    const { userId, cookie, method } = await req.json();
+    const body = await req.json();
+    console.log('Incoming body:', body);
+
+    if (!body.userId) {
+      return new Response(
+        JSON.stringify({ error: 'Missing userId' }),
+        {
+          status: 400,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        }
+      );
+    }
+
+    const { userId, cookie, method } = body;
     if (typeof userId !== 'number') {
       return new Response(
         JSON.stringify({ error: 'User ID is required' }),
