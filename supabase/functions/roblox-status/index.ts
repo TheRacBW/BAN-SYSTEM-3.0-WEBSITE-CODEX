@@ -52,7 +52,7 @@ const presenceCache = new Map<string, { data: UserStatus; timestamp: number }>()
 const PROXY_URL = 'https://roblox-proxy.theraccoonmolester.workers.dev';
 const ROBLOX_API = 'https://presence.roblox.com/v1/presence/users';
 const BEDWARS_PLACE_ID = 6872265039;
-const BEDWARS_UNIVERSE_ID = 2619619496;
+const BEDWARS_UNIVERSE_ID = 6872265039;
 
 // Get admin cookie from environment variable
 const ADMIN_ROBLOX_COOKIE = Deno.env.get('ROBLOX_COOKIE') || '';
@@ -105,8 +105,16 @@ async function getUserPresence(userId: number): Promise<PresenceResult> {
       throw new Error(`Failed to fetch presence: ${response.statusText}`);
     }
 
-    const presence = await response.json();
-    console.log('Raw Roblox Presence Response:', presence);
+    const data = await response.json();
+    console.log('Raw Roblox API Response:', data);
+
+    // Handle the userPresences array format
+    if (!data.userPresences || !Array.isArray(data.userPresences) || data.userPresences.length === 0) {
+      throw new Error('No presence data found in response');
+    }
+
+    const presence = data.userPresences[0];
+    console.log('Extracted Presence Data:', presence);
 
     const isOnline = presence.userPresenceType !== 0;
     const isInGame = presence.userPresenceType === 2;
@@ -123,23 +131,19 @@ async function getUserPresence(userId: number): Promise<PresenceResult> {
       placeId,
       rootPlaceId,
       universeId,
-      matchesPlaceId: placeId === BEDWARS_PLACE_ID,
-      matchesRootPlaceId: rootPlaceId === BEDWARS_PLACE_ID,
       matchesUniverseId: universeId === BEDWARS_UNIVERSE_ID
     });
 
-    const inBedwars = isInGame && (
-      placeId === BEDWARS_PLACE_ID ||
-      rootPlaceId === BEDWARS_PLACE_ID ||
-      universeId === BEDWARS_UNIVERSE_ID
-    );
+    // Updated BedWars detection to only check universeId
+    const inBedwars = isInGame && universeId === BEDWARS_UNIVERSE_ID;
 
     console.log('Final Status:', {
       userId,
       isOnline,
       isInGame,
       inBedwars,
-      userPresenceType: presence.userPresenceType
+      userPresenceType: presence.userPresenceType,
+      universeId
     });
 
     return {
