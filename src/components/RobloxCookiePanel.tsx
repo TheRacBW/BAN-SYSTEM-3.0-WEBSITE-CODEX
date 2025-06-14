@@ -1,104 +1,63 @@
-import React, { useEffect, useState } from 'react';
+import React, { useState } from 'react';
 import { supabase } from '../lib/supabase';
-import { AlertCircle, Save, Play, X } from 'lucide-react';
-import { BEDWARS_PLACE_ID, BEDWARS_UNIVERSE_ID } from '../constants/bedwars';
-import { debounce } from 'lodash';
-
-interface PresenceAttempt {
-  method: 'primary' | 'fallback' | 'direct';
-  success: boolean;
-}
+import { AlertCircle, Play, X, Save } from 'lucide-react';
 
 interface PresenceTestResult {
-  presenceMethod?: 'primary' | 'fallback' | 'direct';
-  attemptLog?: PresenceAttempt[];
-  cookieProvided?: boolean;
+  presenceMethod?: 'proxy' | 'direct';
   userPresenceType?: number;
   placeId?: number | null;
   rootPlaceId?: number | null;
   universeId?: number | null;
   inBedwars?: boolean;
   gameId?: string | null;
+  lastUpdated?: number;
 }
 
 const RobloxCookiePanel: React.FC = () => {
   const [cookie, setCookie] = useState('');
-  const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
   const [testing, setTesting] = useState(false);
-  // Quick sanity check that env variables are loaded in the browser
-  console.log(
-    'Supabase ENV',
-    import.meta.env.VITE_SUPABASE_URL,
-    import.meta.env.VITE_SUPABASE_ANON_KEY
-  );
   const [testResult, setTestResult] = useState<PresenceTestResult | null>(null);
   const [testError, setTestError] = useState<string | null>(null);
   const [showTestModal, setShowTestModal] = useState(false);
-  const [testMethod, setTestMethod] = useState<'auto' | 'primary' | 'fallback' | 'direct'>('auto');
 
-  useEffect(() => {
-    const fetchCookie = async () => {
-      try {
-        const { data } = await supabase
-          .from('roblox_settings')
-          .select('cookie')
-          .eq('id', 'global')
-          .single();
-        if (data?.cookie) setCookie(data.cookie);
-      } catch (err) {
-        console.error('Error fetching cookie:', err);
-        setError('Failed to load cookie');
-      } finally {
-        setLoading(false);
-      }
-    };
-    fetchCookie();
-  }, []);
-
-  interface VerifyResponse {
-    success: boolean;
-    name?: string;
-    error?: string;
-  }
-
-  const verifyCookie = async (value: string): Promise<VerifyResponse> => {
-    try {
-      const { data, error } = await supabase.functions.invoke('verify-cookie', {
-        body: { cookie: value }
-      });
-      if (error) {
-        console.error('verify-cookie response error:', error);
-        throw new Error('Failed to verify cookie');
-      }
-      return data as VerifyResponse;
-    } catch (err) {
-      const message =
-        err instanceof Error ? err.message : 'Network error contacting verify-cookie';
-      console.error('verify-cookie network error:', err);
-      throw new Error(message);
-    }
-  };
-
-  const handleSave = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const verifyAndSaveCookie = async () => {
     setError(null);
     setSuccess(null);
-    const trimmed = cookie.trim();
-    try {
-      const result = await verifyCookie(trimmed);
+    const trimmedCookie = cookie.trim();
 
-      if (result.success) {
-        setSuccess(`Cookie saved for ${result.name}`);
-        setTimeout(() => setSuccess(null), 3000);
-      } else {
-        setError(result.error || 'Verification failed');
+    try {
+      // Validate cookie format
+      if (!trimmedCookie) {
+        throw new Error('Please enter a .ROBLOSECURITY cookie');
       }
+      
+      if (!trimmedCookie.startsWith('_|WARNING:-DO-NOT-SHARE-THIS')) {
+        throw new Error('Invalid .ROBLOSECURITY cookie format');
+      }
+
+      // Test the cookie with a presence check
+      const { data, error } = await supabase.functions.invoke('roblox-status', {
+        body: { userId: 77146135 } // Test user ID
+      });
+
+      if (error) {
+        throw new Error(error.message || 'Failed to verify cookie');
+      }
+
+      if (!data) {
+        throw new Error('No response data received');
+      }
+
+      // If we get here, the cookie works
+      setSuccess('Cookie verified successfully! Please set this cookie in your Supabase environment variables as ROBLOX_COOKIE');
+      setError(null);
     } catch (err) {
-      console.error('Error saving cookie:', err);
-      const message = err instanceof Error ? err.message : 'Failed to save cookie';
-      setError(message);
+      console.error('Error verifying cookie:', err);
+      const msg = err instanceof Error ? err.message : 'Failed to verify cookie';
+      setError(msg);
+      setSuccess(null);
     }
   };
 
@@ -109,28 +68,8 @@ const RobloxCookiePanel: React.FC = () => {
     const TEST_USER_ID = 77146135;
 
     try {
-      const trimmedCookie = cookie.trim();
-      
-      // Validate cookie format
-      if (!trimmedCookie) {
-        throw new Error('Please enter a .ROBLOSECURITY cookie');
-      }
-      
-      if (!trimmedCookie.startsWith('_|WARNING:-DO-NOT-SHARE-THIS')) {
-        throw new Error('Invalid .ROBLOSECURITY cookie format');
-      }
-
-      console.log('Testing presence with cookie length:', trimmedCookie.length);
-      
-      // Add a small delay between requests to prevent rate limiting
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      
       const { data, error } = await supabase.functions.invoke('roblox-status', {
-        body: {
-          userId: TEST_USER_ID,
-          cookie: trimmedCookie,
-          method: testMethod === 'auto' ? undefined : testMethod
-        }
+        body: { userId: TEST_USER_ID }
       });
 
       if (error) {
@@ -148,12 +87,6 @@ const RobloxCookiePanel: React.FC = () => {
         lastUpdated: new Date(data.lastUpdated).toLocaleString()
       });
 
-      // Check if we got a cached response
-      const isCached = Date.now() - data.lastUpdated < 30000; // 30 seconds
-      if (isCached) {
-        console.log('Received cached presence data');
-      }
-
       setTestResult(data as any);
     } catch (err) {
       console.error('Presence test failed:', err);
@@ -165,33 +98,12 @@ const RobloxCookiePanel: React.FC = () => {
     }
   };
 
-  // Add a debounced version of the test function to prevent rapid requests
-  const debouncedTest = React.useCallback(
-    debounce((cookie: string, method: string) => {
-      runPresenceTest();
-    }, 1000),
-    []
-  );
-
-  // Update the test button click handler
-  const handleTestClick = () => {
-    if (testing) return;
-    debouncedTest(cookie, testMethod);
-  };
-
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center h-24">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-600"></div>
-      </div>
-    );
-  }
-
   return (
     <div>
-      <h2 className="text-xl font-semibold mb-2">Roblox Cookie</h2>
+      <h2 className="text-xl font-semibold mb-2">Roblox Admin Cookie</h2>
       <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
-        Provide your .ROBLOSECURITY cookie to enable online and Bedwars detection.
+        Set the admin .ROBLOSECURITY cookie to enable player tracking for all users.
+        This cookie will be used by the edge function to check player presence.
       </p>
 
       {error && (
@@ -204,10 +116,20 @@ const RobloxCookiePanel: React.FC = () => {
       {success && (
         <div className="mb-4 p-3 bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300 rounded">
           {success}
+          <div className="mt-2 text-sm">
+            <p>To set the cookie in Supabase:</p>
+            <ol className="list-decimal list-inside mt-1">
+              <li>Go to your Supabase project dashboard</li>
+              <li>Navigate to Settings → Edge Functions</li>
+              <li>Add environment variable: ROBLOX_COOKIE</li>
+              <li>Paste the verified cookie value</li>
+              <li>Save and redeploy the edge function</li>
+            </ol>
+          </div>
         </div>
       )}
 
-      <form onSubmit={handleSave} className="space-y-4">
+      <div className="space-y-4">
         <textarea
           value={cookie}
           onChange={(e) => setCookie(e.target.value)}
@@ -215,29 +137,18 @@ const RobloxCookiePanel: React.FC = () => {
           rows={3}
           placeholder="Paste .ROBLOSECURITY cookie here"
         />
-        <div>
-          <label className="block text-sm mb-1">Presence API</label>
-          <select
-            value={testMethod}
-            onChange={(e) =>
-              setTestMethod(e.target.value as 'auto' | 'primary' | 'fallback' | 'direct')
-            }
-            className="p-2 border rounded dark:bg-gray-700 dark:border-gray-600"
-          >
-            <option value="auto">Auto</option>
-            <option value="primary">RAC Proxy</option>
-            <option value="fallback">RoProxy</option>
-            <option value="direct">Roblox API</option>
-          </select>
-        </div>
         <div className="flex gap-2">
-          <button type="submit" className="btn btn-primary flex items-center gap-2">
+          <button
+            type="button"
+            onClick={verifyAndSaveCookie}
+            className="btn btn-primary flex items-center gap-2"
+          >
             <Save size={18} />
-            Save Cookie
+            Verify Cookie
           </button>
           <button
             type="button"
-            onClick={handleTestClick}
+            onClick={runPresenceTest}
             disabled={testing}
             className="btn btn-outline flex items-center gap-2"
           >
@@ -245,19 +156,15 @@ const RobloxCookiePanel: React.FC = () => {
             {testing ? 'Testing...' : 'Test Presence'}
           </button>
         </div>
-      </form>
+      </div>
 
       {testResult && (
         <div className="mt-2 text-sm text-gray-600 dark:text-gray-400">
           <p>
             Last Proxy Used:{' '}
-            {testResult.presenceMethod === 'primary'
-              ? 'roblox-proxy'
-              : testResult.presenceMethod === 'fallback'
-              ? 'roproxy'
-              : 'direct'}
+            {testResult.presenceMethod === 'proxy' ? 'roblox-proxy' : 'direct'}
           </p>
-          <p>Cookie Applied: {testResult.cookieProvided ? 'yes' : 'no'}</p>
+          <p>Last Updated: {new Date(testResult.lastUpdated || 0).toLocaleString()}</p>
         </div>
       )}
 
@@ -286,83 +193,28 @@ const RobloxCookiePanel: React.FC = () => {
                 {testResult?.presenceMethod && (
                   <div className="text-sm space-y-1">
                     <p>
-                      <span
-                        className="underline decoration-dotted cursor-help"
-                        title={`Used API: ${
-                          testResult.presenceMethod === 'primary'
-                            ? 'roblox-proxy.theraccoonmolester.workers.dev'
-                            : testResult.presenceMethod === 'fallback'
-                            ? 'presence.roproxy.com'
-                            : 'presence.roblox.com'
-                        }`}
-                      >
-                        API Method: {testResult.presenceMethod}
-                      </span>
+                      <span className="font-medium">API Method:</span>{' '}
+                      {testResult.presenceMethod === 'proxy' ? 'roblox-proxy' : 'direct'}
                     </p>
                     <p>
-                      Proxy Used:{' '}
-                      {testResult.presenceMethod === 'primary'
-                        ? 'roblox-proxy'
-                        : testResult.presenceMethod === 'fallback'
-                        ? 'roproxy'
-                        : 'direct'}
+                      <span className="font-medium">Status:</span>{' '}
+                      {testResult.userPresenceType === 0
+                        ? 'Offline'
+                        : testResult.userPresenceType === 1
+                        ? 'Online'
+                        : 'In Game'}
                     </p>
+                    {testResult.inBedwars && (
+                      <p className="text-green-600 dark:text-green-400">
+                        Currently in Bedwars
+                      </p>
+                    )}
                     <p>
-                      Cookie Applied: {testResult.cookieProvided ? 'yes' : 'no'}
-                    </p>
-                    {Array.isArray(testResult.attemptLog) && (
-                      <p className="flex gap-2">
-                        {(testResult.attemptLog || []).map((a: PresenceAttempt, idx: number) => (
-                          <span key={idx} className="flex items-center gap-1">
-                            {a.success ? '✅' : '❌'}{' '}
-                            {a.method === 'primary'
-                              ? 'theraccoonmolester'
-                              : a.method === 'fallback'
-                              ? 'roproxy'
-                              : 'roblox'}
-                          </span>
-                        ))}
-                      </p>
-                    )}
-                    {!testResult.cookieProvided && (
-                      <p className="text-xs text-red-500">
-                        Cookie was missing or invalid
-                      </p>
-                    )}
-                    <div
-                      className="text-xs text-gray-500"
-                      title={`presenceType=${testResult.userPresenceType}; inGame=${testResult.userPresenceType===2}; bedwarsMatch=${
-                        testResult.inBedwars ||
-                        Number(testResult.placeId) === BEDWARS_PLACE_ID ||
-                        Number(testResult.rootPlaceId) === BEDWARS_PLACE_ID ||
-                        Number(testResult.universeId) === BEDWARS_UNIVERSE_ID
-                      }`}
-                    >
-                      <ul className="list-disc ml-4">
-                        <li>userPresenceType: {testResult.userPresenceType}</li>
-                        <li>In Bedwars: {testResult.inBedwars ? 'yes' : 'no'}</li>
-                        <li>
-                          Missing IDs:{' '}
-                          {!testResult.placeId || !testResult.universeId
-                            ? 'yes'
-                            : 'no'}
-                        </li>
-                        <li>
-                          Cookie Provided:{' '}
-                          {testResult.cookieProvided ? 'yes' : 'no'}
-                        </li>
-                        <li>Game ID: {testResult.gameId || 'n/a'}</li>
-                        <li>Universe ID: {testResult.universeId ?? 'n/a'}</li>
-                      </ul>
-                    </div>
-                    <p className="text-xs mt-1">
-                      [ A collection of User Presences Roblox.Presence.Api.Models.Response.UserPresence ]
+                      <span className="font-medium">Last Updated:</span>{' '}
+                      {new Date(testResult.lastUpdated || 0).toLocaleString()}
                     </p>
                   </div>
                 )}
-                <pre className="text-sm whitespace-pre-wrap break-all">
-                  {JSON.stringify(testResult, null, 2)}
-                </pre>
               </div>
             )}
           </div>
