@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { supabase } from '../lib/supabase';
 import { AlertCircle, Save, Play, X } from 'lucide-react';
 import { BEDWARS_PLACE_ID, BEDWARS_UNIVERSE_ID } from '../constants/bedwars';
+import { debounce } from 'lodash';
 
 interface PresenceAttempt {
   method: 'primary' | 'fallback' | 'direct';
@@ -121,6 +122,9 @@ const RobloxCookiePanel: React.FC = () => {
 
       console.log('Testing presence with cookie length:', trimmedCookie.length);
       
+      // Add a small delay between requests to prevent rate limiting
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      
       const { data, error } = await supabase.functions.invoke('roblox-status', {
         body: {
           userId: TEST_USER_ID,
@@ -139,7 +143,16 @@ const RobloxCookiePanel: React.FC = () => {
       }
 
       // Log the full response for debugging
-      console.log('Presence test response:', data);
+      console.log('Presence test response:', {
+        ...data,
+        lastUpdated: new Date(data.lastUpdated).toLocaleString()
+      });
+
+      // Check if we got a cached response
+      const isCached = Date.now() - data.lastUpdated < 30000; // 30 seconds
+      if (isCached) {
+        console.log('Received cached presence data');
+      }
 
       setTestResult(data as any);
     } catch (err) {
@@ -150,6 +163,20 @@ const RobloxCookiePanel: React.FC = () => {
       setTesting(false);
       setShowTestModal(true);
     }
+  };
+
+  // Add a debounced version of the test function to prevent rapid requests
+  const debouncedTest = React.useCallback(
+    debounce((cookie: string, method: string) => {
+      runPresenceTest();
+    }, 1000),
+    []
+  );
+
+  // Update the test button click handler
+  const handleTestClick = () => {
+    if (testing) return;
+    debouncedTest(cookie, testMethod);
   };
 
   if (loading) {
@@ -210,11 +237,12 @@ const RobloxCookiePanel: React.FC = () => {
           </button>
           <button
             type="button"
-            onClick={runPresenceTest}
+            onClick={handleTestClick}
+            disabled={testing}
             className="btn btn-outline flex items-center gap-2"
           >
             <Play size={18} />
-            Test Presence
+            {testing ? 'Testing...' : 'Test Presence'}
           </button>
         </div>
       </form>

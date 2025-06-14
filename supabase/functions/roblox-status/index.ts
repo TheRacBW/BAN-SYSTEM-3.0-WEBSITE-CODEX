@@ -52,7 +52,27 @@ interface UserStatus {
   presence?: UserPresence;
 }
 
-const CACHE_DURATION = 60; // Cache for 1 minute
+// Cache configuration
+const CACHE_DURATION = 30000; // 30 seconds
+const presenceCache = new Map<string, { data: UserStatus; timestamp: number }>();
+const cookieCache = new Map<string, { cookie: string; timestamp: number }>();
+
+// Cache cleanup interval (every 5 minutes)
+const CACHE_CLEANUP_INTERVAL = 300000;
+setInterval(() => {
+  const now = Date.now();
+  for (const [key, value] of presenceCache.entries()) {
+    if (now - value.timestamp > CACHE_DURATION) {
+      presenceCache.delete(key);
+    }
+  }
+  for (const [key, value] of cookieCache.entries()) {
+    if (now - value.timestamp > CACHE_DURATION) {
+      cookieCache.delete(key);
+    }
+  }
+}, CACHE_CLEANUP_INTERVAL);
+
 const MAX_RETRIES = 3;
 const INITIAL_RETRY_DELAY = 1000;
 import { BEDWARS_PLACE_ID, BEDWARS_UNIVERSE_ID } from './bedwars.ts';
@@ -60,6 +80,12 @@ import { ROBLOX_HEADERS } from './robloxHeaders.ts';
 import { createClient, SupabaseClient } from 'https://esm.sh/@supabase/supabase-js@2';
 
 async function getRobloxCookie(supabase: SupabaseClient): Promise<string> {
+  // Check cache first
+  const cachedCookie = cookieCache.get('global');
+  if (cachedCookie && Date.now() - cachedCookie.timestamp < CACHE_DURATION) {
+    return cachedCookie.cookie;
+  }
+
   const envCookie = Deno.env.get('ROBLOX_COOKIE');
   try {
     const { data } = await supabase
@@ -67,12 +93,19 @@ async function getRobloxCookie(supabase: SupabaseClient): Promise<string> {
       .select('cookie')
       .eq('id', 'global')
       .single();
-    return (data?.cookie || envCookie || '').trim();
+    
+    const cookie = (data?.cookie || envCookie || '').trim();
+    
+    // Cache the result
+    if (cookie) {
+      cookieCache.set('global', { cookie, timestamp: Date.now() });
+    }
+    
+    return cookie;
   } catch {
     return (envCookie || '').trim();
   }
 }
-
 
 const REQUEST_TIMEOUT = 15000; // Increased to 15 seconds
 
@@ -275,135 +308,114 @@ async function getUserStatus(
     }
 
     // Check cache first
-    const cacheKey = `${userId}-${methodFilter || 'auto'}`;
-    const cached = statusCache.get(cacheKey);
-    if (cached && Date.now() - cached.lastUpdated < CACHE_DURATION * 1000) {
-      return cached;
+    const cacheKey = `${userId}-${methodFilter || 'auto'}-${cookieOverride ? 'custom' : 'global'}`;
+    const cachedResult = presenceCache.get(cacheKey);
+    if (cachedResult && Date.now() - cachedResult.timestamp < CACHE_DURATION) {
+      console.log('Returning cached presence result for user:', userId);
+      return cachedResult.data;
     }
 
-    // Get presence data and username in parallel
-    const [presenceResult, username] = await Promise.all([
-      getUserPresence(userId, methodFilter, cookieOverride, supabase).catch(error => {
-        console.error('Presence fetch error:', error);
-        return null;
-      }),
-      getUsernameFromId(userId).catch(error => {
-        console.error('Username fetch error:', error);
-        return null;
-      })
-    ]);
+    // Get username (this is a one-time operation per user)
+    const username = await getUsernameFromId(userId);
+    
+    // Get presence data
+    const presenceResult = await getUserPresence(userId, methodFilter, cookieOverride, supabase);
+    const presence = presenceResult.presence;
 
-    const presence = presenceResult ? presenceResult.presence : null;
-    const presenceMethod = presenceResult ? presenceResult.method : 'primary';
-    const attemptLog = presenceResult ? presenceResult.attempts : [];
-    const cookieProvided = presenceResult ? presenceResult.cookieProvided : false;
-
-    if (!username) {
-      throw new Error(`Unable to find Roblox user with ID ${userId}`);
-    }
-
-    if (
-      presence &&
-      [1, 2].includes(presence.userPresenceType) &&
-      (!presence.placeId || !presence.universeId)
-    ) {
-      console.warn(
-        'Presence API response lacked placeId or universeId; ROBLOX_COOKIE may be invalid.'
-      );
-    }
+    // Determine if user is in Bedwars
+    const inBedwars = presence.placeId === BEDWARS_PLACE_ID || 
+                      presence.universeId === BEDWARS_UNIVERSE_ID;
 
     const status: UserStatus = {
       userId,
       username,
-      isOnline: presence ? [1, 2].includes(presence.userPresenceType) : false,
-      isInGame: presence ? presence.userPresenceType === 2 : false,
-      inBedwars: presence && presence.userPresenceType === 2
-        ? Number(presence.placeId) === BEDWARS_PLACE_ID ||
-          Number(presence.rootPlaceId) === BEDWARS_PLACE_ID ||
-          Number(presence.universeId) === BEDWARS_UNIVERSE_ID
-        : false,
-      userPresenceType: presence ? presence.userPresenceType : null,
-      placeId: presence ? Number(presence.placeId) : null,
-      rootPlaceId: presence ? Number(presence.rootPlaceId) : null,
-      universeId: presence ? Number(presence.universeId) : null,
+      isOnline: presence.userPresenceType === 1 || presence.userPresenceType === 2,
+      isInGame: presence.userPresenceType === 2,
+      inBedwars,
+      userPresenceType: presence.userPresenceType,
+      placeId: presence.placeId,
+      rootPlaceId: presence.rootPlaceId,
+      universeId: presence.universeId,
       lastUpdated: Date.now(),
-      presenceMethod,
-      attemptLog,
-      cookieProvided
+      presenceMethod: presenceResult.method,
+      attemptLog: presenceResult.attempts,
+      cookieProvided: presenceResult.cookieProvided,
+      presence
     };
 
-    // Update cache
-    const fullStatus: UserStatus = { ...status, presence };
-    statusCache.set(cacheKey, fullStatus);
-    return fullStatus;
+    // Cache the result
+    presenceCache.set(cacheKey, { data: status, timestamp: Date.now() });
+
+    return status;
   } catch (error) {
-    console.error('Error in getUserStatus:', error);
+    console.error('Error getting user status:', error);
     throw error;
   }
+}
 
-  Deno.serve(async (req) => {
-    // Handle CORS preflight
-    if (req.method === 'OPTIONS') {
-      return new Response(null, {
-        status: 204,
-        headers: corsHeaders
-      });
-    }
+Deno.serve(async (req) => {
+  // Handle CORS preflight
+  if (req.method === 'OPTIONS') {
+    return new Response(null, {
+      status: 204,
+      headers: corsHeaders
+    });
+  }
 
-    try {
-      const body = await req.json();
-      console.log('Incoming body:', body);
+  try {
+    const body = await req.json();
+    console.log('Incoming body:', body);
 
-      const { userId, cookie, method } = body;
-      console.log('Received cookie length:', typeof cookie === 'string' ? cookie.trim().length : 0);
-      if (typeof userId !== 'number') {
-        return new Response(
-          JSON.stringify({ error: 'Missing userId' }),
-          {
-            status: 400,
-            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-          }
-        );
-      }
-
-      const supabaseUrl = Deno.env.get('SUPABASE_URL') || '';
-      const serviceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
-      if (!supabaseUrl || !serviceKey) {
-        console.error(
-          'Supabase environment variables missing: SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY'
-        );
-        return new Response(
-          JSON.stringify({ error: 'Missing Supabase configuration' }),
-          {
-            status: 500,
-            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-          }
-        );
-      }
-      const supabase = createClient(supabaseUrl, serviceKey);
-
-      const trimmedCookie =
-        typeof cookie === 'string' ? cookie.trim() : undefined;
-      console.log('Request cookie length:', trimmedCookie?.length || 0);
-
-      const status = await getUserStatus(
-        userId,
-        method === 'auto' ? undefined : method,
-        trimmedCookie,
-        supabase
-      );
-
-      return new Response(JSON.stringify(status), {
-        status: 200,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-      });
-    } catch (error) {
-      console.error('roblox-status error:', error);
+    const { userId, cookie, method } = body;
+    console.log('Received cookie length:', typeof cookie === 'string' ? cookie.trim().length : 0);
+    if (typeof userId !== 'number') {
       return new Response(
-        JSON.stringify({ error: 'Internal Server Error' }),
-        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        JSON.stringify({ error: 'Missing userId' }),
+        {
+          status: 400,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        }
       );
     }
-  });
+
+    const supabaseUrl = Deno.env.get('SUPABASE_URL') || '';
+    const serviceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
+    if (!supabaseUrl || !serviceKey) {
+      console.error(
+        'Supabase environment variables missing: SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY'
+      );
+      return new Response(
+        JSON.stringify({ error: 'Missing Supabase configuration' }),
+        {
+          status: 500,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        }
+      );
+    }
+    const supabase = createClient(supabaseUrl, serviceKey);
+
+    const trimmedCookie =
+      typeof cookie === 'string' ? cookie.trim() : undefined;
+    console.log('Request cookie length:', trimmedCookie?.length || 0);
+
+    const status = await getUserStatus(
+      userId,
+      method === 'auto' ? undefined : method,
+      trimmedCookie,
+      supabase
+    );
+
+    return new Response(JSON.stringify(status), {
+      status: 200,
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+    });
+  } catch (error) {
+    console.error('roblox-status error:', error);
+    return new Response(
+      JSON.stringify({ error: 'Internal Server Error' }),
+      { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+    );
+  }
+});
 
 export { getUserStatus };
