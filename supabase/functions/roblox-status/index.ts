@@ -52,8 +52,8 @@ interface UserStatus {
 const CACHE_DURATION = 60; // Cache for 1 minute
 const MAX_RETRIES = 3;
 const INITIAL_RETRY_DELAY = 1000;
-import { BEDWARS_PLACE_ID, BEDWARS_UNIVERSE_ID } from '../../src/constants/bedwars.ts';
-import { ROBLOX_HEADERS } from '../../src/constants/robloxHeaders.ts';
+import { BEDWARS_PLACE_ID, BEDWARS_UNIVERSE_ID } from './bedwars.ts';
+import { ROBLOX_HEADERS } from './robloxHeaders.ts';
 import { createClient, SupabaseClient } from 'https://esm.sh/@supabase/supabase-js@2';
 
 async function getRobloxCookie(supabase: SupabaseClient): Promise<string> {
