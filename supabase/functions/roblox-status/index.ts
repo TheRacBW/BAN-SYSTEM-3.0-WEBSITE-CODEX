@@ -106,40 +106,41 @@ async function getUserPresence(userId: number): Promise<PresenceResult> {
     }
 
     const presence = await response.json();
-    console.log('Roblox Presence Response:', {
-      userId,
-      userPresenceType: presence.userPresenceType,
-      placeId: presence.placeId,
-      rootPlaceId: presence.rootPlaceId,
-      universeId: presence.universeId,
-      locationType: presence.locationType,
-      lastLocation: presence.lastLocation
-    });
+    console.log('Raw Roblox Presence Response:', presence);
 
     const isOnline = presence.userPresenceType !== 0;
     const isInGame = presence.userPresenceType === 2;
     
-    // Debug BedWars detection
-    const placeId = Number(presence.placeId);
-    const rootPlaceId = Number(presence.rootPlaceId);
-    const universeId = Number(presence.universeId);
+    // Convert IDs to numbers and handle null/undefined cases
+    const placeId = presence.placeId ? Number(presence.placeId) : null;
+    const rootPlaceId = presence.rootPlaceId ? Number(presence.rootPlaceId) : null;
+    const universeId = presence.universeId ? Number(presence.universeId) : null;
     
-    console.log('BedWars Detection:', {
+    console.log('BedWars Detection Details:', {
       userId,
+      userPresenceType: presence.userPresenceType,
       isInGame,
       placeId,
       rootPlaceId,
       universeId,
-      matchesPlaceId: placeId === 6872265039,
-      matchesRootPlaceId: rootPlaceId === 6872265039,
-      matchesUniverseId: universeId === 2619619496
+      matchesPlaceId: placeId === BEDWARS_PLACE_ID,
+      matchesRootPlaceId: rootPlaceId === BEDWARS_PLACE_ID,
+      matchesUniverseId: universeId === BEDWARS_UNIVERSE_ID
     });
 
     const inBedwars = isInGame && (
-      placeId === 6872265039 ||
-      rootPlaceId === 6872265039 ||
-      universeId === 2619619496
+      placeId === BEDWARS_PLACE_ID ||
+      rootPlaceId === BEDWARS_PLACE_ID ||
+      universeId === BEDWARS_UNIVERSE_ID
     );
+
+    console.log('Final Status:', {
+      userId,
+      isOnline,
+      isInGame,
+      inBedwars,
+      userPresenceType: presence.userPresenceType
+    });
 
     return {
       isOnline,

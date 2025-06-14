@@ -30,15 +30,19 @@ export default function PlayersPage() {
 
   const fetchAccountStatuses = async (playersList: Player[]) => {
     try {
+      console.log('Fetching statuses for players:', playersList.length);
       const updatedPlayers = await Promise.all(
         playersList.map(async player => {
+          console.log('Fetching statuses for player:', player.alias);
           const updatedAccounts = await Promise.all(
             (player.accounts || []).map(async acc => {
               try {
+                console.log('Fetching status for account:', acc.user_id);
                 const { data, error } = await supabase.functions.invoke('roblox-status', {
                   body: { userId: acc.user_id }
                 });
                 if (!error && data) {
+                  console.log('Status response for account:', acc.user_id, data);
                   const resp: any = data;
                   return {
                     ...acc,
@@ -63,7 +67,7 @@ export default function PlayersPage() {
                   };
                 }
               } catch (err) {
-                console.error('Status fetch error', err);
+                console.error('Status fetch error for account:', acc.user_id, err);
               }
               return acc;
             })
@@ -74,7 +78,7 @@ export default function PlayersPage() {
 
       return updatedPlayers;
     } catch (error) {
-      console.error('Error fetching statuses', error);
+      console.error('Error fetching statuses:', error);
       return playersList;
     }
   };
@@ -230,6 +234,20 @@ export default function PlayersPage() {
 
   const sortedPlayers = sortPlayers(filteredPlayers);
 
+  const handleRefreshAll = async () => {
+    try {
+      setLoading(true);
+      const updatedPlayers = await fetchAccountStatuses(players);
+      setPlayers(updatedPlayers);
+      setSuccess('Player statuses refreshed successfully');
+    } catch (error) {
+      console.error('Error refreshing player statuses:', error);
+      setError('Failed to refresh player statuses');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   if (!user) {
     return (
       <div className="flex items-center justify-center h-[60vh]">
@@ -252,11 +270,12 @@ export default function PlayersPage() {
         <h2 className="text-2xl font-bold">Players</h2>
         <div className="flex gap-2">
           <button
-            onClick={fetchPlayers}
+            onClick={handleRefreshAll}
             className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+            disabled={loading}
           >
-            <RefreshCw size={16} />
-            Refresh All
+            <RefreshCw size={16} className={loading ? 'animate-spin' : ''} />
+            {loading ? 'Refreshing...' : 'Refresh All'}
           </button>
           <button
             onClick={() => setShowAddModal(true)}
