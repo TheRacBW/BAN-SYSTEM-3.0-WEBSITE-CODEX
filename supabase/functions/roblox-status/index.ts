@@ -102,20 +102,43 @@ async function getUserPresence(userId: number): Promise<PresenceResult> {
     );
 
     if (!response.ok) {
-      throw new Error(`Failed to fetch presence: ${response.statusText}`);
+      console.error(`Failed to fetch presence for user ${userId}:`, response.statusText);
+      return {
+        isOnline: false,
+        isInGame: false,
+        inBedwars: false,
+        username: '',
+        userPresenceType: 0,
+        placeId: null,
+        rootPlaceId: null,
+        universeId: null,
+        lastUpdated: Date.now()
+      };
     }
 
     const data = await response.json();
-    console.log('Raw Roblox API Response:', data);
+    console.log(`[${userId}] Full API Response:`, JSON.stringify(data, null, 2));
 
-    // Handle the userPresences array format
+    // Safety check for userPresences
     if (!data.userPresences || !Array.isArray(data.userPresences) || data.userPresences.length === 0) {
-      throw new Error('No presence data found in response');
+      console.log(`[${userId}] No user presences found in response`);
+      return {
+        isOnline: false,
+        isInGame: false,
+        inBedwars: false,
+        username: '',
+        userPresenceType: 0,
+        placeId: null,
+        rootPlaceId: null,
+        universeId: null,
+        lastUpdated: Date.now()
+      };
     }
 
     const presence = data.userPresences[0];
-    console.log('Extracted Presence Data:', presence);
+    console.log(`[${userId}] Extracted presence data:`, JSON.stringify(presence, null, 2));
 
+    // Basic status checks
     const isOnline = presence.userPresenceType !== 0;
     const isInGame = presence.userPresenceType === 2;
     
@@ -124,21 +147,19 @@ async function getUserPresence(userId: number): Promise<PresenceResult> {
     const rootPlaceId = presence.rootPlaceId ? Number(presence.rootPlaceId) : null;
     const universeId = presence.universeId ? Number(presence.universeId) : null;
     
-    console.log('BedWars Detection Details:', {
-      userId,
+    console.log(`[${userId}] Status Details:`, {
       userPresenceType: presence.userPresenceType,
+      isOnline,
       isInGame,
       placeId,
       rootPlaceId,
-      universeId,
-      matchesUniverseId: universeId === BEDWARS_UNIVERSE_ID
+      universeId
     });
 
-    // Updated BedWars detection to only check universeId
+    // BedWars detection
     const inBedwars = isInGame && universeId === BEDWARS_UNIVERSE_ID;
-
-    console.log('Final Status:', {
-      userId,
+    
+    console.log(`[${userId}] Final Status:`, {
       isOnline,
       isInGame,
       inBedwars,
@@ -158,8 +179,18 @@ async function getUserPresence(userId: number): Promise<PresenceResult> {
       lastUpdated: Date.now()
     };
   } catch (error) {
-    console.error('Error fetching presence:', error);
-    throw error;
+    console.error(`[${userId}] Error fetching presence:`, error);
+    return {
+      isOnline: false,
+      isInGame: false,
+      inBedwars: false,
+      username: '',
+      userPresenceType: 0,
+      placeId: null,
+      rootPlaceId: null,
+      universeId: null,
+      lastUpdated: Date.now()
+    };
   }
 }
 
