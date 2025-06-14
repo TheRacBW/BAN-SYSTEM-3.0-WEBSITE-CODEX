@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { supabase } from '../lib/supabase';
 import { Player, SortOption, RANK_VALUES } from '../types/players';
-import { Plus, Search, Users, Gamepad2, ArrowUpDown } from 'lucide-react';
+import { Plus, Search, Users, Gamepad2, ArrowUpDown, RefreshCw } from 'lucide-react';
 import PlayerCard from '../components/PlayerCard';
 import { BEDWARS_PLACE_ID, BEDWARS_UNIVERSE_ID } from '../constants/bedwars';
 
@@ -247,16 +247,25 @@ export default function PlayersPage() {
   }
 
   return (
-    <div className="max-w-7xl mx-auto px-4">
-      <div className="flex justify-between items-center mb-6">
-        <h1 className="text-2xl font-bold">Player Tracking</h1>
-        <button
-          onClick={() => setShowAddModal(true)}
-          className="btn btn-primary flex items-center gap-2"
-        >
-          <Plus size={18} />
-          Add Player
-        </button>
+    <div className="space-y-6">
+      <div className="flex justify-between items-center">
+        <h2 className="text-2xl font-bold">Players</h2>
+        <div className="flex gap-2">
+          <button
+            onClick={fetchPlayers}
+            className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+          >
+            <RefreshCw size={16} />
+            Refresh All
+          </button>
+          <button
+            onClick={() => setShowAddModal(true)}
+            className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+          >
+            <Plus size={16} />
+            Add Player
+          </button>
+        </div>
       </div>
 
       <div className="mb-6 space-y-4">

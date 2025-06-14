@@ -432,7 +432,7 @@ function PlayerCard({ player, onDelete, isAdmin }: PlayerCardProps) {
                     src={BEDWARS_ICON_URL}
                     alt="BedWars"
                     className="w-6 h-6"
-                    title="In Bedwars"
+                    title="In BedWars"
                   />
                 )}
               </div>
@@ -440,40 +440,28 @@ function PlayerCard({ player, onDelete, isAdmin }: PlayerCardProps) {
           </div>
         </div>
 
-        <div className="flex gap-2">
-          <button
-            onClick={(e) => {
-              e.stopPropagation();
-              refreshPlayerData();
-            }}
-            className="p-2 text-gray-600 hover:bg-gray-100 rounded-full"
-            title="Refresh status"
-          >
-            <RefreshCw size={16} />
-          </button>
-          {isAdmin && (
-            <>
-              <button
-                onClick={(e) => {
-                  e.stopPropagation();
-                  setShowEditModal(true);
-                }}
-                className="p-2 text-blue-600 hover:bg-blue-100 rounded-full"
-              >
-                <Edit2 size={16} />
-              </button>
-              <button
-                onClick={(e) => {
-                  e.stopPropagation();
-                  if (onDelete) onDelete(player.id);
-                }}
-                className="p-2 text-red-600 hover:bg-red-100 rounded-full"
-              >
-                <Trash2 size={16} />
-              </button>
-            </>
-          )}
-        </div>
+        {isAdmin && (
+          <div className="flex gap-2">
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                setShowEditModal(true);
+              }}
+              className="p-2 text-blue-600 hover:bg-blue-100 rounded-full"
+            >
+              <Edit2 size={16} />
+            </button>
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                if (onDelete) onDelete(player.id);
+              }}
+              className="p-2 text-red-600 hover:bg-red-100 rounded-full"
+            >
+              <Trash2 size={16} />
+            </button>
+          </div>
+        )}
       </div>
 
       <div className="flex gap-2 mb-4">

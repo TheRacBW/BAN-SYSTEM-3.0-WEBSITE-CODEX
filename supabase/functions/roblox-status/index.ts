@@ -106,12 +106,39 @@ async function getUserPresence(userId: number): Promise<PresenceResult> {
     }
 
     const presence = await response.json();
+    console.log('Roblox Presence Response:', {
+      userId,
+      userPresenceType: presence.userPresenceType,
+      placeId: presence.placeId,
+      rootPlaceId: presence.rootPlaceId,
+      universeId: presence.universeId,
+      locationType: presence.locationType,
+      lastLocation: presence.lastLocation
+    });
+
     const isOnline = presence.userPresenceType !== 0;
     const isInGame = presence.userPresenceType === 2;
+    
+    // Debug BedWars detection
+    const placeId = Number(presence.placeId);
+    const rootPlaceId = Number(presence.rootPlaceId);
+    const universeId = Number(presence.universeId);
+    
+    console.log('BedWars Detection:', {
+      userId,
+      isInGame,
+      placeId,
+      rootPlaceId,
+      universeId,
+      matchesPlaceId: placeId === 6872265039,
+      matchesRootPlaceId: rootPlaceId === 6872265039,
+      matchesUniverseId: universeId === 2619619496
+    });
+
     const inBedwars = isInGame && (
-      Number(presence.placeId) === 6872265039 ||
-      Number(presence.rootPlaceId) === 6872265039 ||
-      Number(presence.universeId) === 2619619496
+      placeId === 6872265039 ||
+      rootPlaceId === 6872265039 ||
+      universeId === 2619619496
     );
 
     return {
