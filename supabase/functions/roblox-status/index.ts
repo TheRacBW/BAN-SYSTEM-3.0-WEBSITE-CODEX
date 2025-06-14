@@ -135,8 +135,23 @@ Deno.serve(async (req) => {
       )
     }
 
-    // Make request to Roblox API using POST with JSON body
+    // Enhanced Roblox API debugging
+    console.log('🍪 Cookie check:', {
+      hascookie: !!robloxCookie,
+      cookieLength: robloxCookie?.length || 0,
+      cookieStart: robloxCookie?.substring(0, 20) + '...',
+      userIdsToCheck: userIds.slice(0, 3)
+    })
+
     console.log('🌐 Making request to Roblox presence API...')
+    console.log('📊 Request details:', {
+      url: 'https://presence.roblox.com/v1/presence/users',
+      method: 'POST',
+      userIdsCount: userIds.length,
+      firstFewIds: userIds.slice(0, 5)
+    })
+
+    // Make request to Roblox API using POST with JSON body
     const robloxResponse = await fetch('https://presence.roblox.com/v1/presence/users', {
       method: 'POST',
       headers: {
@@ -147,16 +162,21 @@ Deno.serve(async (req) => {
       body: JSON.stringify({ userIds: userIds }),
     })
 
-    console.log('🌐 Roblox API response status:', robloxResponse.status)
+    console.log('📨 Roblox API Response:', {
+      ok: robloxResponse.ok,
+      status: robloxResponse.status,
+      statusText: robloxResponse.statusText,
+      headers: Object.fromEntries(robloxResponse.headers.entries())
+    })
 
     if (!robloxResponse.ok) {
       const errorText = await robloxResponse.text()
-      console.error('❌ Roblox API error:', robloxResponse.status, errorText)
-      throw new Error(`Roblox API error: ${robloxResponse.status} - ${errorText}`)
+      console.error('❌ Roblox API Error Response:', errorText)
+      throw new Error(`Roblox API error: ${robloxResponse.status} ${robloxResponse.statusText}`)
     }
 
     const presenceData: RobloxPresenceResponse = await robloxResponse.json()
-    console.log('📄 Roblox API response data:', JSON.stringify(presenceData, null, 2))
+    console.log('📊 Raw presence data sample:', JSON.stringify(presenceData.userPresences?.slice(0, 2), null, 2))
 
     // Process the results
     const userStatuses: UserStatus[] = []
@@ -207,11 +227,12 @@ Deno.serve(async (req) => {
       })
     }
 
-    // Update database with results
+    // Update database with results using proper UPSERT
     console.log('💾 About to upsert', userStatuses.length, 'status records')
     for (const status of userStatuses) {
       console.log(`📝 Upserting status for user ${status.userId}`)
-      const { error: updateError } = await supabaseClient
+      
+      const { error: upsertError } = await supabaseClient
         .from('roblox_user_status')
         .upsert({
           user_id: status.userId,
@@ -225,12 +246,15 @@ Deno.serve(async (req) => {
           universe_id: status.universeId,
           last_updated: new Date(status.lastUpdated).toISOString(),
           presence_method: status.presenceMethod
+        }, {
+          onConflict: 'user_id',  // This makes it UPDATE on conflict instead of error
+          ignoreDuplicates: false
         })
 
-      if (updateError) {
-        console.error(`❌ Failed to update status for user ${status.userId}:`, updateError)
+      if (upsertError) {
+        console.error(`❌ Failed to update status for user ${status.userId}:`, upsertError)
       } else {
-        console.log(`✅ Successfully updated status for user ${status.userId}`)
+        console.log(`✅ Successfully updated user ${status.userId}`)
       }
     }
 
