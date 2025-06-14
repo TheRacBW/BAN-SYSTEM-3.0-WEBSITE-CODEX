@@ -21,6 +21,14 @@ export default function PlayersPage() {
   const [showInBedwarsOnly, setShowInBedwarsOnly] = useState(false);
   const [sortBy, setSortBy] = useState<SortOption>('alias_asc');
   const [newYoutubeChannel, setNewYoutubeChannel] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
+  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
+  const [filterOnline, setFilterOnline] = useState(false);
+  const [filterInGame, setFilterInGame] = useState(false);
+  const [filterInBedwars, setFilterInBedwars] = useState(false);
+  const [showAddPlayer, setShowAddPlayer] = useState(false);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [playerToDelete, setPlayerToDelete] = useState<Player | null>(null);
 
   useEffect(() => {
     if (user) {
@@ -84,52 +92,15 @@ export default function PlayersPage() {
   };
 
   const fetchPlayers = async () => {
-    try {
-      const { data: playersData, error: playersError } = await supabase
-        .from('players')
-        .select(`
-          *,
-          accounts:player_accounts(
-            id,
-            user_id,
-            rank:player_account_ranks(
-              rank_id,
-              account_ranks(*)
-            )
-          ),
-          teammates:player_teammates!player_id(
-            teammate:players!teammate_id(*)
-          ),
-          strategies:player_strategies(
-            id,
-            image_url,
-            kit_ids,
-            teammate_ids,
-            created_at
-          )
-        `)
-        .order('created_at', { ascending: false });
-
-      if (playersError) throw playersError;
-
-      const formattedPlayers =
-        playersData?.map(player => ({
-          ...player,
-          created_at: new Date(player.created_at),
-          updated_at: new Date(player.updated_at),
-          accounts: player.accounts || [],
-          teammates: player.teammates || [],
-          strategies: player.strategies || [],
-        })) || [];
-
-      const playersWithStatus = await fetchAccountStatuses(formattedPlayers);
-      setPlayers(playersWithStatus);
-    } catch (error) {
-      console.error('Error fetching players:', error);
-      setError('Failed to load players');
-    } finally {
-      setLoading(false);
-    }
+    const timestamp = new Date().getTime();
+    const response = await fetch(`/api/players?_t=${timestamp}`, {
+      cache: 'no-store',
+      headers: {
+        'Cache-Control': 'no-cache, no-store, must-revalidate',
+        'Pragma': 'no-cache'
+      }
+    });
+    return response.json();
   };
 
   const handleAddPlayer = async () => {
@@ -235,16 +206,29 @@ export default function PlayersPage() {
   const sortedPlayers = sortPlayers(filteredPlayers);
 
   const handleRefreshAll = async () => {
+    setIsLoading(true);
+    setError(null);
+    
     try {
-      setLoading(true);
-      const updatedPlayers = await fetchAccountStatuses(players);
-      setPlayers(updatedPlayers);
-      setSuccess('Player statuses refreshed successfully');
+      const response = await fetch('/api/roblox-status', { 
+        method: 'POST',
+        cache: 'no-store'
+      });
+      
+      if (!response.ok) {
+        throw new Error('Failed to update player statuses');
+      }
+      
+      await new Promise(resolve => setTimeout(resolve, 2000));
+      
+      const data = await fetchPlayers();
+      setPlayers(data);
+      
     } catch (error) {
-      console.error('Error refreshing player statuses:', error);
-      setError('Failed to refresh player statuses');
+      console.error('Refresh failed:', error);
+      setError(error instanceof Error ? error.message : 'Failed to refresh player data');
     } finally {
-      setLoading(false);
+      setIsLoading(false);
     }
   };
 
@@ -271,11 +255,20 @@ export default function PlayersPage() {
         <div className="flex gap-2">
           <button
             onClick={handleRefreshAll}
-            className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
-            disabled={loading}
+            disabled={isLoading}
+            className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50"
           >
-            <RefreshCw size={16} className={loading ? 'animate-spin' : ''} />
-            {loading ? 'Refreshing...' : 'Refresh All'}
+            {isLoading ? (
+              <>
+                <RefreshCw className="w-4 h-4 animate-spin" />
+                Refreshing...
+              </>
+            ) : (
+              <>
+                <RefreshCw className="w-4 h-4" />
+                Refresh All
+              </>
+            )}
           </button>
           <button
             onClick={() => setShowAddModal(true)}
