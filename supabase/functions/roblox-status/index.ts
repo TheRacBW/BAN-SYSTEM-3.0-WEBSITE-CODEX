@@ -49,6 +49,7 @@ interface UserStatus {
   presenceMethod: 'primary' | 'fallback' | 'direct';
   attemptLog: PresenceAttempt[];
   cookieProvided: boolean;
+  presence?: UserPresence;
 }
 
 const CACHE_DURATION = 60; // Cache for 1 minute
@@ -307,8 +308,9 @@ async function getUserStatus(
     };
 
     // Update cache
-    statusCache.set(cacheKey, status);
-    return { ...status, presence };
+    const fullStatus: UserStatus = { ...status, presence };
+    statusCache.set(cacheKey, fullStatus);
+    return fullStatus;
   } catch (error) {
     console.error('Error in getUserStatus:', error);
     throw error;

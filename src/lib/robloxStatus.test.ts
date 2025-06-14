@@ -45,5 +45,8 @@ describe('getUserStatus', () => {
       { method: 'primary', success: true, cookie: false }
     ]);
     expect(status.cookieProvided).toBe(false);
+    expect(status.presence).toEqual(
+      expect.objectContaining({ userPresenceType: 2 })
+    );
   });
 });

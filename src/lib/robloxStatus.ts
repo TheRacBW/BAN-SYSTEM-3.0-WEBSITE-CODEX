@@ -41,6 +41,7 @@ export interface UserStatus {
   presenceMethod: 'primary' | 'fallback' | 'direct';
   attemptLog: PresenceAttempt[];
   cookieProvided: boolean;
+  presence?: UserPresence;
 }
 
 const CACHE_DURATION = 60; // seconds
@@ -170,6 +171,7 @@ export async function getUserStatus(
     attemptLog,
     cookieProvided
   };
-  statusCache.set(cacheKey, status);
-  return status;
+  const fullStatus: UserStatus = { ...status, presence };
+  statusCache.set(cacheKey, fullStatus);
+  return fullStatus;
 }
