@@ -91,3 +91,18 @@ return detailed information such as `placeId` and `universeId`.
 When invoking the function, the logs will now state whether a cookie was
 received and applied. Look for messages like `Request included cookie: true` to
 confirm the header was sent.
+
+### Calling `roblox-status` with fetch
+
+Send a POST request with `Content-Type: application/json` and include a body containing the Roblox `userId`:
+
+```javascript
+await fetch("/functions/v1/roblox-status", {
+  method: "POST",
+  headers: {
+    "Content-Type": "application/json"
+  },
+  body: JSON.stringify({ userId: 261 })
+});
+```
+
