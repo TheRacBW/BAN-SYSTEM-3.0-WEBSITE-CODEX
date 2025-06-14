@@ -58,22 +58,34 @@ Deno.serve(async (req) => {
       throw new Error('ROBLOX_COOKIE environment variable not set')
     }
 
-    // Get all account user IDs from player_accounts table
+    // First, let's try a simple count to see if we can access the table at all
     console.log('🔍 Querying player_accounts table...')
+    const { count, error: countError } = await supabaseClient
+      .from('player_accounts')
+      .select('*', { count: 'exact', head: true })
+
+    console.log('📊 Table access check:', { count, countError })
+
+    // Now get the actual data with explicit casting
     const { data: accounts, error: accountsError } = await supabaseClient
       .from('player_accounts')
       .select('user_id')
+      .not('user_id', 'is', null)
 
     console.log('🔍 Accounts query result:', { accounts, accountsError })
     console.log('📊 Number of accounts found:', accounts?.length || 0)
 
     if (accounts && accounts.length > 0) {
       console.log('👥 First few account user_ids:', accounts.slice(0, 3).map(a => a.user_id))
+      console.log('🔢 Data types:', accounts.slice(0, 3).map(a => ({ 
+        user_id: a.user_id, 
+        type: typeof a.user_id 
+      })))
     }
 
     if (accountsError) {
       console.error('❌ Database error:', accountsError)
-      throw accountsError
+      throw new Error(`Database query failed: ${accountsError.message}`)
     }
 
     if (!accounts || accounts.length === 0) {
@@ -84,8 +96,17 @@ Deno.serve(async (req) => {
       )
     }
 
-    // Extract user IDs
-    const userIds = accounts.map(account => account.user_id).filter(Boolean)
+    // Also let's make sure we handle the numeric type properly
+    const userIds = accounts.map(account => {
+      // Convert to number if it's a string, or keep as number
+      const userId = typeof account.user_id === 'string' 
+        ? parseInt(account.user_id, 10) 
+        : account.user_id
+      
+      console.log(`🔄 Processing user_id: ${account.user_id} -> ${userId} (${typeof userId})`)
+      return userId
+    }).filter(id => !isNaN(id) && id > 0)
+
     console.log('🎯 User IDs to check:', userIds)
     console.log('📝 User IDs array length:', userIds.length)
 
