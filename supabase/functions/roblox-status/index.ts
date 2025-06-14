@@ -137,7 +137,7 @@ async function getUserPresence(
 ): Promise<PresenceResult> {
   const cookie = cookieOverride || (await getRobloxCookie(supabase));
   if (cookie) {
-    console.log('Using ROBLOX_COOKIE for presence request');
+    console.log('Using ROBLOX_COOKIE for presence request, length', cookie.length);
   } else {
     console.warn('No .ROBLOSECURITY cookie supplied for presence request');
   }
@@ -146,7 +146,7 @@ async function getUserPresence(
     'User-Agent': 'Roblox/WinInet'
   };
   if (cookie) {
-    headers['Cookie'] = `.ROBLOSECURITY=${cookie}`;
+    headers.Cookie = `.ROBLOSECURITY=${cookie}`;
   }
   const body = JSON.stringify({ userIds: [userId] });
   const options = {
@@ -330,6 +330,7 @@ async function getUserStatus(
       console.log('Incoming body:', body);
 
       const { userId, cookie, method } = body;
+      console.log('Received cookie length:', typeof cookie === 'string' ? cookie.trim().length : 0);
       if (typeof userId !== 'number') {
         return new Response(
           JSON.stringify({ error: 'Missing userId' }),
@@ -356,14 +357,18 @@ async function getUserStatus(
       }
       const supabase = createClient(supabaseUrl, serviceKey);
 
-      const { presence } = await getUserPresence(
+      const trimmedCookie =
+        typeof cookie === 'string' ? cookie.trim() : undefined;
+      console.log('Request cookie length:', trimmedCookie?.length || 0);
+
+      const status = await getUserStatus(
         userId,
         method === 'auto' ? undefined : method,
-        typeof cookie === 'string' ? cookie.trim() : undefined,
+        trimmedCookie,
         supabase
       );
 
-      return new Response(JSON.stringify(presence), {
+      return new Response(JSON.stringify(status), {
         status: 200,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' }
       });
