@@ -1,4 +1,5 @@
 /// <reference lib="deno.ns" />
+/// <reference lib="deno.unstable" />
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -312,9 +313,7 @@ async function getUserStatus(
     console.error('Error in getUserStatus:', error);
     throw error;
   }
-}
 
-if (import.meta.main) {
   Deno.serve(async (req) => {
     // Handle CORS preflight
     if (req.method === 'OPTIONS') {
@@ -362,6 +361,5 @@ if (import.meta.main) {
       );
     }
   });
-}
 
 export { getUserStatus };
