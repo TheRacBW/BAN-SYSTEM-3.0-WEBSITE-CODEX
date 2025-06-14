@@ -48,8 +48,22 @@ Deno.serve(async (req) => {
     
     const supabaseClient = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_ANON_KEY') ?? '',
+      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '',
+      {
+        auth: {
+          autoRefreshToken: false,
+          persistSession: false
+        }
+      }
     )
+
+    // Verify we're using the right key
+    const serviceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')
+    const anonKey = Deno.env.get('SUPABASE_ANON_KEY')
+
+    console.log('🔑 Using service role key:', serviceKey ? 'YES' : 'NO')
+    console.log('🔑 Service key length:', serviceKey?.length || 0)
+    console.log('🔑 Anon key length:', anonKey?.length || 0)
 
     // Get the cookie from environment
     const robloxCookie = Deno.env.get('ROBLOX_COOKIE')
