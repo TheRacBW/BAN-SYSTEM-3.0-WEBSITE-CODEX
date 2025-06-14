@@ -55,10 +55,10 @@ Deno.serve(async (req) => {
       throw new Error('ROBLOX_COOKIE environment variable not set')
     }
 
-    // Get all account user IDs from database
+    // Get all account user IDs from player_accounts table
     const { data: accounts, error: accountsError } = await supabaseClient
-      .from('accounts')
-      .select('user_id, username')
+      .from('player_accounts')
+      .select('user_id')
 
     if (accountsError) {
       console.error('Database error:', accountsError)
@@ -109,7 +109,7 @@ Deno.serve(async (req) => {
         // User not found in response - treat as offline
         userStatuses.push({
           userId: account.user_id,
-          username: account.username,
+          username: account.user_id.toString(), // Use user_id as username
           isOnline: false,
           isInGame: false,
           inBedwars: false,
@@ -132,7 +132,7 @@ Deno.serve(async (req) => {
 
       userStatuses.push({
         userId: account.user_id,
-        username: account.username,
+        username: account.user_id.toString(), // Use user_id as username
         isOnline,
         isInGame,
         inBedwars,
@@ -145,10 +145,10 @@ Deno.serve(async (req) => {
       })
     }
 
-    // Update database with results
+    // Update database with results using correct table name
     for (const status of userStatuses) {
       const { error: updateError } = await supabaseClient
-        .from('user_status')
+        .from('roblox_user_status')
         .upsert({
           user_id: status.userId,
           username: status.username,
