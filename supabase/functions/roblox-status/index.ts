@@ -135,19 +135,31 @@ async function getUserPresence(
   cookieOverride: string | undefined,
   supabase: SupabaseClient
 ): Promise<PresenceResult> {
+  // Get and validate cookie
   const cookie = cookieOverride || (await getRobloxCookie(supabase));
-  if (cookie) {
-    console.log('Using ROBLOX_COOKIE for presence request, length', cookie.length);
+  const cookieIncluded = !!cookie?.trim();
+  
+  if (cookieIncluded) {
+    console.log('Cookie provided, length:', cookie.length);
   } else {
-    console.warn('No .ROBLOSECURITY cookie supplied for presence request');
+    console.warn('No .ROBLOSECURITY cookie provided for presence request');
   }
+
+  // Prepare headers with proper cookie format
   const headers: Record<string, string> = {
     'Content-Type': 'application/json',
     'User-Agent': 'Roblox/WinInet'
   };
-  if (cookie) {
-    headers.Cookie = `.ROBLOSECURITY=${cookie}`;
+
+  if (cookieIncluded) {
+    // Ensure cookie is properly formatted
+    const trimmedCookie = cookie.trim();
+    if (!trimmedCookie.startsWith('_|WARNING:-DO-NOT-SHARE-THIS')) {
+      console.warn('Cookie may be invalid - does not start with expected prefix');
+    }
+    headers.Cookie = `.ROBLOSECURITY=${trimmedCookie}`;
   }
+
   const body = JSON.stringify({ userIds: [userId] });
   const options = {
     method: 'POST',
@@ -155,13 +167,22 @@ async function getUserPresence(
     body
   } as const;
 
+  // Log request details
+  console.log('Presence Request Details:', {
+    userId,
+    cookieLength: cookieIncluded ? cookie.length : 0,
+    headers: {
+      ...headers,
+      Cookie: cookieIncluded ? '[REDACTED]' : undefined
+    },
+    body
+  });
+
   const urlMap = {
     primary: PRESENCE_API_PRIMARY,
     fallback: PRESENCE_API_FALLBACK,
     direct: PRESENCE_API_DIRECT
   } as const;
-
-  const cookieIncluded = !!cookie;
 
   const urls: [string, 'primary' | 'fallback' | 'direct'][] = methodFilter
     ? [[urlMap[methodFilter], methodFilter]]
@@ -176,39 +197,42 @@ async function getUserPresence(
 
   for (const [url, method] of urls) {
     try {
-      console.log('Presence Request Inputs:', { cookieLength: cookie?.length, userId, method });
-      const endpoint =
-        method === 'direct'
-          ? 'direct'
-          : method === 'primary'
-            ? 'roblox-proxy'
-            : 'roproxy';
-      console.log('Presence API endpoint:', endpoint, 'cookie attached:', cookieIncluded);
-      console.log('Fetch URL:', url);
-      console.log('Fetch Headers:', options.headers);
-      console.log('Fetch Body:', body);
+      console.log(`Attempting presence request via ${method} endpoint`);
       const response = await fetchWithRetry(url, options);
       const text = await response.text();
-      console.log('Presence API Status:', response.status);
-      console.log('Presence API Body:', text);
+      
+      console.log(`Presence API Response (${method}):`, {
+        status: response.status,
+        statusText: response.statusText,
+        body: text
+      });
+
       const data = JSON.parse(text);
+      
       if (data.userPresences?.[0]) {
-        if (method !== 'primary') {
-          console.warn(`Presence API fallback method used: ${method}`);
-        }
+        const presence = data.userPresences[0];
+        console.log('Presence data received:', {
+          userPresenceType: presence.userPresenceType,
+          placeId: presence.placeId,
+          universeId: presence.universeId,
+          lastLocation: presence.lastLocation
+        });
+
         attemptLog.push({
           method,
           success: true,
           status: response.status,
           cookie: cookieIncluded
         });
+
         return {
-          presence: data.userPresences[0],
+          presence,
           method,
           attempts: attemptLog,
           cookieProvided: cookieIncluded
         };
       }
+
       attemptLog.push({
         method,
         success: false,
@@ -216,6 +240,7 @@ async function getUserPresence(
         cookie: cookieIncluded
       });
     } catch (err) {
+      console.error(`Error in ${method} attempt:`, err);
       attemptLog.push({
         method,
         success: false,

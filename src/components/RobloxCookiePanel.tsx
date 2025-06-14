@@ -106,9 +106,21 @@ const RobloxCookiePanel: React.FC = () => {
     setTestResult(null);
     setTestError(null);
     const TEST_USER_ID = 77146135;
+
     try {
       const trimmedCookie = cookie.trim();
-      console.log('Sending cookie:', trimmedCookie);
+      
+      // Validate cookie format
+      if (!trimmedCookie) {
+        throw new Error('Please enter a .ROBLOSECURITY cookie');
+      }
+      
+      if (!trimmedCookie.startsWith('_|WARNING:-DO-NOT-SHARE-THIS')) {
+        throw new Error('Invalid .ROBLOSECURITY cookie format');
+      }
+
+      console.log('Testing presence with cookie length:', trimmedCookie.length);
+      
       const { data, error } = await supabase.functions.invoke('roblox-status', {
         body: {
           userId: TEST_USER_ID,
@@ -116,9 +128,22 @@ const RobloxCookiePanel: React.FC = () => {
           method: testMethod === 'auto' ? undefined : testMethod
         }
       });
-      if (error) throw error;
+
+      if (error) {
+        console.error('Presence test error:', error);
+        throw new Error(error.message || 'Failed to test presence');
+      }
+
+      if (!data) {
+        throw new Error('No response data received');
+      }
+
+      // Log the full response for debugging
+      console.log('Presence test response:', data);
+
       setTestResult(data as any);
     } catch (err) {
+      console.error('Presence test failed:', err);
       const msg = err instanceof Error ? err.message : 'Presence test failed';
       setTestError(msg);
     } finally {
