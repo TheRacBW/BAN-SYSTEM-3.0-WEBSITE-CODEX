@@ -315,86 +315,51 @@ async function getUserStatus(
 
 if (import.meta.main) {
   Deno.serve(async (req) => {
-  // Handle CORS preflight
-  if (req.method === 'OPTIONS') {
-    return new Response(null, { 
-      status: 204,
-      headers: corsHeaders 
-    });
-  }
-
-  try {
-    const body = await req.json();
-    console.log('Incoming body:', body);
-
-    if (!body.userId) {
-      return new Response(
-        JSON.stringify({ error: 'Missing userId' }),
-        {
-          status: 400,
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-        }
-      );
+    // Handle CORS preflight
+    if (req.method === 'OPTIONS') {
+      return new Response(null, {
+        status: 204,
+        headers: corsHeaders
+      });
     }
 
-    const { userId, cookie, method } = body;
-    if (typeof userId !== 'number') {
-      return new Response(
-        JSON.stringify({ error: 'User ID is required' }),
-        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
-    }
+    try {
+      const body = await req.json();
+      console.log('Incoming body:', body);
 
-    const supabaseUrl = Deno.env.get('SUPABASE_URL') || '';
-    const serviceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
-    const supabase = createClient(supabaseUrl, serviceKey);
-
-    const status = await getUserStatus(
-      userId,
-      method === 'auto' ? undefined : method,
-      typeof cookie === 'string' ? cookie.trim() : undefined,
-      supabase
-    );
-
-    return new Response(
-      JSON.stringify(status),
-      { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-    );
-  } catch (error) {
-    console.error('Server error:', error);
-
-    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-    let status = 500;
-
-    if (errorMessage.includes('not found')) {
-      status = 404;
-    } else if (errorMessage.includes('rate limit')) {
-      status = 429;
-    } else if (errorMessage.includes('timed out')) {
-      status = 504;
-    }
-
-    const extra: Record<string, unknown> = {};
-    if (error && typeof error === 'object' && 'details' in error && (error as any).details) {
-      extra.details = (error as any).details;
-    } else {
-      const match = /status:\s*(\d+)/i.exec(errorMessage);
-      if (match) {
-        extra.fetchStatus = Number(match[1]);
+      const { userId, cookie, method } = body;
+      if (typeof userId !== 'number') {
+        return new Response(
+          JSON.stringify({ error: 'Missing userId' }),
+          {
+            status: 400,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+          }
+        );
       }
-    }
 
-    return new Response(
-      JSON.stringify({
-        error: errorMessage,
-        ...extra
-      }),
-      {
-        status,
+      const supabaseUrl = Deno.env.get('SUPABASE_URL') || '';
+      const serviceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
+      const supabase = createClient(supabaseUrl, serviceKey);
+
+      const { presence } = await getUserPresence(
+        userId,
+        method === 'auto' ? undefined : method,
+        typeof cookie === 'string' ? cookie.trim() : undefined,
+        supabase
+      );
+
+      return new Response(JSON.stringify(presence), {
+        status: 200,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-      }
-    );
-  }
+      });
+    } catch (error) {
+      console.error('roblox-status error:', error);
+      return new Response(
+        JSON.stringify({ error: 'Internal Server Error' }),
+        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
   });
 }
 
