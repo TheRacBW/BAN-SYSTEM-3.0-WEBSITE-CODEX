@@ -24,26 +24,20 @@ interface PresenceResult {
   isInGame: boolean;
   inBedwars: boolean;
   username: string;
-  userPresenceType?: number;
-  placeId?: string;
-  rootPlaceId?: string;
-  universeId?: string;
+  userPresenceType: number | null;
+  placeId: string | null;
+  rootPlaceId: string | null;
+  universeId: string | null;
   lastUpdated: number;
 }
 
 interface UserStatus {
-  userId: number;
-  username: string;
-  isOnline: boolean;
-  isInGame: boolean;
-  inBedwars: boolean;
-  userPresenceType: number | null;
-  placeId: number | null;
-  rootPlaceId: number | null;
-  universeId: number | null;
-  lastUpdated: number;
-  presenceMethod: 'proxy' | 'direct';
-  presence?: UserPresence;
+  userPresenceType: number | null | undefined;
+  placeId: number | null | undefined;
+  rootPlaceId: number | null | undefined;
+  universeId: number | null | undefined;
+  username?: string;
+  lastLocation?: string;
 }
 
 // Constants
@@ -85,7 +79,7 @@ async function fetchWithProxy(url: string, options: RequestInit): Promise<Respon
 }
 
 // Step 1: Basic status check (lightweight)
-async function getBasicRobloxStatus(userId: number): Promise<any> {
+async function getBasicRobloxStatus(userId: number): Promise<UserStatus | null> {
   if (!ADMIN_ROBLOX_COOKIE) {
     throw new Error('Admin Roblox cookie not configured');
   }
@@ -98,11 +92,7 @@ async function getBasicRobloxStatus(userId: number): Promise<any> {
   };
 
   try {
-    const params = new URLSearchParams({
-      userIds: userId.toString()
-    });
-
-    const response = await fetch(`${ROBLOX_API}?${params}`, { headers });
+    const response = await fetch(`${ROBLOX_API}?userIds=${userId}`, { headers });
     
     if (!response.ok) {
       console.error(`[${userId}] Basic status check failed:`, response.statusText);
@@ -125,7 +115,7 @@ async function getBasicRobloxStatus(userId: number): Promise<any> {
 }
 
 // Step 2: Detailed presence check (only for in-game players)
-async function getDetailedPresence(userId: number): Promise<any> {
+async function getDetailedPresence(userId: number): Promise<UserStatus | null> {
   if (!ADMIN_ROBLOX_COOKIE) {
     throw new Error('Admin Roblox cookie not configured');
   }
@@ -138,11 +128,7 @@ async function getDetailedPresence(userId: number): Promise<any> {
   };
 
   try {
-    const params = new URLSearchParams({
-      userIds: userId.toString()
-    });
-
-    const response = await fetch(`${ROBLOX_API}?${params}`, { headers });
+    const response = await fetch(`${ROBLOX_API}?userIds=${userId}`, { headers });
     
     if (!response.ok) {
       console.error(`[${userId}] Detailed presence check failed:`, response.statusText);
@@ -177,7 +163,7 @@ async function getUserPresence(userId: number): Promise<PresenceResult> {
         isInGame: false,
         inBedwars: false,
         username: '',
-        userPresenceType: 0,
+        userPresenceType: null,
         placeId: null,
         rootPlaceId: null,
         universeId: null,
@@ -185,7 +171,7 @@ async function getUserPresence(userId: number): Promise<PresenceResult> {
       };
     }
 
-    // Basic status checks
+    // Basic status checks with safe type handling
     const isOnline = basicStatus.userPresenceType !== 0;
     const isInGame = basicStatus.userPresenceType === 2;
 
@@ -196,7 +182,7 @@ async function getUserPresence(userId: number): Promise<PresenceResult> {
         isInGame: false,
         inBedwars: false,
         username: basicStatus.username || '',
-        userPresenceType: basicStatus.userPresenceType,
+        userPresenceType: basicStatus.userPresenceType ?? null,
         placeId: null,
         rootPlaceId: null,
         universeId: null,
@@ -214,7 +200,7 @@ async function getUserPresence(userId: number): Promise<PresenceResult> {
         isInGame,
         inBedwars: false,
         username: basicStatus.username || '',
-        userPresenceType: basicStatus.userPresenceType,
+        userPresenceType: basicStatus.userPresenceType ?? null,
         placeId: null,
         rootPlaceId: null,
         universeId: null,
@@ -222,13 +208,13 @@ async function getUserPresence(userId: number): Promise<PresenceResult> {
       };
     }
 
-    // Convert IDs to numbers and handle null/undefined cases
-    const placeId = detailedStatus.placeId ? Number(detailedStatus.placeId) : null;
-    const rootPlaceId = detailedStatus.rootPlaceId ? Number(detailedStatus.rootPlaceId) : null;
-    const universeId = detailedStatus.universeId ? Number(detailedStatus.universeId) : null;
+    // Safe type conversion for IDs
+    const placeId = detailedStatus.placeId ? String(detailedStatus.placeId) : null;
+    const rootPlaceId = detailedStatus.rootPlaceId ? String(detailedStatus.rootPlaceId) : null;
+    const universeId = detailedStatus.universeId ? String(detailedStatus.universeId) : null;
 
-    // BedWars detection
-    const inBedwars = universeId === BEDWARS_UNIVERSE_ID;
+    // BedWars detection with safe type handling
+    const inBedwars = universeId === String(BEDWARS_UNIVERSE_ID);
 
     console.log(`[${userId}] Final Status:`, {
       isOnline,
@@ -243,7 +229,7 @@ async function getUserPresence(userId: number): Promise<PresenceResult> {
       isInGame,
       inBedwars,
       username: basicStatus.username || '',
-      userPresenceType: basicStatus.userPresenceType,
+      userPresenceType: basicStatus.userPresenceType ?? null,
       placeId,
       rootPlaceId,
       universeId,
@@ -256,7 +242,7 @@ async function getUserPresence(userId: number): Promise<PresenceResult> {
       isInGame: false,
       inBedwars: false,
       username: '',
-      userPresenceType: 0,
+      userPresenceType: null,
       placeId: null,
       rootPlaceId: null,
       universeId: null,
