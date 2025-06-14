@@ -36,7 +36,17 @@ interface UserStatus {
 }
 
 // Constants
-const BEDWARS_UNIVERSE_ID = 6872265039; // Updated to correct BedWars universe ID
+const BEDWARS_UNIVERSE_ID = 2619619496; // Correct universe ID
+const BEDWARS_PLACE_ID = 6872265039; // Place ID
+
+// CRITICAL: Use the exact same headers that work in your localhost tool
+const getWorkingHeaders = (cookie: string) => ({
+  'Content-Type': 'application/json',
+  'Cookie': `.ROBLOSECURITY=${cookie}`,
+  'User-Agent': 'Roblox/WinInet', // Changed from 'RobloxPresenceChecker/1.0'
+  'Referer': 'https://www.roblox.com/', // CRITICAL: This was missing!
+  'Accept': 'application/json'
+});
 
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
@@ -44,7 +54,7 @@ Deno.serve(async (req) => {
   }
 
   try {
-    console.log('🚀 Starting roblox-status function')
+    console.log('🚀 Starting FIXED roblox-status function')
     
     const supabaseClient = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
@@ -57,62 +67,58 @@ Deno.serve(async (req) => {
       }
     )
 
-    // Verify we're using the right key
-    const serviceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')
-    const anonKey = Deno.env.get('SUPABASE_ANON_KEY')
-
-    console.log('🔑 Using service role key:', serviceKey ? 'YES' : 'NO')
-    console.log('🔑 Service key length:', serviceKey?.length || 0)
-    console.log('🔑 Anon key length:', anonKey?.length || 0)
-
-    // Get the cookie from environment
-    const robloxCookie = Deno.env.get('ROBLOX_COOKIE')
+    // Get cookie from environment variable OR database
+    let robloxCookie = Deno.env.get('ROBLOX_COOKIE')
+    
     if (!robloxCookie) {
-      console.error('❌ ROBLOX_COOKIE environment variable not set')
-      throw new Error('ROBLOX_COOKIE environment variable not set')
+      console.log('🔍 No env cookie, checking database...')
+      const { data: settings } = await supabaseClient
+        .from('roblox_settings')
+        .select('cookie')
+        .eq('id', 'global')
+        .single()
+      
+      robloxCookie = settings?.cookie
     }
 
-    // First, let's try a simple count to see if we can access the table at all
-    console.log('🔍 Querying player_accounts table...')
-    const { count, error: countError } = await supabaseClient
-      .from('player_accounts')
-      .select('*', { count: 'exact', head: true })
-
-    console.log('📊 Table access check:', { count, countError })
-
-    // Now get the actual data with explicit casting
-    const { data: accounts, error: accountsError } = await supabaseClient
-      .from('player_accounts')
-      .select('user_id')
-      .not('user_id', 'is', null)
-
-    console.log('🔍 Accounts query result:', { accounts, accountsError })
-    console.log('📊 Number of accounts found:', accounts?.length || 0)
-
-    if (accounts && accounts.length > 0) {
-      console.log('👥 First few account user_ids:', accounts.slice(0, 3).map(a => a.user_id))
-      console.log('🔢 Data types:', accounts.slice(0, 3).map(a => ({ 
-        user_id: a.user_id, 
-        type: typeof a.user_id 
-      })))
-    }
-
-    if (accountsError) {
-      console.error('❌ Database error:', accountsError)
-      throw new Error(`Database query failed: ${accountsError.message}`)
-    }
-
-    if (!accounts || accounts.length === 0) {
-      console.log('⚠️ No accounts found in database')
+    if (!robloxCookie) {
+      console.error('❌ No Roblox cookie available (checked env and database)')
       return new Response(
-        JSON.stringify({ message: 'No accounts found' }),
-        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        JSON.stringify({ error: 'No Roblox cookie configured. Please set ROBLOX_COOKIE environment variable or use the admin panel.' }),
+        { 
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          status: 400 
+        }
       )
     }
 
-    // Also let's make sure we handle the numeric type properly
+    console.log('🍪 Cookie source:', Deno.env.get('ROBLOX_COOKIE') ? 'environment' : 'database')
+    console.log('🍪 Cookie length:', robloxCookie.length)
+    console.log('🍪 Cookie format valid:', robloxCookie.startsWith('_|WARNING:'))
+
+    // Get accounts from database  
+    const { data: accounts, error: accountsError } = await supabaseClient
+      .from('player_accounts')  // Correct table name from your schema
+      .select('user_id')
+
+    if (accountsError) {
+      console.error('❌ Database error:', accountsError)
+      throw new Error(`Database error: ${accountsError.message}`)
+    }
+
+    if (!accounts || accounts.length === 0) {
+      console.log('📭 No accounts found in database')
+      return new Response(
+        JSON.stringify({ message: 'No accounts to check' }),
+        { 
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          status: 200 
+        }
+      )
+    }
+
+    // Convert user IDs to numbers
     const userIds = accounts.map(account => {
-      // Convert to number if it's a string, or keep as number
       const userId = typeof account.user_id === 'string' 
         ? parseInt(account.user_id, 10) 
         : account.user_id
@@ -127,7 +133,7 @@ Deno.serve(async (req) => {
     if (userIds.length === 0) {
       console.log('⚠️ No valid user IDs found - exiting early')
       return new Response(
-        JSON.stringify({ message: 'No user IDs to check' }), 
+        JSON.stringify({ message: 'No valid user IDs to check' }), 
         { 
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
           status: 200 
@@ -135,30 +141,19 @@ Deno.serve(async (req) => {
       )
     }
 
-    // Enhanced Roblox API debugging
-    console.log('🍪 Cookie check:', {
-      hascookie: !!robloxCookie,
-      cookieLength: robloxCookie?.length || 0,
-      cookieStart: robloxCookie?.substring(0, 20) + '...',
-      userIdsToCheck: userIds.slice(0, 3)
-    })
-
-    console.log('🌐 Making request to Roblox presence API...')
+    console.log('🌐 Making request to Roblox presence API with WORKING headers...')
     console.log('📊 Request details:', {
       url: 'https://presence.roblox.com/v1/presence/users',
       method: 'POST',
       userIdsCount: userIds.length,
-      firstFewIds: userIds.slice(0, 5)
+      firstFewIds: userIds.slice(0, 5),
+      headers: 'Using exact same headers as localhost tool'
     })
 
-    // Make request to Roblox API using POST with JSON body
+    // Use the EXACT same request that works in your localhost tool
     const robloxResponse = await fetch('https://presence.roblox.com/v1/presence/users', {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Cookie': `.ROBLOSECURITY=${robloxCookie}`,
-        'User-Agent': 'RobloxPresenceChecker/1.0',
-      },
+      headers: getWorkingHeaders(robloxCookie),
       body: JSON.stringify({ userIds: userIds }),
     })
 
@@ -172,7 +167,7 @@ Deno.serve(async (req) => {
     if (!robloxResponse.ok) {
       const errorText = await robloxResponse.text()
       console.error('❌ Roblox API Error Response:', errorText)
-      throw new Error(`Roblox API error: ${robloxResponse.status} ${robloxResponse.statusText}`)
+      throw new Error(`Roblox API error: ${robloxResponse.status} ${robloxResponse.statusText} - ${errorText}`)
     }
 
     const presenceData: RobloxPresenceResponse = await robloxResponse.json()
@@ -208,9 +203,43 @@ Deno.serve(async (req) => {
       // Determine status based on presence type
       const isOnline = presence.userPresenceType !== 0
       const isInGame = presence.userPresenceType === 2
-      const inBedwars = isInGame && presence.universeId === BEDWARS_UNIVERSE_ID
+      
+      // Enhanced BedWars detection with fallback
+      let inBedwars = false
+      let universeId = presence.universeId
 
-      console.log(`✅ User ${account.user_id}: presenceType=${presence.userPresenceType}, universeId=${presence.universeId}, inBedwars=${inBedwars}`)
+      if (isInGame) {
+        // Primary check: universe ID
+        if (presence.universeId === BEDWARS_UNIVERSE_ID) {
+          inBedwars = true
+        }
+        // Fallback check: place ID (in case universe ID is null)
+        else if (presence.placeId === BEDWARS_PLACE_ID || presence.rootPlaceId === BEDWARS_PLACE_ID) {
+          inBedwars = true
+          // If we know it's BedWars from place ID but universe ID is null, set it
+          if (!universeId) {
+            universeId = BEDWARS_UNIVERSE_ID
+            console.log(`🔧 Fixed null universeId for user ${account.user_id} using place ID`)
+          }
+        }
+        // Additional fallback: check last location
+        else if (presence.lastLocation && presence.lastLocation.toLowerCase().includes('bedwars')) {
+          inBedwars = true
+          if (!universeId) {
+            universeId = BEDWARS_UNIVERSE_ID
+            console.log(`🔧 Fixed null universeId for user ${account.user_id} using lastLocation`)
+          }
+        }
+      }
+
+      console.log(`✅ User ${account.user_id}:`, {
+        presenceType: presence.userPresenceType,
+        universeId: universeId,
+        originalUniverseId: presence.universeId,
+        placeId: presence.placeId,
+        inBedwars,
+        lastLocation: presence.lastLocation
+      })
 
       userStatuses.push({
         userId: account.user_id,
@@ -221,7 +250,7 @@ Deno.serve(async (req) => {
         userPresenceType: presence.userPresenceType,
         placeId: presence.placeId || null,
         rootPlaceId: presence.rootPlaceId || null,
-        universeId: presence.universeId || null,
+        universeId: universeId || null,
         lastUpdated: Date.now(),
         presenceMethod: 'direct'
       })
@@ -232,8 +261,8 @@ Deno.serve(async (req) => {
     for (const status of userStatuses) {
       console.log(`📝 Upserting status for user ${status.userId}`)
       
-      const { error: upsertError } = await supabaseClient
-        .from('roblox_user_status')
+      const { error } = await supabaseClient
+        .from('user_status')
         .upsert({
           user_id: status.userId,
           username: status.username,
@@ -247,38 +276,46 @@ Deno.serve(async (req) => {
           last_updated: new Date(status.lastUpdated).toISOString(),
           presence_method: status.presenceMethod
         }, {
-          onConflict: 'user_id',  // This makes it UPDATE on conflict instead of error
-          ignoreDuplicates: false
+          onConflict: 'user_id'
         })
 
-      if (upsertError) {
-        console.error(`❌ Failed to update status for user ${status.userId}:`, upsertError)
+      if (error) {
+        console.error(`❌ Failed to update user ${status.userId}:`, error)
       } else {
         console.log(`✅ Successfully updated user ${status.userId}`)
       }
     }
 
-    console.log(`🎉 Successfully processed ${userStatuses.length} users`)
+    console.log('🎉 Function completed successfully')
 
     return new Response(
-      JSON.stringify({ 
-        success: true, 
-        updated: userStatuses.length,
-        statuses: userStatuses 
+      JSON.stringify({
+        success: true,
+        processed: userStatuses.length,
+        timestamp: new Date().toISOString(),
+        summary: {
+          online: userStatuses.filter(s => s.isOnline).length,
+          inGame: userStatuses.filter(s => s.isInGame).length,
+          inBedwars: userStatuses.filter(s => s.inBedwars).length
+        },
+        cookieSource: Deno.env.get('ROBLOX_COOKIE') ? 'environment' : 'database'
       }),
-      { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      { 
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        status: 200 
+      }
     )
 
   } catch (error) {
-    console.error('❌ Error in roblox-status function:', error)
+    console.error('💥 Function error:', error)
     return new Response(
       JSON.stringify({ 
-        error: 'Internal server error', 
-        details: error.message 
+        error: error instanceof Error ? error.message : 'Unknown error',
+        timestamp: new Date().toISOString()
       }),
       { 
-        status: 500, 
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        status: 500 
       }
     )
   }
