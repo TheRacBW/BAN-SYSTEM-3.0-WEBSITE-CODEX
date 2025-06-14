@@ -20,8 +20,15 @@ interface UserPresence {
 }
 
 interface PresenceResult {
-  presence: UserPresence;
-  method: 'proxy' | 'direct';
+  isOnline: boolean;
+  isInGame: boolean;
+  inBedwars: boolean;
+  username: string;
+  userPresenceType?: number;
+  placeId?: string;
+  rootPlaceId?: string;
+  universeId?: string;
+  lastUpdated: number;
 }
 
 interface UserStatus {
@@ -88,26 +95,35 @@ async function getUserPresence(userId: number): Promise<PresenceResult> {
     'Cookie': `.ROBLOSECURITY=${ADMIN_ROBLOX_COOKIE}`
   };
 
-  const body = JSON.stringify({ userIds: [userId] });
-  const options = { method: 'POST', headers, body };
-
   try {
-    const response = await fetchWithProxy(ROBLOX_API, options);
-    const text = await response.text();
-    console.log('Presence API Response:', {
-      status: response.status,
-      statusText: response.statusText,
-      body: text
-    });
+    const response = await fetchWithProxy(
+      `${ROBLOX_API}/users/${userId}/presence`,
+      { headers }
+    );
 
-    const data = JSON.parse(text);
-    if (!data.userPresences?.[0]) {
-      throw new Error('No presence data found');
+    if (!response.ok) {
+      throw new Error(`Failed to fetch presence: ${response.statusText}`);
     }
 
+    const presence = await response.json();
+    const isOnline = presence.userPresenceType !== 0;
+    const isInGame = presence.userPresenceType === 2;
+    const inBedwars = isInGame && (
+      Number(presence.placeId) === 6872265039 ||
+      Number(presence.rootPlaceId) === 6872265039 ||
+      Number(presence.universeId) === 2619619496
+    );
+
     return {
-      presence: data.userPresences[0],
-      method: response.url.includes(PROXY_URL) ? 'proxy' : 'direct'
+      isOnline,
+      isInGame,
+      inBedwars,
+      username: presence.username || '',
+      userPresenceType: presence.userPresenceType,
+      placeId: presence.placeId,
+      rootPlaceId: presence.rootPlaceId,
+      universeId: presence.universeId,
+      lastUpdated: Date.now()
     };
   } catch (error) {
     console.error('Error fetching presence:', error);
@@ -144,23 +160,28 @@ async function getUserStatus(userId: number): Promise<UserStatus> {
       getUserPresence(userId)
     ]);
 
-    const presence = presenceResult.presence;
-    const inBedwars = presence.placeId === BEDWARS_PLACE_ID || 
-                      presence.universeId === BEDWARS_UNIVERSE_ID;
-
     const status: UserStatus = {
       userId,
       username,
-      isOnline: presence.userPresenceType === 1 || presence.userPresenceType === 2,
-      isInGame: presence.userPresenceType === 2,
-      inBedwars,
-      userPresenceType: presence.userPresenceType,
-      placeId: presence.placeId,
-      rootPlaceId: presence.rootPlaceId,
-      universeId: presence.universeId,
+      isOnline: presenceResult.isOnline,
+      isInGame: presenceResult.isInGame,
+      inBedwars: presenceResult.inBedwars,
+      userPresenceType: presenceResult.userPresenceType,
+      placeId: presenceResult.placeId,
+      rootPlaceId: presenceResult.rootPlaceId,
+      universeId: presenceResult.universeId,
       lastUpdated: Date.now(),
-      presenceMethod: presenceResult.method,
-      presence
+      presenceMethod: 'direct',
+      presence: {
+        userPresenceType: presenceResult.userPresenceType,
+        lastLocation: '',
+        placeId: presenceResult.placeId,
+        rootPlaceId: presenceResult.rootPlaceId,
+        gameId: null,
+        universeId: presenceResult.universeId,
+        userId,
+        lastOnline: ''
+      }
     };
 
     // Cache the result

@@ -21,7 +21,8 @@ import {
   Save,
   Maximize2,
   Image,
-  Star
+  Star,
+  RefreshCw
 } from 'lucide-react';
 
 const BEDWARS_ICON_URL =
@@ -405,7 +406,13 @@ function PlayerCard({ player, onDelete, isAdmin }: PlayerCardProps) {
           <div className="space-y-2 mt-2">
             {playerData.accounts?.map(account => (
               <div key={account.id} className="flex items-center gap-2">
-                <RobloxStatus userId={account.user_id} />
+                <RobloxStatus 
+                  username={account.status?.username || ''}
+                  isOnline={account.status?.isOnline || false}
+                  isInGame={account.status?.isInGame || false}
+                  inBedwars={account.status?.inBedwars || false}
+                  lastUpdated={account.status?.lastUpdated}
+                />
                 {getAccountRank(account) ? (
                   <img
                     src={getAccountRank(account)?.image_url}
@@ -420,11 +427,7 @@ function PlayerCard({ player, onDelete, isAdmin }: PlayerCardProps) {
                     title="Rank unknown"
                   />
                 )}
-                {account.status?.userPresenceType === 2 &&
-                  (account.status?.inBedwars ||
-                    Number(account.status?.placeId) === BEDWARS_PLACE_ID ||
-                    Number(account.status?.rootPlaceId) === BEDWARS_PLACE_ID ||
-                    Number(account.status?.universeId) === BEDWARS_UNIVERSE_ID) && (
+                {account.status?.inBedwars && (
                   <img
                     src={BEDWARS_ICON_URL}
                     alt="BedWars"
@@ -437,28 +440,40 @@ function PlayerCard({ player, onDelete, isAdmin }: PlayerCardProps) {
           </div>
         </div>
 
-        {isAdmin && (
-          <div className="flex gap-2">
-            <button
-              onClick={(e) => {
-                e.stopPropagation();
-                setShowEditModal(true);
-              }}
-              className="p-2 text-blue-600 hover:bg-blue-100 rounded-full"
-            >
-              <Edit2 size={16} />
-            </button>
-            <button
-              onClick={(e) => {
-                e.stopPropagation();
-                if (onDelete) onDelete(player.id);
-              }}
-              className="p-2 text-red-600 hover:bg-red-100 rounded-full"
-            >
-              <Trash2 size={16} />
-            </button>
-          </div>
-        )}
+        <div className="flex gap-2">
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              refreshPlayerData();
+            }}
+            className="p-2 text-gray-600 hover:bg-gray-100 rounded-full"
+            title="Refresh status"
+          >
+            <RefreshCw size={16} />
+          </button>
+          {isAdmin && (
+            <>
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setShowEditModal(true);
+                }}
+                className="p-2 text-blue-600 hover:bg-blue-100 rounded-full"
+              >
+                <Edit2 size={16} />
+              </button>
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  if (onDelete) onDelete(player.id);
+                }}
+                className="p-2 text-red-600 hover:bg-red-100 rounded-full"
+              >
+                <Trash2 size={16} />
+              </button>
+            </>
+          )}
+        </div>
       </div>
 
       <div className="flex gap-2 mb-4">
@@ -532,7 +547,13 @@ function PlayerCard({ player, onDelete, isAdmin }: PlayerCardProps) {
                 >
                   <div className="flex items-center gap-4">
                     <div>
-                      <RobloxStatus userId={account.user_id} />
+                      <RobloxStatus 
+                        username={account.status?.username || ''}
+                        isOnline={account.status?.isOnline || false}
+                        isInGame={account.status?.isInGame || false}
+                        inBedwars={account.status?.inBedwars || false}
+                        lastUpdated={account.status?.lastUpdated}
+                      />
                     </div>
                     {getAccountRank(account) ? (
                       <img
@@ -547,11 +568,7 @@ function PlayerCard({ player, onDelete, isAdmin }: PlayerCardProps) {
                         <span className="text-sm">Rank unknown</span>
                       </div>
                     )}
-                    {account.status?.userPresenceType === 2 &&
-                      (account.status?.inBedwars ||
-                        Number(account.status?.placeId) === BEDWARS_PLACE_ID ||
-                        Number(account.status?.rootPlaceId) === BEDWARS_PLACE_ID ||
-                        Number(account.status?.universeId) === BEDWARS_UNIVERSE_ID) && (
+                    {account.status?.inBedwars && (
                       <img
                         src={BEDWARS_ICON_URL}
                         alt="BedWars"

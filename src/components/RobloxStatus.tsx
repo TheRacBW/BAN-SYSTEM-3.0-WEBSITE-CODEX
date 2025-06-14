@@ -1,68 +1,57 @@
-import { useState, useEffect } from 'react';
-import { useRobloxStatus } from '../hooks/useRobloxStatus';
-import { CircleDot, CircleSlash, Gamepad2 } from 'lucide-react';
-import { BEDWARS_PLACE_ID, BEDWARS_UNIVERSE_ID } from '../constants/bedwars';
+import React from 'react';
+import { Gamepad2, Circle } from 'lucide-react';
 
 interface RobloxStatusProps {
-  userId: number;
+  username: string;
+  isOnline: boolean;
+  isInGame: boolean;
+  inBedwars: boolean;
+  lastUpdated?: number;
 }
 
-export default function RobloxStatus({ userId }: RobloxStatusProps) {
-  const { status, loading, error } = useRobloxStatus(userId);
+const RobloxStatus: React.FC<RobloxStatusProps> = ({
+  username,
+  isOnline,
+  isInGame,
+  inBedwars,
+  lastUpdated
+}) => {
+  const getStatusColor = () => {
+    if (!isOnline) return 'text-gray-400';
+    if (inBedwars) return 'text-blue-600 dark:text-blue-400';
+    if (isInGame) return 'text-green-600 dark:text-green-400';
+    return 'text-green-600 dark:text-green-400';
+  };
 
-  if (loading) {
-    return (
-      <div className="flex items-center gap-1 text-xs text-gray-500 dark:text-gray-400">
-        <div className="animate-spin rounded-full h-3 w-3 border-b-2 border-gray-500"></div>
-        <span>Checking status...</span>
-      </div>
-    );
-  }
+  const getStatusText = () => {
+    if (!isOnline) return 'Offline';
+    if (inBedwars) return 'In BedWars';
+    if (isInGame) return 'In Game';
+    return 'Online';
+  };
 
-  if (error) {
-    return (
-      <div className="flex items-center gap-1 text-xs text-red-500 dark:text-red-400">
-        <CircleSlash size={12} />
-        <span>{error}</span>
-      </div>
-    );
-  }
-
-  if (!status) return null;
+  const getStatusIcon = () => {
+    if (!isOnline) return <Circle size={8} className="fill-current" />;
+    if (inBedwars) return <Gamepad2 size={12} className="text-blue-600 dark:text-blue-400" />;
+    if (isInGame) return <Gamepad2 size={12} className="text-green-600 dark:text-green-400" />;
+    return <Circle size={8} className="fill-current text-green-600 dark:text-green-400" />;
+  };
 
   return (
-    <div className="flex flex-col gap-1 text-xs">
-      <div className="flex items-center gap-2">
-        <div className="flex items-center gap-1">
-          <CircleDot
-            size={12}
-            className={status.isOnline ? 'text-green-500' : 'text-gray-400'}
-          />
-          <span className={status.isOnline ? 'text-green-600 dark:text-green-400' : 'text-gray-500'}>
-            {status.username} ({status.isInGame ? 'In Game' : status.isOnline ? 'Online' : 'Offline'})
-          </span>
-        </div>
-        
-        {status.userPresenceType === 2 &&
-          (status.inBedwars ||
-            Number(status.placeId) === BEDWARS_PLACE_ID ||
-            Number(status.rootPlaceId) === BEDWARS_PLACE_ID ||
-            Number(status.universeId) === BEDWARS_UNIVERSE_ID) && (
-          <div className="flex items-center gap-1 text-blue-600 dark:text-blue-400">
-            <Gamepad2 size={12} />
-            <span>In Bedwars</span>
-          </div>
-        )}
+    <div className="flex items-center gap-2">
+      <div className={`flex items-center gap-1 ${getStatusColor()}`}>
+        {getStatusIcon()}
+        <span className="text-sm">
+          {username} ({getStatusText()})
+        </span>
       </div>
-      {status.presenceMethod && (
-        <span className="text-gray-500" title="Presence API method">
-          via {status.presenceMethod === 'primary'
-            ? 'roblox-proxy'
-            : status.presenceMethod === 'fallback'
-            ? 'roproxy'
-            : 'roblox'}
+      {lastUpdated && (
+        <span className="text-xs text-gray-500">
+          {new Date(lastUpdated).toLocaleTimeString()}
         </span>
       )}
     </div>
   );
-}
+};
+
+export default RobloxStatus;
