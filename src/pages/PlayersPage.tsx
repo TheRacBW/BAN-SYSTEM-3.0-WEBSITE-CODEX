@@ -3,10 +3,11 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { supabase } from '../lib/supabase';
 import { Player, SortOption, RANK_VALUES } from '../types/players';
-import { Plus, Search, Users, Gamepad2, ArrowUpDown, RefreshCw, Pin } from 'lucide-react';
+import { Plus, Search, Users, Gamepad2, ArrowUpDown, RefreshCw, Pin, X } from 'lucide-react';
 import PlayerCard from '../components/PlayerCard';
 import { BEDWARS_PLACE_ID, BEDWARS_UNIVERSE_ID } from '../constants/bedwars';
 import { useUserPins } from '../hooks/useUserPins';
+import RobloxStatus from '../components/RobloxStatus';
 
 export default function PlayersPage() {
   const navigate = useNavigate();
@@ -32,6 +33,7 @@ export default function PlayersPage() {
   const [showAddPlayer, setShowAddPlayer] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [playerToDelete, setPlayerToDelete] = useState<Player | null>(null);
+  const [selectedTeammate, setSelectedTeammate] = useState<Player | null>(null);
 
   useEffect(() => {
     if (user) {
@@ -313,6 +315,11 @@ export default function PlayersPage() {
     await togglePin(playerId);
   };
 
+  const handleTeammateClick = (teammate: Player) => {
+    console.log('Opening teammate modal for:', teammate.alias);
+    setSelectedTeammate(teammate);
+  };
+
   if (!user) {
     return (
       <div className="flex items-center justify-center h-[60vh]">
@@ -441,6 +448,7 @@ export default function PlayersPage() {
             isPinned={isPinned(player.id)}
             onPinToggle={handlePinToggle}
             showPinIcon={!!user}
+            onTeammateClick={handleTeammateClick}
           />
         ))}
       </div>
@@ -493,6 +501,82 @@ export default function PlayersPage() {
                   className="btn btn-primary"
                 >
                   Add Player
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Teammate Modal */}
+      {selectedTeammate && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white dark:bg-gray-800 rounded-lg p-6 max-w-4xl w-full mx-4 max-h-[90vh] overflow-y-auto">
+            <div className="flex justify-between items-start mb-6">
+              <div>
+                <h2 className="text-2xl font-bold">{selectedTeammate.alias}</h2>
+                <div className="flex items-center gap-2 mt-2">
+                  <Users size={18} className="text-gray-500" />
+                  <span className="text-gray-600 dark:text-gray-400">
+                    Teammate of {players.find(p => p.id === selectedTeammate.id)?.alias || 'Unknown'}
+                  </span>
+                </div>
+              </div>
+              <button
+                onClick={() => setSelectedTeammate(null)}
+                className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
+              >
+                <X size={24} />
+              </button>
+            </div>
+
+            <div className="space-y-8">
+              <section>
+                <h3 className="text-lg font-semibold mb-4">Known Accounts</h3>
+                <div className="space-y-4">
+                  {selectedTeammate.accounts?.map(account => (
+                    <div 
+                      key={account.id}
+                      className="flex items-center justify-between bg-gray-50 dark:bg-gray-700/50 p-4 rounded-lg"
+                    >
+                      <div className="flex items-center gap-4">
+                        <div>
+                          <RobloxStatus 
+                            username={account.status?.username || account.user_id.toString()}
+                            isOnline={account.status?.isOnline || false}
+                            isInGame={account.status?.isInGame || false}
+                            inBedwars={account.status?.inBedwars || false}
+                            lastUpdated={account.status?.lastUpdated}
+                          />
+                        </div>
+                        {account.rank?.[0]?.account_ranks && (
+                          <img
+                            src={account.rank[0].account_ranks.image_url}
+                            alt={account.rank[0].account_ranks.name}
+                            className="w-8 h-8"
+                            title={account.rank[0].account_ranks.name}
+                          />
+                        )}
+                        {account.status?.inBedwars && (
+                          <img
+                            src="https://cdn2.steamgriddb.com/icon/3ad9ecf4b4a26b7671e09283f001d626.png"
+                            alt="BedWars"
+                            className="w-8 h-8"
+                            title="In BedWars"
+                          />
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </section>
+
+              <div className="flex justify-center pt-4">
+                <button
+                  onClick={() => setSelectedTeammate(null)}
+                  className="btn btn-outline"
+                >
+                  Close
                 </button>
               </div>
             </div>
