@@ -182,14 +182,25 @@ export default function PlayersPage() {
         const playersWithStatuses = await fetchAccountStatuses(playersData);
         console.log('✅ fetchPlayers: Players with statuses:', playersWithStatuses.length);
         setPlayers(playersWithStatuses);
+        
+        // Only set dataReady to true if we actually have data
+        if (playersWithStatuses && playersWithStatuses.length > 0) {
+          console.log('✅ fetchPlayers: Setting dataReady to true - we have data');
+          setDataReady(true);
+        } else {
+          console.log('⚠️ fetchPlayers: No player data available, keeping dataReady false');
+        }
+      } else {
+        console.log('⚠️ fetchPlayers: No playersData received, keeping dataReady false');
       }
     } catch (error) {
       console.error('❌ fetchPlayers: Error fetching players:', error);
       setError('Failed to fetch players');
+      // Don't set dataReady to true on error
     } finally {
       console.log('🏁 fetchPlayers: Setting loading to false');
       setLoading(false);
-      setDataReady(true);
+      // Note: dataReady is now set conditionally above, not here
     }
   };
 
@@ -308,19 +319,24 @@ export default function PlayersPage() {
   });
 
   const handleRefreshAll = async () => {
+    console.log('🔄 handleRefreshAll: Starting refresh...');
     setIsLoading(true);
     setDataReady(false);
     setError(null);
     
     try {
       // Fetch fresh player data with updated statuses
+      // fetchPlayers() will handle setting dataReady = true when complete
       await fetchPlayers();
+      console.log('✅ handleRefreshAll: Refresh completed successfully');
       
     } catch (error) {
-      console.error('Refresh failed:', error);
+      console.error('❌ handleRefreshAll: Refresh failed:', error);
       setError(error instanceof Error ? error.message : 'Failed to refresh player data');
+      // Don't set dataReady = true on error, let user retry
     } finally {
       setIsLoading(false);
+      console.log('🏁 handleRefreshAll: Refresh operation finished');
     }
   };
 
@@ -346,6 +362,35 @@ export default function PlayersPage() {
     return (
       <div className="flex items-center justify-center h-[60vh]">
         <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-600"></div>
+      </div>
+    );
+  }
+
+  // Show empty state if no players found
+  if (dataReady && players.length === 0) {
+    return (
+      <div className="space-y-6">
+        <div className="flex justify-between items-center">
+          <h2 className="text-2xl font-bold">Players</h2>
+          <button
+            onClick={() => setShowAddModal(true)}
+            className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+          >
+            <Plus size={16} />
+            Add Player
+          </button>
+        </div>
+        <div className="flex items-center justify-center h-[40vh]">
+          <div className="text-center">
+            <p className="text-lg text-gray-600 mb-4">No players found</p>
+            <button
+              onClick={() => setShowAddModal(true)}
+              className="btn btn-primary"
+            >
+              Add Your First Player
+            </button>
+          </div>
+        </div>
       </div>
     );
   }
