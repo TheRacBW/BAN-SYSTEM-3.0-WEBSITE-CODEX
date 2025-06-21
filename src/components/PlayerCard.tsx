@@ -123,11 +123,77 @@ function PlayerCard({ player, onDelete, isAdmin, isPinned, onPinToggle, showPinI
     try {
       const { data, error } = await supabase
         .from('players')
-        .select('*')
+        .select(`
+          *,
+          accounts:player_accounts(
+            id,
+            user_id,
+            rank:player_account_ranks(
+              rank_id,
+              account_ranks(*)
+            )
+          )
+        `)
         .neq('id', player.id);
 
       if (error) throw error;
-      setAvailableTeammates(data || []);
+      
+      if (data) {
+        // Fetch Roblox status data for all available teammates
+        const allAccountIds = data.flatMap(p => p.accounts?.map(acc => acc.user_id) || []);
+        
+        if (allAccountIds.length > 0) {
+          const { data: statusData, error: statusError } = await supabase
+            .from('roblox_user_status')
+            .select('*')
+            .in('user_id', allAccountIds);
+          
+          if (!statusError && statusData) {
+            // Create a map of user_id to status
+            const statusMap = new Map();
+            statusData.forEach((status: any) => {
+              statusMap.set(status.user_id, status);
+            });
+            
+            // Merge status data with accounts
+            const updatedData = data.map(player => ({
+              ...player,
+              accounts: player.accounts?.map(acc => {
+                const status = statusMap.get(acc.user_id);
+                if (status) {
+                  return {
+                    ...acc,
+                    status: {
+                      isOnline: status.is_online,
+                      isInGame: status.is_in_game ?? false,
+                      inBedwars: typeof status.in_bedwars === 'boolean'
+                        ? status.in_bedwars
+                        : (status.is_in_game ?? false) && (
+                            Number(status.place_id) === BEDWARS_PLACE_ID ||
+                            Number(status.root_place_id) === BEDWARS_PLACE_ID ||
+                            Number(status.universe_id) === BEDWARS_UNIVERSE_ID
+                          ),
+                      userPresenceType: status.user_presence_type,
+                      placeId: status.place_id,
+                      rootPlaceId: status.root_place_id,
+                      universeId: status.universe_id,
+                      presenceMethod: status.presence_method,
+                      username: status.username,
+                      lastUpdated: new Date(status.last_updated).getTime(),
+                    },
+                  };
+                }
+                return acc;
+              })
+            }));
+            
+            setAvailableTeammates(updatedData);
+            return;
+          }
+        }
+        
+        setAvailableTeammates(data);
+      }
     } catch (error) {
       console.error('Error fetching available teammates:', error);
     }
@@ -135,6 +201,9 @@ function PlayerCard({ player, onDelete, isAdmin, isPinned, onPinToggle, showPinI
 
   const refreshPlayerData = async () => {
     try {
+      console.log('🔄 Refreshing player data for:', player.id);
+      
+      // Fetch basic player data
       const { data, error } = await supabase
         .from('players')
         .select(`
@@ -163,11 +232,68 @@ function PlayerCard({ player, onDelete, isAdmin, isPinned, onPinToggle, showPinI
         .single();
 
       if (error) throw error;
+      
       if (data) {
+        // Fetch Roblox status data for all accounts
+        const accountIds = data.accounts?.map(acc => acc.user_id) || [];
+        if (accountIds.length > 0) {
+          console.log('📊 Fetching Roblox status for accounts:', accountIds);
+          
+          const { data: statusData, error: statusError } = await supabase
+            .from('roblox_user_status')
+            .select('*')
+            .in('user_id', accountIds);
+          
+          if (statusError) {
+            console.error('❌ Error fetching status data:', statusError);
+          } else if (statusData) {
+            console.log('✅ Fetched status data for', statusData.length, 'accounts');
+            
+            // Create a map of user_id to status
+            const statusMap = new Map();
+            statusData.forEach((status: any) => {
+              statusMap.set(status.user_id, status);
+            });
+            
+            // Merge status data with accounts
+            const updatedAccounts = data.accounts?.map(acc => {
+              const status = statusMap.get(acc.user_id);
+              if (status) {
+                return {
+                  ...acc,
+                  status: {
+                    isOnline: status.is_online,
+                    isInGame: status.is_in_game ?? false,
+                    inBedwars: typeof status.in_bedwars === 'boolean'
+                      ? status.in_bedwars
+                      : (status.is_in_game ?? false) && (
+                          Number(status.place_id) === BEDWARS_PLACE_ID ||
+                          Number(status.root_place_id) === BEDWARS_PLACE_ID ||
+                          Number(status.universe_id) === BEDWARS_UNIVERSE_ID
+                        ),
+                    userPresenceType: status.user_presence_type,
+                    placeId: status.place_id,
+                    rootPlaceId: status.root_place_id,
+                    universeId: status.universe_id,
+                    presenceMethod: status.presence_method,
+                    username: status.username,
+                    lastUpdated: new Date(status.last_updated).getTime(),
+                  },
+                };
+              }
+              return acc;
+            });
+            
+            // Update the data with merged accounts
+            data.accounts = updatedAccounts;
+          }
+        }
+        
+        console.log('✅ Player data refreshed successfully');
         setPlayerData(data);
       }
     } catch (error) {
-      console.error('Error refreshing player data:', error);
+      console.error('❌ Error refreshing player data:', error);
     }
   };
 
@@ -902,7 +1028,7 @@ function PlayerCard({ player, onDelete, isAdmin, isPinned, onPinToggle, showPinI
 
     return (
       <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-        <div className="bg-white dark:bg-gray-800 rounded-lg p-6 max-w-2xl w-full mx-4 max-h-[90vh] overflow-y-auto">
+        <div className="bg-white dark:bg-gray-800 rounded-lg p-6 max-w-4xl w-full mx-4 max-h-[90vh] overflow-y-auto">
           <h3 className="text-xl font-bold mb-4">Manage Teammates</h3>
           
           <div className="space-y-4">
@@ -917,45 +1043,137 @@ function PlayerCard({ player, onDelete, isAdmin, isPinned, onPinToggle, showPinI
               <Search size={18} className="absolute left-3 top-2.5 text-gray-400" />
             </div>
 
-            <div className="space-y-4">
-              <div className="space-y-2">
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              <div className="space-y-4">
                 <h4 className="font-medium text-gray-700 dark:text-gray-300">Current Teammates</h4>
-                {playerData.teammates?.map(teammate => (
-                  <div
-                    key={teammate.teammate.id}
-                    className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-700/50 rounded-lg"
-                  >
-                    <span>{teammate.teammate.alias}</span>
-                    <button
-                      onClick={() => handleRemoveTeammate(teammate.teammate.id)}
-                      className="text-red-600 hover:text-red-700"
-                    >
-                      <X size={18} />
-                    </button>
+                {playerData.teammates?.length === 0 ? (
+                  <p className="text-gray-500 text-sm">No teammates added yet.</p>
+                ) : (
+                  <div className="space-y-3">
+                    {playerData.teammates?.map(teammate => (
+                      <div
+                        key={teammate.teammate.id}
+                        className="flex items-center justify-between p-4 bg-gray-50 dark:bg-gray-700/50 rounded-lg"
+                      >
+                        <div className="flex-1">
+                          <div className="flex items-center gap-2 mb-2">
+                            <span className="font-medium">{teammate.teammate.alias}</span>
+                            <button
+                              onClick={() => handleRemoveTeammate(teammate.teammate.id)}
+                              className="text-red-600 hover:text-red-700 p-1"
+                              title="Remove teammate"
+                            >
+                              <X size={16} />
+                            </button>
+                          </div>
+                          
+                          {/* Show teammate's accounts and status */}
+                          {teammate.teammate.accounts && teammate.teammate.accounts.length > 0 ? (
+                            <div className="space-y-1">
+                              {teammate.teammate.accounts.map(account => (
+                                <div key={account.id} className="flex items-center gap-2 text-sm">
+                                  <RobloxStatus 
+                                    username={account.status?.username || account.user_id.toString()}
+                                    isOnline={account.status?.isOnline || false}
+                                    isInGame={account.status?.isInGame || false}
+                                    inBedwars={account.status?.inBedwars || false}
+                                    lastUpdated={account.status?.lastUpdated}
+                                  />
+                                  {getAccountRank(account) && (
+                                    <img
+                                      src={getAccountRank(account)?.image_url}
+                                      alt={getAccountRank(account)?.name}
+                                      className="w-4 h-4"
+                                      title={getAccountRank(account)?.name}
+                                    />
+                                  )}
+                                  {account.status?.inBedwars && (
+                                    <img
+                                      src={BEDWARS_ICON_URL}
+                                      alt="BedWars"
+                                      className="w-4 h-4"
+                                      title="In BedWars"
+                                    />
+                                  )}
+                                </div>
+                              ))}
+                            </div>
+                          ) : (
+                            <p className="text-gray-500 text-sm">No accounts found</p>
+                          )}
+                        </div>
+                      </div>
+                    ))}
                   </div>
-                ))}
+                )}
               </div>
 
-              <div className="space-y-2">
+              <div className="space-y-4">
                 <h4 className="font-medium text-gray-700 dark:text-gray-300">Available Players</h4>
-                {filteredTeammates.map(teammate => (
-                  <div
-                    key={teammate.id}
-                    className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-700/50 rounded-lg"
-                  >
-                    <span>{teammate.alias}</span>
-                    <button
-                      onClick={() => handleAddTeammate(teammate.id)}
-                      className="text-green-600 hover:text-green-700"
-                    >
-                      <Plus size={18} />
-                    </button>
+                {filteredTeammates.length === 0 ? (
+                  <p className="text-gray-500 text-sm">No available players found.</p>
+                ) : (
+                  <div className="space-y-3">
+                    {filteredTeammates.map(teammate => (
+                      <div
+                        key={teammate.id}
+                        className="flex items-center justify-between p-4 bg-gray-50 dark:bg-gray-700/50 rounded-lg"
+                      >
+                        <div className="flex-1">
+                          <div className="flex items-center gap-2 mb-2">
+                            <span className="font-medium">{teammate.alias}</span>
+                            <button
+                              onClick={() => handleAddTeammate(teammate.id)}
+                              className="text-green-600 hover:text-green-700 p-1"
+                              title="Add as teammate"
+                            >
+                              <Plus size={16} />
+                            </button>
+                          </div>
+                          
+                          {/* Show available player's accounts and status */}
+                          {teammate.accounts && teammate.accounts.length > 0 ? (
+                            <div className="space-y-1">
+                              {teammate.accounts.map(account => (
+                                <div key={account.id} className="flex items-center gap-2 text-sm">
+                                  <RobloxStatus 
+                                    username={account.status?.username || account.user_id.toString()}
+                                    isOnline={account.status?.isOnline || false}
+                                    isInGame={account.status?.isInGame || false}
+                                    inBedwars={account.status?.inBedwars || false}
+                                    lastUpdated={account.status?.lastUpdated}
+                                  />
+                                  {getAccountRank(account) && (
+                                    <img
+                                      src={getAccountRank(account)?.image_url}
+                                      alt={getAccountRank(account)?.name}
+                                      className="w-4 h-4"
+                                      title={getAccountRank(account)?.name}
+                                    />
+                                  )}
+                                  {account.status?.inBedwars && (
+                                    <img
+                                      src={BEDWARS_ICON_URL}
+                                      alt="BedWars"
+                                      className="w-4 h-4"
+                                      title="In BedWars"
+                                    />
+                                  )}
+                                </div>
+                              ))}
+                            </div>
+                          ) : (
+                            <p className="text-gray-500 text-sm">No accounts found</p>
+                          )}
+                        </div>
+                      </div>
+                    ))}
                   </div>
-                ))}
+                )}
               </div>
             </div>
 
-            <div className="flex justify-end gap-3 mt-4">
+            <div className="flex justify-end gap-3 mt-6">
               <button
                 onClick={() => setShowTeammateModal(false)}
                 className="btn btn-outline"
@@ -964,7 +1182,6 @@ function PlayerCard({ player, onDelete, isAdmin, isPinned, onPinToggle, showPinI
               </button>
             </div>
           </div>
-        
         </div>
       </div>
     );
