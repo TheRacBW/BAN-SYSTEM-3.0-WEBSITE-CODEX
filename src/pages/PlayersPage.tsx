@@ -32,75 +32,142 @@ export default function PlayersPage() {
 
   useEffect(() => {
     if (user) {
+      console.log('🔍 PlayersPage: User authenticated, fetching players...');
       fetchPlayers();
+    } else {
+      console.log('🔍 PlayersPage: No user, skipping fetch');
     }
   }, [user]);
 
   const fetchAccountStatuses = async (playersList: Player[]) => {
     try {
-      console.log('Fetching statuses for players:', playersList.length);
-      const updatedPlayers = await Promise.all(
-        playersList.map(async player => {
-          console.log('Fetching statuses for player:', player.alias);
-          const updatedAccounts = await Promise.all(
-            (player.accounts || []).map(async acc => {
-              try {
-                console.log('Fetching status for account:', acc.user_id);
-                const { data, error } = await supabase.functions.invoke('roblox-status', {
-                  body: { userId: acc.user_id }
-                });
-                if (!error && data) {
-                  console.log('Status response for account:', acc.user_id, data);
-                  const resp: any = data;
-                  return {
-                    ...acc,
-                    status: {
-                      isOnline: resp.isOnline,
-                      isInGame: resp.isInGame ?? false,
-                      inBedwars: typeof resp.inBedwars === 'boolean'
-                        ? resp.inBedwars
-                        : (resp.isInGame ?? false) && (
-                            Number(resp.placeId) === BEDWARS_PLACE_ID ||
-                            Number(resp.rootPlaceId) === BEDWARS_PLACE_ID ||
-                            Number(resp.universeId) === BEDWARS_UNIVERSE_ID
-                          ),
-                      userPresenceType: resp.userPresenceType,
-                      placeId: resp.placeId,
-                      rootPlaceId: resp.rootPlaceId,
-                      universeId: resp.universeId,
-                      presenceMethod: resp.presenceMethod,
-                      username: resp.username,
-                      lastUpdated: resp.lastUpdated,
-                    },
-                  };
-                }
-              } catch (err) {
-                console.error('Status fetch error for account:', acc.user_id, err);
-              }
-              return acc;
-            })
-          );
-          return { ...player, accounts: updatedAccounts };
-        })
-      );
+      console.log('🚀 fetchAccountStatuses: Starting with players:', playersList.length);
+      
+      // Call the roblox-status function without parameters - it processes all accounts
+      console.log('📞 fetchAccountStatuses: Calling roblox-status Supabase function...');
+      const { data, error } = await supabase.functions.invoke('roblox-status', {
+        body: {} // No parameters needed - function processes all accounts
+      });
+      
+      if (error) {
+        console.error('❌ fetchAccountStatuses: Error calling roblox-status function:', error);
+        return playersList; // Return original data if function fails
+      }
+      
+      if (!data || !Array.isArray(data)) {
+        console.error('❌ fetchAccountStatuses: Invalid response from roblox-status function:', data);
+        return playersList;
+      }
+      
+      console.log('✅ fetchAccountStatuses: Successfully received status data:', data.length, 'statuses');
+      console.log('📊 fetchAccountStatuses: Sample status data:', data[0]);
+      
+      // Create a map of user_id to status for quick lookup
+      const statusMap = new Map();
+      data.forEach((status: any) => {
+        statusMap.set(status.userId, status);
+      });
+      
+      console.log('🗺️ fetchAccountStatuses: Created status map with', statusMap.size, 'entries');
+      
+      // Update players with their account statuses
+      const updatedPlayers = playersList.map(player => {
+        const updatedAccounts = (player.accounts || []).map(acc => {
+          const status = statusMap.get(acc.user_id);
+          if (status) {
+            console.log('✅ fetchAccountStatuses: Found status for account:', acc.user_id, status);
+            return {
+              ...acc,
+              status: {
+                isOnline: status.isOnline,
+                isInGame: status.isInGame ?? false,
+                inBedwars: typeof status.inBedwars === 'boolean'
+                  ? status.inBedwars
+                  : (status.isInGame ?? false) && (
+                      Number(status.placeId) === BEDWARS_PLACE_ID ||
+                      Number(status.rootPlaceId) === BEDWARS_PLACE_ID ||
+                      Number(status.universeId) === BEDWARS_UNIVERSE_ID
+                    ),
+                userPresenceType: status.userPresenceType,
+                placeId: status.placeId,
+                rootPlaceId: status.rootPlaceId,
+                universeId: status.universeId,
+                presenceMethod: status.presenceMethod,
+                username: status.username,
+                lastUpdated: status.lastUpdated,
+              },
+            };
+          } else {
+            console.log('⚠️ fetchAccountStatuses: No status found for account:', acc.user_id);
+          }
+          return acc;
+        });
+        return { ...player, accounts: updatedAccounts };
+      });
 
+      console.log('✅ fetchAccountStatuses: Returning updated players:', updatedPlayers.length);
       return updatedPlayers;
     } catch (error) {
-      console.error('Error fetching statuses:', error);
+      console.error('❌ fetchAccountStatuses: Error fetching statuses:', error);
       return playersList;
     }
   };
 
   const fetchPlayers = async () => {
-    const timestamp = new Date().getTime();
-    const response = await fetch(`/api/players?_t=${timestamp}`, {
-      cache: 'no-store',
-      headers: {
-        'Cache-Control': 'no-cache, no-store, must-revalidate',
-        'Pragma': 'no-cache'
+    try {
+      console.log('🚀 fetchPlayers: Starting to fetch players from Supabase...');
+      setLoading(true);
+      setError(null);
+      
+      // Fetch players with their accounts and related data
+      const { data: playersData, error: playersError } = await supabase
+        .from('players')
+        .select(`
+          *,
+          accounts:player_accounts(
+            id,
+            user_id,
+            rank:player_account_ranks(
+              rank_id,
+              account_ranks(*)
+            )
+          ),
+          teammates:player_teammates!player_id(
+            teammate:players!teammate_id(*)
+          ),
+          strategies:player_strategies(
+            id,
+            image_url,
+            kit_ids,
+            teammate_ids,
+            starred_kit_id,
+            created_at
+          )
+        `)
+        .order('alias');
+
+      if (playersError) {
+        console.error('❌ fetchPlayers: Database error:', playersError);
+        throw playersError;
       }
-    });
-    return response.json();
+
+      console.log('✅ fetchPlayers: Successfully fetched players:', playersData?.length || 0);
+      console.log('📊 fetchPlayers: Sample player data:', playersData?.[0]);
+
+      if (playersData) {
+        // Fetch statuses for all accounts
+        console.log('🔄 fetchPlayers: Calling fetchAccountStatuses...');
+        const playersWithStatuses = await fetchAccountStatuses(playersData);
+        console.log('✅ fetchPlayers: Players with statuses:', playersWithStatuses.length);
+        setPlayers(playersWithStatuses);
+      }
+    } catch (error) {
+      console.error('❌ fetchPlayers: Error fetching players:', error);
+      setError('Failed to fetch players');
+    } finally {
+      console.log('🏁 fetchPlayers: Setting loading to false');
+      setLoading(false);
+    }
   };
 
   const handleAddPlayer = async () => {
@@ -210,19 +277,8 @@ export default function PlayersPage() {
     setError(null);
     
     try {
-      const response = await fetch('/api/roblox-status', { 
-        method: 'POST',
-        cache: 'no-store'
-      });
-      
-      if (!response.ok) {
-        throw new Error('Failed to update player statuses');
-      }
-      
-      await new Promise(resolve => setTimeout(resolve, 2000));
-      
-      const data = await fetchPlayers();
-      setPlayers(data);
+      // Fetch fresh player data with updated statuses
+      await fetchPlayers();
       
     } catch (error) {
       console.error('Refresh failed:', error);
