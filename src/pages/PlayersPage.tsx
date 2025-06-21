@@ -15,6 +15,7 @@ export default function PlayersPage() {
   const { pinnedPlayers, togglePin, isPinned, loading: pinsLoading } = useUserPins();
   const [players, setPlayers] = useState<Player[]>([]);
   const [loading, setLoading] = useState(true);
+  const [dataReady, setDataReady] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
@@ -137,6 +138,7 @@ export default function PlayersPage() {
     try {
       console.log('🚀 fetchPlayers: Starting to fetch players from Supabase...');
       setLoading(true);
+      setDataReady(false);
       setError(null);
       
       // Fetch players with their accounts and related data
@@ -187,6 +189,7 @@ export default function PlayersPage() {
     } finally {
       console.log('🏁 fetchPlayers: Setting loading to false');
       setLoading(false);
+      setDataReady(true);
     }
   };
 
@@ -294,8 +297,19 @@ export default function PlayersPage() {
 
   const sortedPlayers = sortPlayers(filteredPlayers);
 
+  // Debug logging for state management
+  console.log('🔍 PlayersPage State Debug:', {
+    playersCount: players.length,
+    loading,
+    dataReady,
+    filteredPlayersCount: filteredPlayers.length,
+    sortedPlayersCount: sortedPlayers.length,
+    shouldShowLoading: loading || !dataReady
+  });
+
   const handleRefreshAll = async () => {
     setIsLoading(true);
+    setDataReady(false);
     setError(null);
     
     try {
@@ -328,7 +342,7 @@ export default function PlayersPage() {
     );
   }
 
-  if (loading) {
+  if (loading || !dataReady) {
     return (
       <div className="flex items-center justify-center h-[60vh]">
         <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-600"></div>
