@@ -44,6 +44,15 @@ export default function PlayersPage() {
     }
   }, [user]);
 
+  // Debug effect to log when players state changes
+  useEffect(() => {
+    console.log('🔄 PlayersPage: Players state updated:', {
+      playersCount: players.length,
+      loading,
+      error
+    });
+  }, [players, loading, error]);
+
   const fetchAccountStatuses = async (playersList: Player[]) => {
     try {
       console.log('🚀 fetchAccountStatuses: Starting with players:', playersList.length);
@@ -293,6 +302,18 @@ export default function PlayersPage() {
   });
 
   const sortedPlayers = sortPlayers(filteredPlayers);
+
+  // Debug logging
+  console.log('🔍 PlayersPage Debug:', {
+    playersCount: players.length,
+    filteredPlayersCount: filteredPlayers.length,
+    sortedPlayersCount: sortedPlayers.length,
+    searchQuery,
+    showOnlineOnly,
+    showInBedwarsOnly,
+    showPinnedOnly,
+    samplePlayer: players[0]
+  });
 
   const handleRefreshAll = async () => {
     setIsLoading(true);

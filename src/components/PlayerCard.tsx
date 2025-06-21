@@ -106,6 +106,11 @@ function PlayerCard({ player, onDelete, isAdmin, isPinned, onPinToggle, showPinI
     fetchAvailableTeammates();
   }, []);
 
+  // Update playerData when player prop changes
+  useEffect(() => {
+    setPlayerData(player);
+  }, [player]);
+
   const fetchRanks = async () => {
     try {
       const { data, error } = await supabase
