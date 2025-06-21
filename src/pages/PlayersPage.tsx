@@ -3,13 +3,15 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { supabase } from '../lib/supabase';
 import { Player, SortOption, RANK_VALUES } from '../types/players';
-import { Plus, Search, Users, Gamepad2, ArrowUpDown, RefreshCw } from 'lucide-react';
+import { Plus, Search, Users, Gamepad2, ArrowUpDown, RefreshCw, Pin } from 'lucide-react';
 import PlayerCard from '../components/PlayerCard';
 import { BEDWARS_PLACE_ID, BEDWARS_UNIVERSE_ID } from '../constants/bedwars';
+import { useUserPins } from '../hooks/useUserPins';
 
 export default function PlayersPage() {
   const navigate = useNavigate();
   const { user, isAdmin } = useAuth();
+  const { pinnedPlayers, togglePin, isPinned, loading: pinsLoading } = useUserPins();
   const [players, setPlayers] = useState<Player[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -19,6 +21,7 @@ export default function PlayersPage() {
   const [newAlias, setNewAlias] = useState('');
   const [showOnlineOnly, setShowOnlineOnly] = useState(false);
   const [showInBedwarsOnly, setShowInBedwarsOnly] = useState(false);
+  const [showPinnedOnly, setShowPinnedOnly] = useState(false);
   const [sortBy, setSortBy] = useState<SortOption>('alias_asc');
   const [newYoutubeChannel, setNewYoutubeChannel] = useState('');
   const [isLoading, setIsLoading] = useState(false);
@@ -282,7 +285,9 @@ export default function PlayersPage() {
         account.status?.universeId === BEDWARS_UNIVERSE_ID
       );
 
-    return matchesSearch && hasOnlineAccount && hasInBedwarsAccount;
+    const isPinnedPlayer = !showPinnedOnly || isPinned(player.id);
+
+    return matchesSearch && hasOnlineAccount && hasInBedwarsAccount && isPinnedPlayer;
   });
 
   const sortedPlayers = sortPlayers(filteredPlayers);
@@ -301,6 +306,11 @@ export default function PlayersPage() {
     } finally {
       setIsLoading(false);
     }
+  };
+
+  const handlePinToggle = async (playerId: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    await togglePin(playerId);
   };
 
   if (!user) {
@@ -403,6 +413,20 @@ export default function PlayersPage() {
               <Gamepad2 size={18} />
               In Bedwars
             </button>
+
+            {user && (
+              <button
+                onClick={() => setShowPinnedOnly(!showPinnedOnly)}
+                className={`btn ${
+                  showPinnedOnly 
+                    ? 'bg-yellow-500 hover:bg-yellow-600 text-white' 
+                    : 'btn-outline'
+                } flex items-center gap-2`}
+              >
+                <Pin size={18} />
+                Pinned Only
+              </button>
+            )}
           </div>
         </div>
       </div>
@@ -414,6 +438,9 @@ export default function PlayersPage() {
             player={player}
             isAdmin={isAdmin}
             onDelete={handleDeletePlayer}
+            isPinned={isPinned(player.id)}
+            onPinToggle={handlePinToggle}
+            showPinIcon={!!user}
           />
         ))}
       </div>

@@ -47,7 +47,7 @@ const RobloxStatus: React.FC<RobloxStatusProps> = ({
       </div>
       {lastUpdated && (
         <span className="text-xs text-gray-500">
-          {new Date(lastUpdated).toLocaleTimeString()}
+          {new Date(lastUpdated).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}
         </span>
       )}
     </div>

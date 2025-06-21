@@ -22,7 +22,8 @@ import {
   Maximize2,
   Image,
   Star,
-  RefreshCw
+  RefreshCw,
+  Pin
 } from 'lucide-react';
 
 const BEDWARS_ICON_URL =
@@ -32,9 +33,12 @@ interface PlayerCardProps {
   player: Player;
   onDelete?: (playerId: string) => void;
   isAdmin?: boolean;
+  isPinned?: boolean;
+  onPinToggle?: (playerId: string, e: React.MouseEvent) => void;
+  showPinIcon?: boolean;
 }
 
-function PlayerCard({ player, onDelete, isAdmin }: PlayerCardProps) {
+function PlayerCard({ player, onDelete, isAdmin, isPinned, onPinToggle, showPinIcon }: PlayerCardProps) {
   const { user } = useAuth();
   const { kits } = useKits();
   const [showModal, setShowModal] = useState(false);
@@ -402,7 +406,22 @@ function PlayerCard({ player, onDelete, isAdmin }: PlayerCardProps) {
     >
       <div className="flex justify-between items-start mb-4">
         <div>
-          <h3 className="text-xl font-semibold">{playerData.alias}</h3>
+          <div className="flex items-center gap-2">
+            <h3 className="text-xl font-semibold">{playerData.alias}</h3>
+            {showPinIcon && onPinToggle && (
+              <button
+                onClick={(e) => onPinToggle(player.id, e)}
+                className={`p-1 rounded-full transition-colors ${
+                  isPinned 
+                    ? 'text-yellow-500 hover:text-yellow-600' 
+                    : 'text-gray-400 hover:text-yellow-500'
+                }`}
+                title={isPinned ? 'Unpin player' : 'Pin player'}
+              >
+                <Pin size={16} className={isPinned ? 'fill-current' : ''} />
+              </button>
+            )}
+          </div>
           <div className="space-y-2 mt-2">
             {playerData.accounts?.map(account => (
               <div key={account.id} className="flex items-center gap-2">
