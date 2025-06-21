@@ -43,29 +43,44 @@ export default function PlayersPage() {
     try {
       console.log('🚀 fetchAccountStatuses: Starting with players:', playersList.length);
       
-      // Call the roblox-status function without parameters - it processes all accounts
-      console.log('📞 fetchAccountStatuses: Calling roblox-status Supabase function...');
-      const { data, error } = await supabase.functions.invoke('roblox-status', {
+      // First, call the roblox-status function to update the database
+      console.log('📞 fetchAccountStatuses: Calling roblox-status function to update database...');
+      const { error: functionError } = await supabase.functions.invoke('roblox-status', {
         body: {} // No parameters needed - function processes all accounts
       });
       
-      if (error) {
-        console.error('❌ fetchAccountStatuses: Error calling roblox-status function:', error);
-        return playersList; // Return original data if function fails
+      if (functionError) {
+        console.error('❌ fetchAccountStatuses: Error calling roblox-status function:', functionError);
+        // Continue anyway - we'll try to read existing data
+      } else {
+        console.log('✅ fetchAccountStatuses: Successfully called roblox-status function');
+        // Small delay to ensure database has time to update
+        await new Promise(resolve => setTimeout(resolve, 1000));
       }
       
-      if (!data || !Array.isArray(data)) {
-        console.error('❌ fetchAccountStatuses: Invalid response from roblox-status function:', data);
+      // Now read the status data from the roblox_user_status table
+      console.log('📖 fetchAccountStatuses: Reading status data from roblox_user_status table...');
+      const { data: statusData, error: statusError } = await supabase
+        .from('roblox_user_status')
+        .select('*');
+      
+      if (statusError) {
+        console.error('❌ fetchAccountStatuses: Error reading from roblox_user_status table:', statusError);
         return playersList;
       }
       
-      console.log('✅ fetchAccountStatuses: Successfully received status data:', data.length, 'statuses');
-      console.log('📊 fetchAccountStatuses: Sample status data:', data[0]);
+      if (!statusData || !Array.isArray(statusData)) {
+        console.error('❌ fetchAccountStatuses: Invalid status data from database:', statusData);
+        return playersList;
+      }
+      
+      console.log('✅ fetchAccountStatuses: Successfully read status data:', statusData.length, 'records');
+      console.log('📊 fetchAccountStatuses: Sample status data:', statusData[0]);
       
       // Create a map of user_id to status for quick lookup
       const statusMap = new Map();
-      data.forEach((status: any) => {
-        statusMap.set(status.userId, status);
+      statusData.forEach((status: any) => {
+        statusMap.set(status.user_id, status);
       });
       
       console.log('🗺️ fetchAccountStatuses: Created status map with', statusMap.size, 'entries');
@@ -79,22 +94,22 @@ export default function PlayersPage() {
             return {
               ...acc,
               status: {
-                isOnline: status.isOnline,
-                isInGame: status.isInGame ?? false,
-                inBedwars: typeof status.inBedwars === 'boolean'
-                  ? status.inBedwars
-                  : (status.isInGame ?? false) && (
-                      Number(status.placeId) === BEDWARS_PLACE_ID ||
-                      Number(status.rootPlaceId) === BEDWARS_PLACE_ID ||
-                      Number(status.universeId) === BEDWARS_UNIVERSE_ID
+                isOnline: status.is_online,
+                isInGame: status.is_in_game ?? false,
+                inBedwars: typeof status.in_bedwars === 'boolean'
+                  ? status.in_bedwars
+                  : (status.is_in_game ?? false) && (
+                      Number(status.place_id) === BEDWARS_PLACE_ID ||
+                      Number(status.root_place_id) === BEDWARS_PLACE_ID ||
+                      Number(status.universe_id) === BEDWARS_UNIVERSE_ID
                     ),
-                userPresenceType: status.userPresenceType,
-                placeId: status.placeId,
-                rootPlaceId: status.rootPlaceId,
-                universeId: status.universeId,
-                presenceMethod: status.presenceMethod,
+                userPresenceType: status.user_presence_type,
+                placeId: status.place_id,
+                rootPlaceId: status.root_place_id,
+                universeId: status.universe_id,
+                presenceMethod: status.presence_method,
                 username: status.username,
-                lastUpdated: status.lastUpdated,
+                lastUpdated: new Date(status.last_updated).getTime(),
               },
             };
           } else {

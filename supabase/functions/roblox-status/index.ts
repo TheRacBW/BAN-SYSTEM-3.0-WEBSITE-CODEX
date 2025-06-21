@@ -43,8 +43,8 @@ const BEDWARS_PLACE_ID = 6872265039; // Place ID
 const getWorkingHeaders = (cookie: string) => ({
   'Content-Type': 'application/json',
   'Cookie': `.ROBLOSECURITY=${cookie}`,
-  'User-Agent': 'Roblox/WinInet', // Changed from 'RobloxPresenceChecker/1.0'
-  'Referer': 'https://www.roblox.com/', // CRITICAL: This was missing!
+  'User-Agent': 'Roblox/WinInet',
+  'Referer': 'https://www.roblox.com/',
   'Accept': 'application/json'
 });
 
@@ -262,7 +262,7 @@ Deno.serve(async (req) => {
       console.log(`📝 Upserting status for user ${status.userId}`)
       
       const { error } = await supabaseClient
-        .from('user_status')
+        .from('roblox_user_status')
         .upsert({
           user_id: status.userId,
           username: status.username,
@@ -289,17 +289,7 @@ Deno.serve(async (req) => {
     console.log('🎉 Function completed successfully')
 
     return new Response(
-      JSON.stringify({
-        success: true,
-        processed: userStatuses.length,
-        timestamp: new Date().toISOString(),
-        summary: {
-          online: userStatuses.filter(s => s.isOnline).length,
-          inGame: userStatuses.filter(s => s.isInGame).length,
-          inBedwars: userStatuses.filter(s => s.inBedwars).length
-        },
-        cookieSource: Deno.env.get('ROBLOX_COOKIE') ? 'environment' : 'database'
-      }),
+      JSON.stringify(userStatuses),
       { 
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         status: 200 
