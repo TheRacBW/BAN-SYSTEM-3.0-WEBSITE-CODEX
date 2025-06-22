@@ -341,6 +341,110 @@ export default function PlayersPage() {
     }
   };
 
+  // New targeted update function that only updates a specific player
+  const handlePlayerUpdate = async (playerId: string) => {
+    console.log('🔄 handlePlayerUpdate: Updating specific player:', playerId);
+    
+    try {
+      // Fetch only the updated player data with all related information
+      const { data: playerData, error: playerError } = await supabase
+        .from('players')
+        .select(`
+          *,
+          accounts:player_accounts(
+            id,
+            user_id,
+            rank:player_account_ranks(
+              rank_id,
+              account_ranks(*)
+            )
+          ),
+          teammates:player_teammates!player_id(
+            teammate:players!teammate_id(*)
+          ),
+          strategies:player_strategies(
+            id,
+            image_url,
+            kit_ids,
+            teammate_ids,
+            starred_kit_id,
+            created_at
+          )
+        `)
+        .eq('id', playerId)
+        .single();
+
+      if (playerError) {
+        console.error('❌ handlePlayerUpdate: Error fetching player data:', playerError);
+        throw playerError;
+      }
+
+      if (playerData) {
+        // Fetch status data for this player's accounts
+        const accountUserIds = playerData.accounts?.map(acc => acc.user_id) || [];
+        
+        if (accountUserIds.length > 0) {
+          const { data: statusData, error: statusError } = await supabase
+            .from('roblox_user_status')
+            .select('*')
+            .in('user_id', accountUserIds);
+
+          if (!statusError && statusData) {
+            const statusMap = new Map();
+            statusData.forEach((status: any) => {
+              statusMap.set(status.user_id, status);
+            });
+
+            // Update player's accounts with status data
+            const updatedAccounts = (playerData.accounts || []).map(acc => {
+              const status = statusMap.get(acc.user_id);
+              if (status) {
+                return {
+                  ...acc,
+                  status: {
+                    isOnline: status.is_online,
+                    isInGame: status.is_in_game ?? false,
+                    inBedwars: typeof status.in_bedwars === 'boolean'
+                      ? status.in_bedwars
+                      : (status.is_in_game ?? false) && (
+                          Number(status.place_id) === BEDWARS_PLACE_ID ||
+                          Number(status.root_place_id) === BEDWARS_PLACE_ID ||
+                          Number(status.universe_id) === BEDWARS_UNIVERSE_ID
+                        ),
+                    userPresenceType: status.user_presence_type,
+                    placeId: status.place_id,
+                    rootPlaceId: status.root_place_id,
+                    universeId: status.universe_id,
+                    presenceMethod: status.presence_method,
+                    username: status.username,
+                    lastUpdated: new Date(status.last_updated).getTime(),
+                  },
+                };
+              }
+              return acc;
+            });
+
+            playerData.accounts = updatedAccounts;
+          }
+        }
+
+        // Update only this player in the state
+        setPlayers(prevPlayers => 
+          prevPlayers.map(p => 
+            p.id === playerId ? playerData : p
+          )
+        );
+        
+        console.log('✅ handlePlayerUpdate: Player updated in state without page refresh');
+      }
+    } catch (error) {
+      console.error('❌ handlePlayerUpdate: Error updating player:', error);
+      // Fallback to full refresh only if targeted update fails
+      console.log('🔄 handlePlayerUpdate: Falling back to full refresh');
+      await loadPlayers();
+    }
+  };
+
   const handlePinToggle = async (playerId: string, e: React.MouseEvent) => {
     e.stopPropagation();
     await togglePin(playerId);
@@ -509,7 +613,7 @@ export default function PlayersPage() {
             onPinToggle={handlePinToggle}
             showPinIcon={!!user}
             onTeammateClick={handleTeammateClick}
-            onPlayerUpdate={loadPlayers}
+            onPlayerUpdate={handlePlayerUpdate}
           />
         ))}
       </div>

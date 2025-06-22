@@ -111,6 +111,7 @@ function PlayerCard({ player, onDelete, isAdmin, isPinned, onPinToggle, showPinI
   useEffect(() => {
     fetchRanks();
     fetchAvailableTeammates();
+    fetchCurrentTeammatesWithStatus();
   }, []);
 
   // Update playerData when player prop changes
@@ -121,6 +122,8 @@ function PlayerCard({ player, onDelete, isAdmin, isPinned, onPinToggle, showPinI
       accountsWithStatus: player.accounts?.filter(acc => acc.status).length || 0
     });
     setPlayerData(player);
+    // Refresh teammate data when player prop changes
+    fetchCurrentTeammatesWithStatus();
   }, [player]);
 
   const fetchRanks = async () => {
@@ -206,20 +209,119 @@ function PlayerCard({ player, onDelete, isAdmin, isPinned, onPinToggle, showPinI
             console.log('✅ Available teammates with status:', playersWithStatus.length);
             setAvailableTeammates(playersWithStatus);
           } else {
-            console.log('⚠️ No status data found, setting players without status');
+            console.log('⚠️ No status data found, setting teammates without status');
             setAvailableTeammates(data);
           }
         } else {
-          console.log('⚠️ No user IDs found, setting players without status');
+          console.log('⚠️ No user IDs found, setting teammates without status');
           setAvailableTeammates(data);
         }
       } else {
-        console.log('⚠️ No available teammates found');
+        console.log('⚠️ No available teammates data found');
         setAvailableTeammates([]);
       }
     } catch (error) {
       console.error('❌ Error fetching available teammates:', error);
       setAvailableTeammates([]);
+    }
+  };
+
+  const fetchCurrentTeammatesWithStatus = async () => {
+    try {
+      console.log('🔄 Fetching current teammates with status for player:', player.alias);
+      
+      const { data, error } = await supabase
+        .from('player_teammates')
+        .select(`
+          teammate:players!teammate_id(
+            *,
+            accounts:player_accounts(
+              id,
+              user_id
+            )
+          )
+        `)
+        .eq('player_id', player.id);
+
+      if (error) throw error;
+      
+      if (data && data.length > 0) {
+        // Get all user IDs from teammates
+        const allUserIds = data.flatMap(t => 
+          t.teammate?.accounts?.map(a => a.user_id) || []
+        );
+        
+        if (allUserIds.length > 0) {
+          console.log('📊 Fetching status data for teammate user IDs:', allUserIds);
+          
+          // Fetch status data for all teammate accounts
+          const { data: statusData, error: statusError } = await supabase
+            .from('roblox_user_status')
+            .select('*')
+            .in('user_id', allUserIds);
+
+          if (!statusError && statusData) {
+            const statusMap = new Map(statusData.map(s => [s.user_id, s]));
+            
+            // Map status to teammates
+            const teammatesWithStatus = data.map(teammate => ({
+              ...teammate,
+              teammate: {
+                ...teammate.teammate,
+                accounts: teammate.teammate?.accounts?.map(account => ({
+                  ...account,
+                  status: statusMap.get(account.user_id) ? {
+                    isOnline: statusMap.get(account.user_id).is_online,
+                    isInGame: statusMap.get(account.user_id).is_in_game ?? false,
+                    inBedwars: typeof statusMap.get(account.user_id).in_bedwars === 'boolean'
+                      ? statusMap.get(account.user_id).in_bedwars
+                      : (statusMap.get(account.user_id).is_in_game ?? false) && (
+                          Number(statusMap.get(account.user_id).place_id) === BEDWARS_PLACE_ID ||
+                          Number(statusMap.get(account.user_id).root_place_id) === BEDWARS_PLACE_ID ||
+                          Number(statusMap.get(account.user_id).universe_id) === BEDWARS_UNIVERSE_ID
+                        ),
+                    userPresenceType: statusMap.get(account.user_id).user_presence_type,
+                    placeId: statusMap.get(account.user_id).place_id,
+                    rootPlaceId: statusMap.get(account.user_id).root_place_id,
+                    universeId: statusMap.get(account.user_id).universe_id,
+                    presenceMethod: statusMap.get(account.user_id).presence_method,
+                    username: statusMap.get(account.user_id).username,
+                    lastUpdated: new Date(statusMap.get(account.user_id).last_updated).getTime(),
+                  } : null
+                })) || []
+              }
+            }));
+            
+            console.log('✅ Current teammates with status:', teammatesWithStatus);
+            
+            // Update playerData with the enhanced teammate data
+            setPlayerData(prevData => ({
+              ...prevData,
+              teammates: teammatesWithStatus
+            }));
+          } else {
+            console.log('⚠️ No status data found for teammates');
+            setPlayerData(prevData => ({
+              ...prevData,
+              teammates: data
+            }));
+          }
+        } else {
+          console.log('⚠️ No user IDs found in teammates');
+          setPlayerData(prevData => ({
+            ...prevData,
+            teammates: data
+          }));
+        }
+      } else {
+        console.log('⚠️ No current teammates found');
+        setPlayerData(prevData => ({
+          ...prevData,
+          teammates: []
+        }));
+      }
+    } catch (error) {
+      console.error('❌ Error fetching current teammates:', error);
     }
   };
 
@@ -248,8 +350,9 @@ function PlayerCard({ player, onDelete, isAdmin, isPinned, onPinToggle, showPinI
       // Refresh available teammates list to update UI immediately
       await fetchAvailableTeammates();
       
-      // Close modal after successful add
-      setShowTeammateModal(false);
+      // Refresh current teammates with status data
+      await fetchCurrentTeammatesWithStatus();
+      
     } catch (error) {
       console.error('❌ Error adding teammate:', error);
       setError('Failed to add teammate');
@@ -279,6 +382,9 @@ function PlayerCard({ player, onDelete, isAdmin, isPinned, onPinToggle, showPinI
       
       // Refresh available teammates list to update UI immediately
       await fetchAvailableTeammates();
+      
+      // Refresh current teammates with status data
+      await fetchCurrentTeammatesWithStatus();
     } catch (error) {
       console.error('❌ Error removing teammate:', error);
       setError('Failed to remove teammate');
@@ -720,16 +826,26 @@ function PlayerCard({ player, onDelete, isAdmin, isPinned, onPinToggle, showPinI
                 <p className="text-gray-500 text-sm col-span-full">No teammates added yet.</p>
               ) : (
                 playerData.teammates?.map(teammate => {
-                  // Get teammate's overall status
-                  const teammateAccounts = teammate.teammate.accounts || [];
-                  const hasOnlineAccount = teammateAccounts.some(acc => acc.status?.isOnline);
-                  const hasInBedwarsAccount = teammateAccounts.some(acc => acc.status?.inBedwars);
+                  // Find the best account to display (online first, then any account)
+                  const onlineAccount = teammate.teammate.accounts?.find(acc => 
+                    acc.status?.isOnline === true
+                  );
+                  const anyAccount = teammate.teammate.accounts?.[0];
+                  const displayAccount = onlineAccount || anyAccount;
+                  
+                  console.log('🔍 Main teammate status debug:', {
+                    alias: teammate.teammate.alias,
+                    accounts: teammate.teammate.accounts?.length || 0,
+                    hasStatus: !!displayAccount?.status,
+                    isOnline: displayAccount?.status?.isOnline,
+                    username: displayAccount?.status?.username
+                  });
                   
                   let statusText = 'Offline';
                   let statusColor = 'text-gray-400';
                   
-                  if (hasOnlineAccount) {
-                    if (hasInBedwarsAccount) {
+                  if (displayAccount?.status?.isOnline) {
+                    if (displayAccount.status.inBedwars) {
                       statusText = 'Online - In BedWars';
                       statusColor = 'text-blue-600 dark:text-blue-400';
                     } else {
@@ -750,9 +866,9 @@ function PlayerCard({ player, onDelete, isAdmin, isPinned, onPinToggle, showPinI
                           {statusText}
                         </div>
                         {/* Show teammate's accounts if they have any */}
-                        {teammateAccounts.length > 0 && (
+                        {teammate.teammate.accounts && teammate.teammate.accounts.length > 0 && (
                           <div className="flex items-center gap-1 mt-1">
-                            {teammateAccounts.slice(0, 3).map(account => (
+                            {teammate.teammate.accounts.slice(0, 3).map(account => (
                               <div key={account.id} className="flex items-center gap-1">
                                 {account.status?.inBedwars && (
                                   <img
@@ -772,8 +888,8 @@ function PlayerCard({ player, onDelete, isAdmin, isPinned, onPinToggle, showPinI
                                 )}
                               </div>
                             ))}
-                            {teammateAccounts.length > 3 && (
-                              <span className="text-xs text-gray-500">+{teammateAccounts.length - 3}</span>
+                            {teammate.teammate.accounts.length > 3 && (
+                              <span className="text-xs text-gray-500">+{teammate.teammate.accounts.length - 3}</span>
                             )}
                           </div>
                         )}
@@ -1043,10 +1159,24 @@ function PlayerCard({ player, onDelete, isAdmin, isPinned, onPinToggle, showPinI
   );
 
   const renderTeammateModal = () => {
-    const filteredTeammates = availableTeammates.filter(t => 
-      t.alias.toLowerCase().includes(teammateSearchQuery.toLowerCase()) &&
-      !playerData.teammates?.some(pt => pt.teammate.id === t.id)
-    );
+    const filteredTeammates = availableTeammates.filter(teammate => {
+      const searchLower = teammateSearchQuery.toLowerCase().trim();
+      
+      // Search by player alias
+      const matchesAlias = teammate.alias.toLowerCase().includes(searchLower);
+      
+      // Search by any account username
+      const matchesUsername = teammate.accounts?.some(account => 
+        account.status?.username?.toLowerCase().includes(searchLower)
+      );
+      
+      // Don't show players who are already teammates
+      const isNotCurrentTeammate = !playerData.teammates?.some(pt => 
+        pt.teammate.id === teammate.id
+      );
+      
+      return (matchesAlias || matchesUsername) && isNotCurrentTeammate;
+    });
 
     console.log('🔍 Teammate modal debug:', {
       availableTeammates: availableTeammates.length,
@@ -1064,7 +1194,7 @@ function PlayerCard({ player, onDelete, isAdmin, isPinned, onPinToggle, showPinI
             <div className="relative">
               <input
                 type="text"
-                placeholder="Search players..."
+                placeholder="Search players by alias or Roblox username..."
                 value={teammateSearchQuery}
                 onChange={(e) => setTeammateSearchQuery(e.target.value)}
                 className="w-full p-2 pl-10 border rounded dark:bg-gray-700 dark:border-gray-600"
@@ -1079,51 +1209,63 @@ function PlayerCard({ player, onDelete, isAdmin, isPinned, onPinToggle, showPinI
                   <p className="text-gray-500 text-sm">No teammates added yet.</p>
                 ) : (
                   <div className={`space-y-2 ${(playerData.teammates?.length || 0) > 4 ? 'max-h-40 overflow-y-auto pr-2' : ''}`}>
-                    {playerData.teammates?.map(teammate => (
-                      <div
-                        key={teammate.teammate.id}
-                        className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-700/50 rounded-lg"
-                      >
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-center gap-2 mb-1">
-                            <span className="font-medium truncate">{teammate.teammate.alias}</span>
-                            <button
-                              onClick={() => handleRemoveTeammate(teammate.teammate.id)}
-                              className="text-red-600 hover:text-red-700 p-1 flex-shrink-0"
-                              title="Remove teammate"
-                            >
-                              <X size={16} />
-                            </button>
-                          </div>
-                          
-                          {/* Show teammate's accounts and status */}
-                          {teammate.teammate.accounts && teammate.teammate.accounts.length > 0 ? (
-                            <div className="space-y-1">
-                              {teammate.teammate.accounts.slice(0, 2).map(account => (
-                                <div key={account.id} className="flex items-center gap-2 text-xs">
-                                  <div className={`w-2 h-2 rounded-full ${
-                                    account.status?.isOnline ? 'bg-green-500' : 'bg-gray-400'
-                                  }`} />
-                                  <span className="font-mono text-blue-600 dark:text-blue-400">
-                                    {account.status?.username || `User ${account.user_id}`}
-                                  </span>
-                                  {account.status?.isOnline && (
-                                    <span className="text-green-600 text-xs">
-                                      {account.status.inBedwars ? 'Bedwars' : 'Online'}
-                                    </span>
-                                  )}
-                                </div>
-                              ))}
-                              {teammate.teammate.accounts.length > 2 && (
-                                <p className="text-gray-500 text-xs">+{teammate.teammate.accounts.length - 2} more accounts</p>
-                              )}
+                    {playerData.teammates?.map(teammate => {
+                      // Find the best account to display (online first, then any account)
+                      const onlineAccount = teammate.teammate.accounts?.find(acc => 
+                        acc.status?.isOnline === true
+                      );
+                      const anyAccount = teammate.teammate.accounts?.[0];
+                      const displayAccount = onlineAccount || anyAccount;
+                      
+                      console.log('🔍 Current teammate status debug:', {
+                        alias: teammate.teammate.alias,
+                        accounts: teammate.teammate.accounts?.length || 0,
+                        hasStatus: !!displayAccount?.status,
+                        isOnline: displayAccount?.status?.isOnline,
+                        username: displayAccount?.status?.username
+                      });
+                      
+                      return (
+                        <div
+                          key={teammate.teammate.id}
+                          className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-700/50 rounded-lg"
+                        >
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-2 mb-1">
+                              <span className="font-medium truncate">{teammate.teammate.alias}</span>
+                              <button
+                                onClick={() => handleRemoveTeammate(teammate.teammate.id)}
+                                className="text-red-600 hover:text-red-700 p-1 flex-shrink-0"
+                                title="Remove teammate"
+                              >
+                                <X size={16} />
+                              </button>
                             </div>
-                          ) : (
-                            <p className="text-gray-500 text-xs">No accounts found</p>
-                          )}
+                            
+                            {/* Show teammate's status */}
+                            {displayAccount?.status ? (
+                              <div className="flex items-center gap-2 text-xs">
+                                <div className={`w-2 h-2 rounded-full ${
+                                  displayAccount.status.isOnline ? 'bg-green-500' : 'bg-gray-400'
+                                }`} />
+                                <span className="text-sm text-gray-600 dark:text-gray-400">
+                                  {displayAccount.status.isOnline ? (
+                                    displayAccount.status.inBedwars ? 'In Bedwars' : 'Online'
+                                  ) : 'Offline'}
+                                </span>
+                                {displayAccount.status.username && (
+                                  <span className="font-mono text-blue-600 dark:text-blue-400">
+                                    {displayAccount.status.username}
+                                  </span>
+                                )}
+                              </div>
+                            ) : (
+                              <span className="text-sm text-gray-500">No status data</span>
+                            )}
+                          </div>
                         </div>
-                      </div>
-                    ))}
+                      );
+                    })}
                   </div>
                 )}
               </div>
@@ -1134,51 +1276,55 @@ function PlayerCard({ player, onDelete, isAdmin, isPinned, onPinToggle, showPinI
                   <p className="text-gray-500 text-sm">No available players found.</p>
                 ) : (
                   <div className={`space-y-2 ${filteredTeammates.length > 6 ? 'max-h-60 overflow-y-auto pr-2' : ''}`}>
-                    {filteredTeammates.map(teammate => (
-                      <div
-                        key={teammate.id}
-                        className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-700/50 rounded-lg"
-                      >
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-center gap-2 mb-1">
-                            <span className="font-medium truncate">{teammate.alias}</span>
-                            <button
-                              onClick={() => handleAddTeammate(teammate.id)}
-                              className="text-green-600 hover:text-green-700 p-1 flex-shrink-0"
-                              title="Add as teammate"
-                            >
-                              <Plus size={16} />
-                            </button>
-                          </div>
-                          
-                          {/* Show available player's accounts and status */}
-                          {teammate.accounts && teammate.accounts.length > 0 ? (
-                            <div className="space-y-1">
-                              {teammate.accounts.slice(0, 2).map(account => (
-                                <div key={account.id} className="flex items-center gap-2 text-xs">
-                                  <div className={`w-2 h-2 rounded-full ${
-                                    account.status?.isOnline ? 'bg-green-500' : 'bg-gray-400'
-                                  }`} />
-                                  <span className="font-mono text-blue-600 dark:text-blue-400">
-                                    {account.status?.username || `User ${account.user_id}`}
-                                  </span>
-                                  {account.status?.isOnline && (
-                                    <span className="text-green-600 text-xs">
-                                      {account.status.inBedwars ? 'Bedwars' : 'Online'}
-                                    </span>
-                                  )}
-                                </div>
-                              ))}
-                              {teammate.accounts.length > 2 && (
-                                <p className="text-gray-500 text-xs">+{teammate.accounts.length - 2} more accounts</p>
-                              )}
+                    {filteredTeammates.map(teammate => {
+                      // Find the best account to display (online first, then any account)
+                      const onlineAccount = teammate.accounts?.find(acc => 
+                        acc.status?.isOnline === true
+                      );
+                      const anyAccount = teammate.accounts?.[0];
+                      const displayAccount = onlineAccount || anyAccount;
+                      
+                      return (
+                        <div
+                          key={teammate.id}
+                          className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-700/50 rounded-lg"
+                        >
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-2 mb-1">
+                              <span className="font-medium truncate">{teammate.alias}</span>
+                              <button
+                                onClick={() => handleAddTeammate(teammate.id)}
+                                className="text-green-600 hover:text-green-700 p-1 flex-shrink-0"
+                                title="Add as teammate"
+                              >
+                                <Plus size={16} />
+                              </button>
                             </div>
-                          ) : (
-                            <p className="text-gray-500 text-xs">No accounts found</p>
-                          )}
+                            
+                            {/* Show available player's status */}
+                            {displayAccount?.status ? (
+                              <div className="flex items-center gap-2 text-xs">
+                                <div className={`w-2 h-2 rounded-full ${
+                                  displayAccount.status.isOnline ? 'bg-green-500' : 'bg-gray-400'
+                                }`} />
+                                <span className="text-sm text-gray-600 dark:text-gray-400">
+                                  {displayAccount.status.isOnline ? (
+                                    displayAccount.status.inBedwars ? 'In Bedwars' : 'Online'
+                                  ) : 'Offline'}
+                                </span>
+                                {displayAccount.status.username && (
+                                  <span className="font-mono text-blue-600 dark:text-blue-400">
+                                    {displayAccount.status.username}
+                                  </span>
+                                )}
+                              </div>
+                            ) : (
+                              <span className="text-sm text-gray-500">No status data</span>
+                            )}
+                          </div>
                         </div>
-                      </div>
-                    ))}
+                      );
+                    })}
                   </div>
                 )}
               </div>
