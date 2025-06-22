@@ -17,7 +17,10 @@ export interface PlayerAccount {
   player_id: string;
   user_id: number;
   created_at: Date;
-  rank?: AccountRank;
+  rank?: {
+    rank_id: string;
+    account_ranks: AccountRank;
+  };
   status?: {
     isOnline: boolean;
     isInGame: boolean;

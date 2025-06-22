@@ -142,7 +142,11 @@ function PlayerCard({ player, onDelete, isAdmin, isPinned, onPinToggle, showPinI
     console.log('🔄 PlayerCard prop update for:', player.alias, {
       hasAccounts: player.accounts?.length || 0,
       hasStatus: player.accounts?.[0]?.status ? 'yes' : 'no',
-      accountsWithStatus: player.accounts?.filter(acc => acc.status).length || 0
+      accountsWithStatus: player.accounts?.filter(acc => acc.status).length || 0,
+      // Debug rank data
+      accountsWithRank: player.accounts?.filter(acc => acc.rank).length || 0,
+      firstAccountRank: player.accounts?.[0]?.rank ? 'has-rank' : 'no-rank',
+      rankData: player.accounts?.[0]?.rank
     });
     setPlayerData(player);
     // Refresh teammate data when player prop changes
@@ -628,9 +632,18 @@ function PlayerCard({ player, onDelete, isAdmin, isPinned, onPinToggle, showPinI
     }
   };
 
-  const getAccountRank = (account: PlayerAccount) => {
-    if (!account.rank) return null;
-    return account.rank;
+  const getAccountRank = (account: PlayerAccount): AccountRank | null => {
+    try {
+      // Check if rank data exists from the JOIN
+      if (account.rank?.account_ranks) {
+        return account.rank.account_ranks;
+      }
+      
+      return null;
+    } catch (error) {
+      console.error('Error getting account rank:', error);
+      return null;
+    }
   };
 
   // Get rank icon URL with fallback
@@ -645,28 +658,40 @@ function PlayerCard({ player, onDelete, isAdmin, isPinned, onPinToggle, showPinI
     
     if (!rank) {
       return (
-        <div className="w-4 h-4 flex items-center justify-center text-gray-400 text-xs border border-gray-300 rounded bg-gray-50 dark:bg-gray-700">
-          ?
+        <div className="w-4 h-4 flex items-center justify-center" title="No rank assigned">
+          <HelpCircle size={14} className="text-gray-400" />
         </div>
       );
     }
     
-    const iconUrl = RANK_ICONS[rank.name as keyof typeof RANK_ICONS];
+    // Use the image_url from the database
+    if (rank.image_url) {
+      return (
+        <img 
+          src={rank.image_url}
+          alt={rank.name}
+          className="w-4 h-4 object-contain"
+          title={rank.name}
+          onError={(e) => {
+            // Fallback to text if image fails
+            const fallback = document.createElement('div');
+            fallback.className = 'w-4 h-4 flex items-center justify-center text-xs font-bold text-blue-600 border border-gray-300 rounded';
+            fallback.textContent = rank.name[0];
+            fallback.title = rank.name;
+            e.currentTarget.parentNode?.replaceChild(fallback, e.currentTarget);
+          }}
+        />
+      );
+    }
     
+    // Fallback to text display
     return (
-      <img 
-        src={iconUrl}
-        alt={rank.name}
-        className="w-4 h-4 object-contain"
-        onError={(e) => {
-          console.log(`Failed to load rank icon for ${rank.name}:`, iconUrl);
-          // Replace with text fallback
-          const fallbackElement = document.createElement('div');
-          fallbackElement.className = 'w-4 h-4 flex items-center justify-center text-gray-400 text-xs border border-gray-300 rounded bg-gray-50 dark:bg-gray-700';
-          fallbackElement.textContent = rank.name[0];
-          e.currentTarget.parentNode?.replaceChild(fallbackElement, e.currentTarget);
-        }}
-      />
+      <div 
+        className="w-4 h-4 flex items-center justify-center text-xs font-bold text-blue-600 border border-gray-300 rounded"
+        title={rank.name}
+      >
+        {rank.name[0]}
+      </div>
     );
   };
 
@@ -696,7 +721,11 @@ function PlayerCard({ player, onDelete, isAdmin, isPinned, onPinToggle, showPinI
       hasPlayerData: !!playerData,
       hasAccounts: playerData.accounts?.length || 0,
       accountsWithStatus: playerData.accounts?.filter(acc => acc.status).length || 0,
-      firstAccountStatus: playerData.accounts?.[0]?.status ? 'has-status' : 'no-status'
+      firstAccountStatus: playerData.accounts?.[0]?.status ? 'has-status' : 'no-status',
+      // Debug rank data
+      accountsWithRank: playerData.accounts?.filter(acc => acc.rank).length || 0,
+      firstAccountRank: playerData.accounts?.[0]?.rank ? 'has-rank' : 'no-rank',
+      rankData: playerData.accounts?.[0]?.rank
     });
 
     const sortedAccounts = getSortedAccounts();
@@ -757,6 +786,15 @@ function PlayerCard({ player, onDelete, isAdmin, isPinned, onPinToggle, showPinI
             </div>
           )}
         </div>
+
+        {/* Debug Rank Info (temporary) */}
+        {isAdmin && (
+          <div className="text-xs text-gray-500 mb-2 p-2 bg-gray-100 dark:bg-gray-700 rounded">
+            <div>Accounts: {playerData.accounts?.length || 0}</div>
+            <div>With Rank: {playerData.accounts?.filter(acc => acc.rank).length || 0}</div>
+            <div>Rank Data: {JSON.stringify(playerData.accounts?.[0]?.rank || 'none')}</div>
+          </div>
+        )}
 
         {/* Known Accounts section with proper spacing */}
         {accountCount > 0 && (
