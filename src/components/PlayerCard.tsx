@@ -138,6 +138,8 @@ function PlayerCard({ player, onDelete, isAdmin, isPinned, onPinToggle, showPinI
 
   const fetchAvailableTeammates = async () => {
     try {
+      console.log('🔍 Fetching available teammates for player:', player.alias);
+      
       const { data, error } = await supabase
         .from('players')
         .select(`
@@ -156,111 +158,15 @@ function PlayerCard({ player, onDelete, isAdmin, isPinned, onPinToggle, showPinI
       if (error) throw error;
       
       if (data) {
-        // Fetch Roblox status data for all accounts
-        const accountIds = data.accounts?.map(acc => acc.user_id) || [];
-        
-        // Also get teammate account IDs
-        const teammateAccountIds = data.teammates?.flatMap(t => 
-          t.teammate.accounts?.map(acc => acc.user_id) || []
-        ) || [];
-        
-        // Combine all account IDs
-        const allAccountIds = [...accountIds, ...teammateAccountIds];
-        
-        if (allAccountIds.length > 0) {
-          console.log('📊 Fetching Roblox status for accounts:', allAccountIds);
-          
-          const { data: statusData, error: statusError } = await supabase
-            .from('roblox_user_status')
-            .select('*')
-            .in('user_id', allAccountIds);
-          
-          if (statusError) {
-            console.error('❌ Error fetching status data:', statusError);
-          } else if (statusData) {
-            console.log('✅ Fetched status data for', statusData.length, 'accounts');
-            
-            // Create a map of user_id to status
-            const statusMap = new Map();
-            statusData.forEach((status: any) => {
-              statusMap.set(status.user_id, status);
-            });
-            
-            // Merge status data with accounts
-            const updatedAccounts = data.accounts?.map(acc => {
-              const status = statusMap.get(acc.user_id);
-              if (status) {
-                return {
-                  ...acc,
-                  status: {
-                    isOnline: status.is_online,
-                    isInGame: status.is_in_game ?? false,
-                    inBedwars: typeof status.in_bedwars === 'boolean'
-                      ? status.in_bedwars
-                      : (status.is_in_game ?? false) && (
-                          Number(status.place_id) === BEDWARS_PLACE_ID ||
-                          Number(status.root_place_id) === BEDWARS_PLACE_ID ||
-                          Number(status.universe_id) === BEDWARS_UNIVERSE_ID
-                        ),
-                    userPresenceType: status.user_presence_type,
-                    placeId: status.place_id,
-                    rootPlaceId: status.root_place_id,
-                    universeId: status.universe_id,
-                    presenceMethod: status.presence_method,
-                    username: status.username,
-                    lastUpdated: new Date(status.last_updated).getTime(),
-                  },
-                };
-              }
-              return acc;
-            });
-            
-            // Also update teammate accounts with status data
-            const updatedTeammates = data.teammates?.map(teammate => ({
-              ...teammate,
-              teammate: {
-                ...teammate.teammate,
-                accounts: teammate.teammate.accounts?.map(acc => {
-                  const status = statusMap.get(acc.user_id);
-                  if (status) {
-                    return {
-                      ...acc,
-                      status: {
-                        isOnline: status.is_online,
-                        isInGame: status.is_in_game ?? false,
-                        inBedwars: typeof status.in_bedwars === 'boolean'
-                          ? status.in_bedwars
-                          : (status.is_in_game ?? false) && (
-                              Number(status.place_id) === BEDWARS_PLACE_ID ||
-                              Number(status.root_place_id) === BEDWARS_PLACE_ID ||
-                              Number(status.universe_id) === BEDWARS_UNIVERSE_ID
-                            ),
-                        userPresenceType: status.user_presence_type,
-                        placeId: status.place_id,
-                        rootPlaceId: status.root_place_id,
-                        universeId: status.universe_id,
-                        presenceMethod: status.presence_method,
-                        username: status.username,
-                        lastUpdated: new Date(status.last_updated).getTime(),
-                      },
-                    };
-                  }
-                  return acc;
-                })
-              }
-            }));
-            
-            // Update the data with merged accounts and teammates
-            data.accounts = updatedAccounts;
-            data.teammates = updatedTeammates;
-          }
-        }
-        
-        // Don't call setPlayerData here - it overwrites good props data!
-        // setPlayerData(data);
+        console.log('✅ Fetched available teammates:', data.length);
+        setAvailableTeammates(data || []);
+      } else {
+        console.log('⚠️ No available teammates found');
+        setAvailableTeammates([]);
       }
     } catch (error) {
       console.error('❌ Error fetching available teammates:', error);
+      setAvailableTeammates([]);
     }
   };
 
@@ -275,6 +181,9 @@ function PlayerCard({ player, onDelete, isAdmin, isPinned, onPinToggle, showPinI
 
       if (error) throw error;
       setSuccess('Teammate added successfully');
+      
+      // Refresh available teammates list to update UI immediately
+      await fetchAvailableTeammates();
     } catch (error) {
       console.error('Error adding teammate:', error);
       setError('Failed to add teammate');
@@ -291,6 +200,9 @@ function PlayerCard({ player, onDelete, isAdmin, isPinned, onPinToggle, showPinI
 
       if (error) throw error;
       setSuccess('Teammate removed successfully');
+      
+      // Refresh available teammates list to update UI immediately
+      await fetchAvailableTeammates();
     } catch (error) {
       console.error('Error removing teammate:', error);
       setError('Failed to remove teammate');
@@ -1059,6 +971,13 @@ function PlayerCard({ player, onDelete, isAdmin, isPinned, onPinToggle, showPinI
       t.alias.toLowerCase().includes(teammateSearchQuery.toLowerCase()) &&
       !playerData.teammates?.some(pt => pt.teammate.id === t.id)
     );
+
+    console.log('🔍 Teammate modal debug:', {
+      availableTeammates: availableTeammates.length,
+      filteredTeammates: filteredTeammates.length,
+      currentTeammates: playerData.teammates?.length || 0,
+      searchQuery: teammateSearchQuery
+    });
 
     return (
       <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
