@@ -268,7 +268,6 @@ function PlayerCard({ player, onDelete, isAdmin, isPinned, onPinToggle, showPinI
         });
 
       if (error) throw error;
-      await refreshPlayerData();
       setSuccess('Teammate added successfully');
     } catch (error) {
       console.error('Error adding teammate:', error);
@@ -285,7 +284,6 @@ function PlayerCard({ player, onDelete, isAdmin, isPinned, onPinToggle, showPinI
         .eq('teammate_id', teammateId);
 
       if (error) throw error;
-      await refreshPlayerData();
       setSuccess('Teammate removed successfully');
     } catch (error) {
       console.error('Error removing teammate:', error);
@@ -314,7 +312,6 @@ function PlayerCard({ player, onDelete, isAdmin, isPinned, onPinToggle, showPinI
       setShowAddAccountModal(false);
       setNewUserId('');
       setSuccess('Account added successfully');
-      await refreshPlayerData();
     } catch (error) {
       console.error('Error adding account:', error);
       setError('Failed to add account');
@@ -353,7 +350,6 @@ function PlayerCard({ player, onDelete, isAdmin, isPinned, onPinToggle, showPinI
       setImageUrl('');
       setSelectedTeammates([]);
       setSuccess('Strategy added successfully');
-      await refreshPlayerData();
     } catch (error) {
       console.error('Error adding strategy:', error);
       setError('Failed to add strategy');
@@ -413,7 +409,6 @@ function PlayerCard({ player, onDelete, isAdmin, isPinned, onPinToggle, showPinI
         if (insertError) throw insertError;
       }
 
-      await refreshPlayerData();
       setSuccess('Rank updated successfully');
     } catch (error) {
       console.error('Error updating rank:', error);
@@ -432,7 +427,6 @@ function PlayerCard({ player, onDelete, isAdmin, isPinned, onPinToggle, showPinI
 
       if (error) throw error;
       setSuccess('Account deleted successfully');
-      await refreshPlayerData();
     } catch (error) {
       console.error('Error deleting account:', error);
       setError('Failed to delete account');
@@ -448,7 +442,6 @@ function PlayerCard({ player, onDelete, isAdmin, isPinned, onPinToggle, showPinI
 
       if (error) throw error;
       setSuccess('Strategy deleted successfully');
-      await refreshPlayerData();
     } catch (error) {
       console.error('Error deleting strategy:', error);
       setError('Failed to delete strategy');
@@ -469,7 +462,6 @@ function PlayerCard({ player, onDelete, isAdmin, isPinned, onPinToggle, showPinI
 
       setSuccess('Player updated successfully');
       setShowEditModal(false);
-      await refreshPlayerData();
     } catch (error) {
       console.error('Error updating player:', error);
       setError('Failed to update player');
