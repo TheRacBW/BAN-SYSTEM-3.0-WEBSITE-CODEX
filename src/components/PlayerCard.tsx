@@ -854,6 +854,9 @@ function PlayerCard({ player, onDelete, isAdmin, isPinned, onPinToggle, showPinI
                 <p className="text-gray-500 text-sm col-span-full">No teammates added yet.</p>
               ) : (
                 playerData.teammates?.map(teammate => {
+                  const accountCount = teammate.teammate.accounts?.length || 0;
+                  const hasMultipleAccounts = accountCount > 1;
+
                   // Find the best account to display (online first, then any account)
                   const onlineAccount = teammate.teammate.accounts?.find(acc => 
                     acc.status?.isOnline === true
@@ -889,45 +892,23 @@ function PlayerCard({ player, onDelete, isAdmin, isPinned, onPinToggle, showPinI
                       onClick={() => handleTeammateNavigation(teammate.teammate.id)}
                     >
                       <div className="flex-1">
-                        <div className="flex flex-col">
+                        <div className="flex items-center gap-2 flex-wrap mb-1">
                           <span className="font-medium">{teammate.teammate.alias}</span>
                           {displayAccount?.status?.username && (
                             <span className="text-sm text-gray-500">
                               ({displayAccount.status.username})
                             </span>
                           )}
+                          {hasMultipleAccounts && (
+                            <span className="inline-flex items-center gap-1 text-xs bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-200 px-2 py-1 rounded-full">
+                              <Users size={12} />
+                              {accountCount}
+                            </span>
+                          )}
                         </div>
                         <div className={`text-sm ${statusColor}`}>
                           {statusText}
                         </div>
-                        {/* Show teammate's accounts if they have any */}
-                        {teammate.teammate.accounts && teammate.teammate.accounts.length > 0 && (
-                          <div className="flex items-center gap-1 mt-1">
-                            {teammate.teammate.accounts.slice(0, 3).map(account => (
-                              <div key={account.id} className="flex items-center gap-1">
-                                {account.status?.inBedwars && (
-                                  <img
-                                    src={BEDWARS_ICON_URL}
-                                    alt="BedWars"
-                                    className="w-3 h-3"
-                                    title="In BedWars"
-                                  />
-                                )}
-                                {getAccountRank(account) && (
-                                  <img
-                                    src={getAccountRank(account)?.image_url}
-                                    alt={getAccountRank(account)?.name}
-                                    className="w-3 h-3"
-                                    title={getAccountRank(account)?.name}
-                                  />
-                                )}
-                              </div>
-                            ))}
-                            {teammate.teammate.accounts.length > 3 && (
-                              <span className="text-xs text-gray-500">+{teammate.teammate.accounts.length - 3}</span>
-                            )}
-                          </div>
-                        )}
                       </div>
                       <ChevronRight size={18} className="text-gray-400" />
                     </div>
@@ -1245,6 +1226,9 @@ function PlayerCard({ player, onDelete, isAdmin, isPinned, onPinToggle, showPinI
                 ) : (
                   <div className={`space-y-2 ${(playerData.teammates?.length || 0) > 4 ? 'max-h-40 overflow-y-auto pr-2' : ''}`}>
                     {playerData.teammates?.map(teammate => {
+                      const accountCount = teammate.teammate.accounts?.length || 0;
+                      const hasMultipleAccounts = accountCount > 1;
+
                       // Find the best account to display (online first, then any account)
                       const onlineAccount = teammate.teammate.accounts?.find(acc => 
                         acc.status?.isOnline === true
@@ -1259,6 +1243,19 @@ function PlayerCard({ player, onDelete, isAdmin, isPinned, onPinToggle, showPinI
                         isOnline: displayAccount?.status?.isOnline,
                         username: displayAccount?.status?.username
                       });
+                      
+                      let statusText = 'Offline';
+                      let statusColor = 'text-gray-400';
+                      
+                      if (displayAccount?.status?.isOnline) {
+                        if (displayAccount.status.inBedwars) {
+                          statusText = 'Online - In BedWars';
+                          statusColor = 'text-blue-600 dark:text-blue-400';
+                        } else {
+                          statusText = 'Online';
+                          statusColor = 'text-green-600 dark:text-green-400';
+                        }
+                      }
                       
                       return (
                         <div
@@ -1312,6 +1309,9 @@ function PlayerCard({ player, onDelete, isAdmin, isPinned, onPinToggle, showPinI
                 ) : (
                   <div className={`space-y-2 ${filteredTeammates.length > 6 ? 'max-h-60 overflow-y-auto pr-2' : ''}`}>
                     {filteredTeammates.map(teammate => {
+                      const accountCount = teammate.accounts?.length || 0;
+                      const hasMultipleAccounts = accountCount > 1;
+
                       // Find the best account to display (online first, then any account)
                       const onlineAccount = teammate.accounts?.find(acc => 
                         acc.status?.isOnline === true
@@ -1517,14 +1517,19 @@ function PlayerCard({ player, onDelete, isAdmin, isPinned, onPinToggle, showPinI
   );
 
   if (isModal) {
-    return renderModal();
+    return (
+      <>
+        {renderModal()}
+        {showTeammateModal && renderTeammateModal()}
+        {showAddAccountModal && renderAddAccountModal()}
+        {showAddStrategyModal && renderAddStrategyModal()}
+        {showRankClaimModal && renderRankClaimModal()}
+        {showEditModal && renderEditModal()}
+      </>
+    );
   }
 
-  return (
-    <>
-      {renderCard()}
-    </>
-  );
+  return renderCard();
 }
 
 export default PlayerCard;
