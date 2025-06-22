@@ -29,6 +29,13 @@ import {
 const BEDWARS_ICON_URL =
   'https://cdn2.steamgriddb.com/icon/3ad9ecf4b4a26b7671e09283f001d626.png';
 
+// Type for teammate relationship from database
+interface TeammateRelationship {
+  teammate: Player & {
+    accounts?: PlayerAccount[];
+  };
+}
+
 interface PlayerCardProps {
   player: Player;
   onDelete?: (playerId: string) => void;
@@ -87,9 +94,11 @@ function PlayerCard({ player, onDelete, isAdmin, isPinned, onPinToggle, showPinI
     const kitUsage = new Map<string, number>();
     
     playerData.strategies?.forEach(strategy => {
-      if (strategy.starred_kit_id) {
-        const count = kitUsage.get(strategy.starred_kit_id) || 0;
-        kitUsage.set(strategy.starred_kit_id, count + 1);
+      // Note: starred_kit_id is not in the type, so we'll use the first kit as starred
+      if (strategy.kit_ids && strategy.kit_ids.length > 0) {
+        const starredKitId = strategy.kit_ids[0]; // Use first kit as starred
+        const count = kitUsage.get(starredKitId) || 0;
+        kitUsage.set(starredKitId, count + 1);
       }
     });
 
@@ -162,7 +171,7 @@ function PlayerCard({ player, onDelete, isAdmin, isPinned, onPinToggle, showPinI
       
       if (data) {
         // Fetch status data for all accounts
-        const allUserIds = data.flatMap(p => p.accounts?.map(a => a.user_id) || []);
+        const allUserIds = data.flatMap((p: any) => p.accounts?.map((a: any) => a.user_id) || []);
         
         if (allUserIds.length > 0) {
           console.log('📊 Fetching status data for user IDs:', allUserIds);
@@ -184,9 +193,9 @@ function PlayerCard({ player, onDelete, isAdmin, isPinned, onPinToggle, showPinI
             });
             
             // Map status data to players
-            const playersWithStatus = data.map(player => ({
+            const playersWithStatus = data.map((player: any) => ({
               ...player,
-              accounts: player.accounts?.map(account => ({
+              accounts: player.accounts?.map((account: any) => ({
                 ...account,
                 status: statusMap.get(account.user_id) ? {
                   isOnline: statusMap.get(account.user_id).is_online,
@@ -209,18 +218,18 @@ function PlayerCard({ player, onDelete, isAdmin, isPinned, onPinToggle, showPinI
               })) || []
             }));
             
-            console.log('✅ Available teammates with status:', playersWithStatus.length);
-            setAvailableTeammates(playersWithStatus);
+            console.log('✅ Available teammates with status:', playersWithStatus);
+            setAvailableTeammates(playersWithStatus as any);
           } else {
-            console.log('⚠️ No status data found, setting teammates without status');
-            setAvailableTeammates(data);
+            console.log('⚠️ No status data found');
+            setAvailableTeammates(data as any);
           }
         } else {
-          console.log('⚠️ No user IDs found, setting teammates without status');
-          setAvailableTeammates(data);
+          console.log('⚠️ No user IDs found');
+          setAvailableTeammates(data as any);
         }
       } else {
-        console.log('⚠️ No available teammates data found');
+        console.log('⚠️ No available teammates found');
         setAvailableTeammates([]);
       }
     } catch (error) {
@@ -250,8 +259,8 @@ function PlayerCard({ player, onDelete, isAdmin, isPinned, onPinToggle, showPinI
       
       if (data && data.length > 0) {
         // Get all user IDs from teammates
-        const allUserIds = data.flatMap(t => 
-          t.teammate?.accounts?.map(a => a.user_id) || []
+        const allUserIds = data.flatMap((t: any) => 
+          t.teammate?.accounts?.map((a: any) => a.user_id) || []
         );
         
         if (allUserIds.length > 0) {
@@ -264,14 +273,14 @@ function PlayerCard({ player, onDelete, isAdmin, isPinned, onPinToggle, showPinI
             .in('user_id', allUserIds);
 
           if (!statusError && statusData) {
-            const statusMap = new Map(statusData.map(s => [s.user_id, s]));
+            const statusMap = new Map(statusData.map((s: any) => [s.user_id, s]));
             
             // Map status to teammates
-            const teammatesWithStatus = data.map(teammate => ({
+            const teammatesWithStatus = data.map((teammate: any) => ({
               ...teammate,
               teammate: {
                 ...teammate.teammate,
-                accounts: teammate.teammate?.accounts?.map(account => ({
+                accounts: teammate.teammate?.accounts?.map((account: any) => ({
                   ...account,
                   status: statusMap.get(account.user_id) ? {
                     isOnline: statusMap.get(account.user_id).is_online,
@@ -300,20 +309,20 @@ function PlayerCard({ player, onDelete, isAdmin, isPinned, onPinToggle, showPinI
             // Update playerData with the enhanced teammate data
             setPlayerData(prevData => ({
               ...prevData,
-              teammates: teammatesWithStatus
+              teammates: teammatesWithStatus as any
             }));
           } else {
             console.log('⚠️ No status data found for teammates');
             setPlayerData(prevData => ({
               ...prevData,
-              teammates: data
+              teammates: data as any
             }));
           }
         } else {
           console.log('⚠️ No user IDs found in teammates');
           setPlayerData(prevData => ({
             ...prevData,
-            teammates: data
+            teammates: data as any
           }));
         }
       } else {
@@ -609,8 +618,28 @@ function PlayerCard({ player, onDelete, isAdmin, isPinned, onPinToggle, showPinI
   };
 
   const getAccountRank = (account: PlayerAccount) => {
-    if (!account.rank || !account.rank[0]) return null;
-    return account.rank[0].account_ranks;
+    if (!account.rank) return null;
+    return account.rank;
+  };
+
+  // Sort accounts by priority: Bedwars > In Game > Online > Offline
+  const getSortedAccounts = () => {
+    if (!playerData.accounts) return [];
+    
+    return [...playerData.accounts].sort((a: PlayerAccount, b: PlayerAccount) => {
+      const aStatus = a.status;
+      const bStatus = b.status;
+      
+      // Priority: Bedwars (highest) > In Game > Online > Offline (lowest)
+      const getPriority = (status: any) => {
+        if (status?.inBedwars) return 4;
+        if (status?.isInGame) return 3;
+        if (status?.isOnline) return 2;
+        return 1; // Offline
+      };
+      
+      return getPriority(bStatus) - getPriority(aStatus);
+    });
   };
 
   const renderCard = () => {
@@ -622,13 +651,17 @@ function PlayerCard({ player, onDelete, isAdmin, isPinned, onPinToggle, showPinI
       firstAccountStatus: playerData.accounts?.[0]?.status ? 'has-status' : 'no-status'
     });
 
+    const sortedAccounts = getSortedAccounts();
+    const accountCount = sortedAccounts.length;
+    const showAccountCount = accountCount > 2;
+
     return (
       <div 
-        className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-6 cursor-pointer hover:shadow-lg transition-shadow"
+        className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-6 cursor-pointer hover:shadow-lg transition-shadow h-64 flex flex-col"
         onClick={() => onTeammateClick && onTeammateClick(player)}
       >
         <div className="flex justify-between items-start mb-4">
-          <div>
+          <div className="flex-1">
             <div className="flex items-center gap-2">
               <h3 className="text-xl font-semibold">{playerData.alias}</h3>
               {showPinIcon && onPinToggle && (
@@ -645,41 +678,58 @@ function PlayerCard({ player, onDelete, isAdmin, isPinned, onPinToggle, showPinI
                 </button>
               )}
             </div>
-            <div className="space-y-2 mt-2">
-              {playerData.accounts?.map(account => (
-                <div key={account.id} className="flex items-center gap-2">
-                  <RobloxStatus 
-                    username={account.status?.username || ''}
-                    isOnline={account.status?.isOnline || false}
-                    isInGame={account.status?.isInGame || false}
-                    inBedwars={account.status?.inBedwars || false}
-                    lastUpdated={account.status?.lastUpdated}
-                  />
-                  {getAccountRank(account) ? (
-                    <img
-                      src={getAccountRank(account)?.image_url}
-                      alt={getAccountRank(account)?.name}
-                      className="w-6 h-6"
-                      title={getAccountRank(account)?.name}
-                    />
-                  ) : (
-                    <HelpCircle
-                      size={16}
-                      className="text-gray-400"
-                      title="Rank unknown"
-                    />
-                  )}
-                  {account.status?.inBedwars && (
-                    <img
-                      src={BEDWARS_ICON_URL}
-                      alt="BedWars"
-                      className="w-6 h-6"
-                      title="In BedWars"
-                    />
+            
+            {/* Known Accounts Section */}
+            {accountCount > 0 && (
+              <div className="mt-3">
+                <div className="flex items-center gap-2 mb-2">
+                  <h4 className="text-sm font-semibold text-gray-700 dark:text-gray-300">
+                    Known Accounts
+                  </h4>
+                  {showAccountCount && (
+                    <span className="text-xs text-red-500 dark:text-red-400 font-medium">
+                      👥 {accountCount}
+                    </span>
                   )}
                 </div>
-              ))}
-            </div>
+                
+                {/* Scrollable Account List */}
+                <div className={`space-y-1 ${showAccountCount ? 'max-h-20 overflow-y-auto pr-1' : ''}`}>
+                  {sortedAccounts.slice(0, showAccountCount ? undefined : 2).map(account => (
+                    <div key={account.id} className="flex items-center gap-2">
+                      <RobloxStatus 
+                        username={account.status?.username || ''}
+                        isOnline={account.status?.isOnline || false}
+                        isInGame={account.status?.isInGame || false}
+                        inBedwars={account.status?.inBedwars || false}
+                        lastUpdated={account.status?.lastUpdated}
+                      />
+                      {getAccountRank(account) ? (
+                        <img
+                          src={getAccountRank(account)?.image_url}
+                          alt={getAccountRank(account)?.name}
+                          className="w-5 h-5"
+                          title={getAccountRank(account)?.name}
+                        />
+                      ) : (
+                        <HelpCircle
+                          size={14}
+                          className="text-gray-400"
+                        />
+                      )}
+                      {account.status?.inBedwars && (
+                        <img
+                          src={BEDWARS_ICON_URL}
+                          alt="BedWars"
+                          className="w-5 h-5"
+                          title="In BedWars"
+                        />
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
 
           {isAdmin && (
@@ -720,7 +770,7 @@ function PlayerCard({ player, onDelete, isAdmin, isPinned, onPinToggle, showPinI
           ))}
         </div>
 
-        <div className="flex gap-2">
+        <div className="flex gap-2 mt-auto">
           <button
             onClick={(e) => {
               e.stopPropagation();
@@ -771,7 +821,7 @@ function PlayerCard({ player, onDelete, isAdmin, isPinned, onPinToggle, showPinI
           <section>
             <h3 className="text-lg font-semibold mb-4">Known Accounts</h3>
             <div className="space-y-4">
-              {playerData.accounts?.map(account => (
+              {getSortedAccounts().map(account => (
                 <div 
                   key={account.id}
                   className="flex items-center justify-between bg-gray-50 dark:bg-gray-700/50 p-4 rounded-lg"
@@ -853,12 +903,12 @@ function PlayerCard({ player, onDelete, isAdmin, isPinned, onPinToggle, showPinI
               {playerData.teammates?.length === 0 ? (
                 <p className="text-gray-500 text-sm col-span-full">No teammates added yet.</p>
               ) : (
-                playerData.teammates?.map(teammate => {
+                (playerData.teammates as any)?.map((teammate: any) => {
                   const accountCount = teammate.teammate.accounts?.length || 0;
                   const hasMultipleAccounts = accountCount > 1;
 
                   // Find the best account to display (online first, then any account)
-                  const onlineAccount = teammate.teammate.accounts?.find(acc => 
+                  const onlineAccount = teammate.teammate.accounts?.find((acc: any) => 
                     acc.status?.isOnline === true
                   );
                   const anyAccount = teammate.teammate.accounts?.[0];
@@ -906,11 +956,14 @@ function PlayerCard({ player, onDelete, isAdmin, isPinned, onPinToggle, showPinI
                             </span>
                           )}
                         </div>
-                        <div className={`text-sm ${statusColor}`}>
-                          {statusText}
+                        
+                        <div className="flex items-center gap-2">
+                          <span className={`text-sm ${statusColor}`}>
+                            {statusText}
+                          </span>
+                          <ChevronRight size={18} className="text-gray-400" />
                         </div>
                       </div>
-                      <ChevronRight size={18} className="text-gray-400" />
                     </div>
                   );
                 })
@@ -1021,44 +1074,47 @@ function PlayerCard({ player, onDelete, isAdmin, isPinned, onPinToggle, showPinI
               <Search className="absolute left-2 top-2.5 text-gray-400" size={16} />
             </div>
             <div className="grid grid-cols-4 gap-2 max-h-[200px] overflow-y-auto">
-              {displayKits.map(kit => (
-                <div
-                  key={kit.id}
-                  onClick={() => {
-                    if (selectedKits.includes(kit.id)) {
-                      setSelectedKits(prev => prev.filter(id => id !== kit.id));
-                      if (starredKitId === kit.id) {
-                        setStarredKitId(null);
+              {displayKits.map(kit => {
+                if (!kit) return null;
+                return (
+                  <div
+                    key={kit.id}
+                    onClick={() => {
+                      if (selectedKits.includes(kit.id)) {
+                        setSelectedKits(prev => prev.filter(id => id !== kit.id));
+                        if (starredKitId === kit.id) {
+                          setStarredKitId(null);
+                        }
+                      } else if (selectedKits.length < 5) {
+                        setSelectedKits(prev => [...prev, kit.id]);
                       }
-                    } else if (selectedKits.length < 5) {
-                      setSelectedKits(prev => [...prev, kit.id]);
-                    }
-                  }}
-                  className={`relative cursor-pointer ${
-                    selectedKits.includes(kit.id) 
-                      ? 'ring-2 ring-primary-500' 
-                      : ''
-                  }`}
-                >
-                  <KitCard kit={kit} size="sm" />
-                  {selectedKits.includes(kit.id) && (
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setStarredKitId(starredKitId === kit.id ? null : kit.id);
-                      }}
-                      className={`absolute top-1 right-1 p-1 rounded-full ${
-                        starredKitId === kit.id
-                          ? 'text-yellow-500'
-                          : 'text-gray-400 hover:text-yellow-500'
-                      }`}
-                      title={starredKitId === kit.id ? 'Unstar kit' : 'Star this kit to indicate it is used by the player'}
-                    >
-                      <Star size={16} />
-                    </button>
-                  )}
-                </div>
-              ))}
+                    }}
+                    className={`relative cursor-pointer ${
+                      selectedKits.includes(kit.id) 
+                        ? 'ring-2 ring-primary-500' 
+                        : ''
+                    }`}
+                  >
+                    <KitCard kit={kit} size="sm" />
+                    {selectedKits.includes(kit.id) && (
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setStarredKitId(starredKitId === kit.id ? null : kit.id);
+                        }}
+                        className={`absolute top-1 right-1 p-1 rounded-full ${
+                          starredKitId === kit.id
+                            ? 'text-yellow-500'
+                            : 'text-gray-400 hover:text-yellow-500'
+                        }`}
+                        title={starredKitId === kit.id ? 'Unstar kit' : 'Star this kit to indicate it is used by the player'}
+                      >
+                        <Star size={16} />
+                      </button>
+                    )}
+                  </div>
+                );
+              })}
             </div>
             <p className="text-sm text-gray-500 mt-2">
               Star the kit that {player.alias} uses in this strategy
