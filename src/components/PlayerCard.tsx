@@ -108,6 +108,11 @@ function PlayerCard({ player, onDelete, isAdmin, isPinned, onPinToggle, showPinI
 
   // Update playerData when player prop changes
   useEffect(() => {
+    console.log('🔄 PlayerCard prop update for:', player.alias, {
+      hasAccounts: player.accounts?.length || 0,
+      hasStatus: player.accounts?.[0]?.status ? 'yes' : 'no',
+      accountsWithStatus: player.accounts?.filter(acc => acc.status).length || 0
+    });
     setPlayerData(player);
   }, [player]);
 
@@ -488,128 +493,138 @@ function PlayerCard({ player, onDelete, isAdmin, isPinned, onPinToggle, showPinI
     return account.rank[0].account_ranks;
   };
 
-  const renderCard = () => (
-    <div 
-      className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-6 cursor-pointer hover:shadow-lg transition-shadow"
-      onClick={() => setShowModal(true)}
-    >
-      <div className="flex justify-between items-start mb-4">
-        <div>
-          <div className="flex items-center gap-2">
-            <h3 className="text-xl font-semibold">{playerData.alias}</h3>
-            {showPinIcon && onPinToggle && (
+  const renderCard = () => {
+    // Debug logging to see what data is being rendered
+    console.log('🎨 PlayerCard rendering for:', playerData.alias, {
+      hasPlayerData: !!playerData,
+      hasAccounts: playerData.accounts?.length || 0,
+      accountsWithStatus: playerData.accounts?.filter(acc => acc.status).length || 0,
+      firstAccountStatus: playerData.accounts?.[0]?.status ? 'has-status' : 'no-status'
+    });
+
+    return (
+      <div 
+        className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-6 cursor-pointer hover:shadow-lg transition-shadow"
+        onClick={() => setShowModal(true)}
+      >
+        <div className="flex justify-between items-start mb-4">
+          <div>
+            <div className="flex items-center gap-2">
+              <h3 className="text-xl font-semibold">{playerData.alias}</h3>
+              {showPinIcon && onPinToggle && (
+                <button
+                  onClick={(e) => onPinToggle(player.id, e)}
+                  className={`p-1 rounded-full transition-colors ${
+                    isPinned 
+                      ? 'text-yellow-500 hover:text-yellow-600' 
+                      : 'text-gray-400 hover:text-yellow-500'
+                  }`}
+                  title={isPinned ? 'Unpin player' : 'Pin player'}
+                >
+                  <Pin size={16} className={isPinned ? 'fill-current' : ''} />
+                </button>
+              )}
+            </div>
+            <div className="space-y-2 mt-2">
+              {playerData.accounts?.map(account => (
+                <div key={account.id} className="flex items-center gap-2">
+                  <RobloxStatus 
+                    username={account.status?.username || ''}
+                    isOnline={account.status?.isOnline || false}
+                    isInGame={account.status?.isInGame || false}
+                    inBedwars={account.status?.inBedwars || false}
+                    lastUpdated={account.status?.lastUpdated}
+                  />
+                  {getAccountRank(account) ? (
+                    <img
+                      src={getAccountRank(account)?.image_url}
+                      alt={getAccountRank(account)?.name}
+                      className="w-6 h-6"
+                      title={getAccountRank(account)?.name}
+                    />
+                  ) : (
+                    <HelpCircle
+                      size={16}
+                      className="text-gray-400"
+                      title="Rank unknown"
+                    />
+                  )}
+                  {account.status?.inBedwars && (
+                    <img
+                      src={BEDWARS_ICON_URL}
+                      alt="BedWars"
+                      className="w-6 h-6"
+                      title="In BedWars"
+                    />
+                  )}
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {isAdmin && (
+            <div className="flex gap-2">
               <button
-                onClick={(e) => onPinToggle(player.id, e)}
-                className={`p-1 rounded-full transition-colors ${
-                  isPinned 
-                    ? 'text-yellow-500 hover:text-yellow-600' 
-                    : 'text-gray-400 hover:text-yellow-500'
-                }`}
-                title={isPinned ? 'Unpin player' : 'Pin player'}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setShowEditModal(true);
+                }}
+                className="p-2 text-blue-600 hover:bg-blue-100 rounded-full"
               >
-                <Pin size={16} className={isPinned ? 'fill-current' : ''} />
+                <Edit2 size={16} />
               </button>
-            )}
-          </div>
-          <div className="space-y-2 mt-2">
-            {playerData.accounts?.map(account => (
-              <div key={account.id} className="flex items-center gap-2">
-                <RobloxStatus 
-                  username={account.status?.username || ''}
-                  isOnline={account.status?.isOnline || false}
-                  isInGame={account.status?.isInGame || false}
-                  inBedwars={account.status?.inBedwars || false}
-                  lastUpdated={account.status?.lastUpdated}
-                />
-                {getAccountRank(account) ? (
-                  <img
-                    src={getAccountRank(account)?.image_url}
-                    alt={getAccountRank(account)?.name}
-                    className="w-6 h-6"
-                    title={getAccountRank(account)?.name}
-                  />
-                ) : (
-                  <HelpCircle
-                    size={16}
-                    className="text-gray-400"
-                    title="Rank unknown"
-                  />
-                )}
-                {account.status?.inBedwars && (
-                  <img
-                    src={BEDWARS_ICON_URL}
-                    alt="BedWars"
-                    className="w-6 h-6"
-                    title="In BedWars"
-                  />
-                )}
-              </div>
-            ))}
-          </div>
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  if (onDelete) onDelete(player.id);
+                }}
+                className="p-2 text-red-600 hover:bg-red-100 rounded-full"
+              >
+                <Trash2 size={16} />
+              </button>
+            </div>
+          )}
         </div>
 
-        {isAdmin && (
-          <div className="flex gap-2">
-            <button
-              onClick={(e) => {
-                e.stopPropagation();
-                setShowEditModal(true);
-              }}
-              className="p-2 text-blue-600 hover:bg-blue-100 rounded-full"
-            >
-              <Edit2 size={16} />
-            </button>
-            <button
-              onClick={(e) => {
-                e.stopPropagation();
-                if (onDelete) onDelete(player.id);
-              }}
-              className="p-2 text-red-600 hover:bg-red-100 rounded-full"
-            >
-              <Trash2 size={16} />
-            </button>
-          </div>
-        )}
-      </div>
+        <div className="flex gap-2 mb-4">
+          {playerData.strategies?.slice(0, 3).map(strategy => (
+            strategy.kit_ids?.slice(0, 3).map(kitId => {
+              const kit = kits.find(k => k.id === kitId);
+              if (!kit) return null;
+              return (
+                <div key={kitId} className="w-8 h-8">
+                  <KitCard kit={kit} size="sm" showDetails={false} />
+                </div>
+              );
+            })
+          ))}
+        </div>
 
-      <div className="flex gap-2 mb-4">
-        {playerData.strategies?.slice(0, 3).map(strategy => (
-          strategy.kit_ids?.slice(0, 3).map(kitId => {
-            const kit = kits.find(k => k.id === kitId);
-            if (!kit) return null;
-            return (
-              <div key={kitId} className="w-8 h-8">
-                <KitCard kit={kit} size="sm" showDetails={false} />
-              </div>
-            );
-          })
-        ))}
+        <div className="flex gap-2">
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              setShowAddAccountModal(true);
+            }}
+            className="btn btn-outline flex items-center gap-1 text-sm"
+          >
+            <Plus size={14} />
+            Add Account
+          </button>
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              setShowAddStrategyModal(true);
+            }}
+            className="btn btn-outline flex items-center gap-1 text-sm"
+          >
+            <Plus size={14} />
+            Add Strategy
+          </button>
+        </div>
       </div>
-
-      <div className="flex gap-2">
-        <button
-          onClick={(e) => {
-            e.stopPropagation();
-            setShowAddAccountModal(true);
-          }}
-          className="btn btn-outline flex items-center gap-1 text-sm"
-        >
-          <Plus size={14} />
-          Add Account
-        </button>
-        <button
-          onClick={(e) => {
-            e.stopPropagation();
-            setShowAddStrategyModal(true);
-          }}
-          className="btn btn-outline flex items-center gap-1 text-sm"
-        >
-          <Plus size={14} />
-          Add Strategy
-        </button>
-      </div>
-    </div>
-  );
+    );
+  };
 
   const renderModal = () => (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
