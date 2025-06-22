@@ -639,6 +639,37 @@ function PlayerCard({ player, onDelete, isAdmin, isPinned, onPinToggle, showPinI
     return fallbackUrl || rank.image_url;
   };
 
+  // Rank Icon Component with proper error handling
+  const RankIcon = ({ account }: { account: PlayerAccount }) => {
+    const rank = getAccountRank(account);
+    
+    if (!rank) {
+      return (
+        <div className="w-4 h-4 flex items-center justify-center text-gray-400 text-xs border border-gray-300 rounded bg-gray-50 dark:bg-gray-700">
+          ?
+        </div>
+      );
+    }
+    
+    const iconUrl = RANK_ICONS[rank.name as keyof typeof RANK_ICONS];
+    
+    return (
+      <img 
+        src={iconUrl}
+        alt={rank.name}
+        className="w-4 h-4 object-contain"
+        onError={(e) => {
+          console.log(`Failed to load rank icon for ${rank.name}:`, iconUrl);
+          // Replace with text fallback
+          const fallbackElement = document.createElement('div');
+          fallbackElement.className = 'w-4 h-4 flex items-center justify-center text-gray-400 text-xs border border-gray-300 rounded bg-gray-50 dark:bg-gray-700';
+          fallbackElement.textContent = rank.name[0];
+          e.currentTarget.parentNode?.replaceChild(fallbackElement, e.currentTarget);
+        }}
+      />
+    );
+  };
+
   // Sort accounts by priority: Bedwars > In Game > Online > Offline
   const getSortedAccounts = () => {
     if (!playerData.accounts) return [];
@@ -670,11 +701,16 @@ function PlayerCard({ player, onDelete, isAdmin, isPinned, onPinToggle, showPinI
 
     const sortedAccounts = getSortedAccounts();
     const accountCount = sortedAccounts.length;
-    const showAccountCount = accountCount > 2;
+    const maxVisibleAccounts = 2;
+    const showScrollbar = accountCount > maxVisibleAccounts;
+
+    console.log('Sorted accounts:', sortedAccounts);
+    console.log('Account count:', accountCount);
+    console.log('Show scrollbar:', showScrollbar);
 
     return (
       <div 
-        className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-4 h-80 flex flex-col cursor-pointer hover:shadow-lg transition-shadow"
+        className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-4 h-64 flex flex-col cursor-pointer hover:shadow-lg transition-shadow"
         onClick={() => onTeammateClick && onTeammateClick(player)}
       >
         {/* Header with pin, edit, delete buttons */}
@@ -729,7 +765,7 @@ function PlayerCard({ player, onDelete, isAdmin, isPinned, onPinToggle, showPinI
               <h4 className="text-sm font-semibold text-gray-700 dark:text-gray-300">
                 Known Accounts
               </h4>
-              {showAccountCount && (
+              {showScrollbar && (
                 <div className="flex items-center gap-1 text-xs text-red-500 dark:text-red-400">
                   <Users size={12} />
                   <span>{accountCount}</span>
@@ -737,10 +773,10 @@ function PlayerCard({ player, onDelete, isAdmin, isPinned, onPinToggle, showPinI
               )}
             </div>
             
-            {/* Scrollable account container with proper spacing */}
-            <div className={`space-y-2 ${showAccountCount ? 'max-h-28 overflow-y-auto pr-2' : ''}`}>
-              {sortedAccounts.slice(0, showAccountCount ? undefined : 2).map(account => (
-                <div key={account.id} className="flex items-center gap-2">
+            {/* Fixed height container showing max 2 accounts */}
+            <div className={`space-y-2 ${showScrollbar ? 'h-16 overflow-y-auto pr-2' : ''}`}>
+              {sortedAccounts.map(account => (
+                <div key={account.id} className="flex items-center gap-2 min-h-[28px]">
                   <RobloxStatus 
                     username={account.status?.username || `User ${account.user_id}`}
                     isOnline={account.status?.isOnline || false}
@@ -748,30 +784,14 @@ function PlayerCard({ player, onDelete, isAdmin, isPinned, onPinToggle, showPinI
                     inBedwars={account.status?.inBedwars || false}
                     lastUpdated={account.status?.lastUpdated}
                   />
-                  
-                  {/* Rank icon inline with username */}
-                  {getAccountRank(account) ? (
-                    <img 
-                      src={getRankIconUrl(getAccountRank(account)!)}
-                      alt={getAccountRank(account)!.name}
-                      className="w-4 h-4 object-contain"
-                      onError={(e) => {
-                        // Fallback if image fails to load
-                        e.currentTarget.style.display = 'none';
-                      }}
-                    />
-                  ) : (
-                    <HelpCircle
-                      size={14}
-                      className="text-gray-400"
-                    />
-                  )}
-                  
+                  <div className="w-8 h-8 flex items-center justify-center">
+                    <RankIcon account={account} />
+                  </div>
                   {account.status?.inBedwars && (
                     <img
                       src={BEDWARS_ICON_URL}
                       alt="BedWars"
-                      className="w-4 h-4"
+                      className="w-8 h-8"
                       title="In BedWars"
                     />
                   )}
@@ -863,19 +883,9 @@ function PlayerCard({ player, onDelete, isAdmin, isPinned, onPinToggle, showPinI
                         lastUpdated={account.status?.lastUpdated}
                       />
                     </div>
-                    {getAccountRank(account) ? (
-                      <img
-                        src={getRankIconUrl(getAccountRank(account)!)}
-                        alt={getAccountRank(account)!.name}
-                        className="w-8 h-8"
-                        title={getAccountRank(account)!.name}
-                      />
-                    ) : (
-                      <div className="flex items-center gap-1 text-gray-500">
-                        <HelpCircle size={18} />
-                        <span className="text-sm">Rank unknown</span>
-                      </div>
-                    )}
+                    <div className="w-8 h-8 flex items-center justify-center">
+                      <RankIcon account={account} />
+                    </div>
                     {account.status?.inBedwars && (
                       <img
                         src={BEDWARS_ICON_URL}
