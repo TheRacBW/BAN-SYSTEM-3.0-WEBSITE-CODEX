@@ -139,15 +139,6 @@ function PlayerCard({ player, onDelete, isAdmin, isPinned, onPinToggle, showPinI
 
   // Update playerData when player prop changes
   useEffect(() => {
-    console.log('🔄 PlayerCard prop update for:', player.alias, {
-      hasAccounts: player.accounts?.length || 0,
-      hasStatus: player.accounts?.[0]?.status ? 'yes' : 'no',
-      accountsWithStatus: player.accounts?.filter(acc => acc.status).length || 0,
-      // Debug rank data
-      accountsWithRank: player.accounts?.filter(acc => acc.rank).length || 0,
-      firstAccountRank: player.accounts?.[0]?.rank ? 'has-rank' : 'no-rank',
-      rankData: player.accounts?.[0]?.rank
-    });
     setPlayerData(player);
     // Refresh teammate data when player prop changes
     fetchCurrentTeammatesWithStatus();
@@ -634,9 +625,9 @@ function PlayerCard({ player, onDelete, isAdmin, isPinned, onPinToggle, showPinI
 
   const getAccountRank = (account: PlayerAccount): AccountRank | null => {
     try {
-      // Check if rank data exists from the JOIN
-      if (account.rank?.account_ranks) {
-        return account.rank.account_ranks;
+      // Handle array structure from database
+      if (account.rank && Array.isArray(account.rank) && account.rank.length > 0) {
+        return account.rank[0].account_ranks; // Get first rank from array
       }
       
       return null;
@@ -656,15 +647,19 @@ function PlayerCard({ player, onDelete, isAdmin, isPinned, onPinToggle, showPinI
   const RankIcon = ({ account }: { account: PlayerAccount }) => {
     const rank = getAccountRank(account);
     
+    // Log for debugging (console only - no UI)
+    console.log('RankIcon debug:', {
+      accountId: account.id,
+      userId: account.user_id,
+      rankArray: account.rank,
+      processedRank: rank
+    });
+    
     if (!rank) {
-      return (
-        <div className="w-4 h-4 flex items-center justify-center" title="No rank assigned">
-          <HelpCircle size={14} className="text-gray-400" />
-        </div>
-      );
+      return <HelpCircle size={14} className="text-gray-400" />;
     }
     
-    // Use the image_url from the database
+    // Try to use the database image URL
     if (rank.image_url) {
       return (
         <img 
@@ -672,10 +667,12 @@ function PlayerCard({ player, onDelete, isAdmin, isPinned, onPinToggle, showPinI
           alt={rank.name}
           className="w-4 h-4 object-contain"
           title={rank.name}
+          onLoad={() => console.log(`✅ Rank icon loaded: ${rank.name}`)}
           onError={(e) => {
-            // Fallback to text if image fails
-            const fallback = document.createElement('div');
-            fallback.className = 'w-4 h-4 flex items-center justify-center text-xs font-bold text-blue-600 border border-gray-300 rounded';
+            console.log(`❌ Rank icon failed: ${rank.name}`, rank.image_url);
+            // Replace with text fallback
+            const fallback = document.createElement('span');
+            fallback.className = 'text-xs font-bold text-blue-600 border border-blue-300 rounded px-1';
             fallback.textContent = rank.name[0];
             fallback.title = rank.name;
             e.currentTarget.parentNode?.replaceChild(fallback, e.currentTarget);
@@ -684,14 +681,14 @@ function PlayerCard({ player, onDelete, isAdmin, isPinned, onPinToggle, showPinI
       );
     }
     
-    // Fallback to text display
+    // Text fallback
     return (
-      <div 
-        className="w-4 h-4 flex items-center justify-center text-xs font-bold text-blue-600 border border-gray-300 rounded"
+      <span 
+        className="text-xs font-bold text-blue-600 border border-blue-300 rounded px-1"
         title={rank.name}
       >
         {rank.name[0]}
-      </div>
+      </span>
     );
   };
 
@@ -716,26 +713,10 @@ function PlayerCard({ player, onDelete, isAdmin, isPinned, onPinToggle, showPinI
   };
 
   const renderCard = () => {
-    // Debug logging to see what data is being rendered
-    console.log('🎨 PlayerCard rendering for:', playerData.alias, {
-      hasPlayerData: !!playerData,
-      hasAccounts: playerData.accounts?.length || 0,
-      accountsWithStatus: playerData.accounts?.filter(acc => acc.status).length || 0,
-      firstAccountStatus: playerData.accounts?.[0]?.status ? 'has-status' : 'no-status',
-      // Debug rank data
-      accountsWithRank: playerData.accounts?.filter(acc => acc.rank).length || 0,
-      firstAccountRank: playerData.accounts?.[0]?.rank ? 'has-rank' : 'no-rank',
-      rankData: playerData.accounts?.[0]?.rank
-    });
-
     const sortedAccounts = getSortedAccounts();
     const accountCount = sortedAccounts.length;
     const maxVisibleAccounts = 2;
     const showScrollbar = accountCount > maxVisibleAccounts;
-
-    console.log('Sorted accounts:', sortedAccounts);
-    console.log('Account count:', accountCount);
-    console.log('Show scrollbar:', showScrollbar);
 
     return (
       <div 
@@ -786,15 +767,6 @@ function PlayerCard({ player, onDelete, isAdmin, isPinned, onPinToggle, showPinI
             </div>
           )}
         </div>
-
-        {/* Debug Rank Info (temporary) */}
-        {isAdmin && (
-          <div className="text-xs text-gray-500 mb-2 p-2 bg-gray-100 dark:bg-gray-700 rounded">
-            <div>Accounts: {playerData.accounts?.length || 0}</div>
-            <div>With Rank: {playerData.accounts?.filter(acc => acc.rank).length || 0}</div>
-            <div>Rank Data: {JSON.stringify(playerData.accounts?.[0]?.rank || 'none')}</div>
-          </div>
-        )}
 
         {/* Known Accounts section with proper spacing */}
         {accountCount > 0 && (

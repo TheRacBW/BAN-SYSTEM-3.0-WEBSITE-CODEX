@@ -47,8 +47,8 @@ export function usePlayerData(player: Player) {
   };
 
   const getAccountRank = (account: PlayerAccount) => {
-    if (!account.rank?.account_ranks) return null;
-    return account.rank.account_ranks;
+    if (!account.rank || !Array.isArray(account.rank) || account.rank.length === 0) return null;
+    return account.rank[0].account_ranks;
   };
 
   const handleDeleteAccount = async (accountId: string) => {

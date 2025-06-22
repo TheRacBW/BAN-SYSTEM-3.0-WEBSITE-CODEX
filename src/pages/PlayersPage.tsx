@@ -8,7 +8,6 @@ import PlayerCard from '../components/PlayerCard';
 import { BEDWARS_PLACE_ID, BEDWARS_UNIVERSE_ID } from '../constants/bedwars';
 import { useUserPins } from '../hooks/useUserPins';
 import RobloxStatus from '../components/RobloxStatus';
-import TestRankData from '../components/TestRankData';
 
 export default function PlayersPage() {
   const navigate = useNavigate();
@@ -80,13 +79,6 @@ export default function PlayersPage() {
       console.log('✅ loadPlayers: Successfully fetched players:', playersData?.length || 0);
 
       if (playersData) {
-        // Debug rank data loading
-        console.log('🔍 DEBUG: Sample player data structure:', playersData[0]);
-        if (playersData[0]?.accounts?.length > 0) {
-          console.log('🔍 DEBUG: Sample account data:', playersData[0].accounts[0]);
-          console.log('🔍 DEBUG: Sample rank data:', playersData[0].accounts[0].rank);
-        }
-        
         // Fetch statuses for all accounts
         console.log('🔄 loadPlayers: Calling fetchAccountStatuses...');
         const playersWithStatuses = await fetchAccountStatuses(playersData);
@@ -258,14 +250,18 @@ export default function PlayersPage() {
   };
 
   const getPlayerRankScore = (player: Player) => {
-    if (!player.accounts?.length) return 0;
-    
     const ranks = player.accounts
-      .map(account => account.rank?.account_ranks?.name)
+      ?.map(account => {
+        // Handle array structure
+        if (account.rank && Array.isArray(account.rank) && account.rank.length > 0) {
+          return account.rank[0].account_ranks?.name;
+        }
+        return null;
+      })
       .filter(Boolean)
       .map(rankName => RANK_VALUES[rankName as keyof typeof RANK_VALUES] || 0);
     
-    return ranks.length ? ranks.reduce((a, b) => a + b, 0) / ranks.length : 0;
+    return ranks?.length ? ranks.reduce((a, b) => a + b, 0) / ranks.length : 0;
   };
 
   const sortPlayers = (players: Player[]) => {
@@ -521,9 +517,6 @@ export default function PlayersPage() {
 
   return (
     <div className="space-y-6">
-      {/* Temporary Rank Data Test */}
-      {isAdmin && <TestRankData />}
-      
       <div className="flex justify-between items-center">
         <h2 className="text-2xl font-bold">Players</h2>
         <div className="flex gap-2">
@@ -752,12 +745,12 @@ export default function PlayersPage() {
                             lastUpdated={account.status?.lastUpdated}
                           />
                         </div>
-                        {account.rank?.account_ranks && (
+                        {account.rank && Array.isArray(account.rank) && account.rank.length > 0 && (
                           <img
-                            src={account.rank.account_ranks.image_url}
-                            alt={account.rank.account_ranks.name}
+                            src={account.rank[0].account_ranks.image_url}
+                            alt={account.rank[0].account_ranks.name}
                             className="w-8 h-8"
-                            title={account.rank.account_ranks.name}
+                            title={account.rank[0].account_ranks.name}
                           />
                         )}
                         {account.status?.inBedwars && (

@@ -17,10 +17,10 @@ export interface PlayerAccount {
   player_id: string;
   user_id: number;
   created_at: Date;
-  rank?: {
+  rank?: Array<{
     rank_id: string;
     account_ranks: AccountRank;
-  };
+  }>;
   status?: {
     isOnline: boolean;
     isInGame: boolean;
