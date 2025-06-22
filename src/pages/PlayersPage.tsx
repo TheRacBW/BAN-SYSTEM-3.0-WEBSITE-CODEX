@@ -306,11 +306,12 @@ export default function PlayersPage() {
 
   const sortedPlayers = sortPlayers(filteredPlayers);
 
-  // Comprehensive debug logging for state management
-  console.log('🔍 PlayersPage State Debug:', {
+  // Critical debug logging to track render state
+  console.log('🎯 RENDER STATE:', { 
+    loading, 
+    dataReady, 
     playersCount: players.length,
-    loading,
-    dataReady,
+    hasPlayers: players.length > 0,
     filteredPlayersCount: filteredPlayers.length,
     sortedPlayersCount: sortedPlayers.length,
     shouldShowLoading: loading || !dataReady,
