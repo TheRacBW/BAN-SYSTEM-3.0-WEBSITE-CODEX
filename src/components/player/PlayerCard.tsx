@@ -20,6 +20,12 @@ interface PlayerCardProps {
 }
 
 function PlayerCard({ player, onDelete, isAdmin }: PlayerCardProps) {
+  console.log('🔥 PLAYER/PlayerCard rendering:', player.alias, {
+    hasAccounts: player.accounts?.length || 0,
+    hasStatus: player.accounts?.[0]?.status ? 'yes' : 'no',
+    firstAccountStatus: player.accounts?.[0]?.status ? 'has-status' : 'no-status'
+  });
+  
   const { user } = useAuth();
   const {
     playerData,
