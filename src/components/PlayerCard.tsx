@@ -171,6 +171,7 @@ function PlayerCard({ player, onDelete, isAdmin, isPinned, onPinToggle, showPinI
   };
 
   const handleAddTeammate = async (teammateId: string) => {
+    console.log('🔄 Adding teammate:', teammateId, 'to player:', player.id);
     try {
       const { error } = await supabase
         .from('player_teammates')
@@ -180,17 +181,22 @@ function PlayerCard({ player, onDelete, isAdmin, isPinned, onPinToggle, showPinI
         });
 
       if (error) throw error;
+      console.log('✅ Teammate added successfully');
       setSuccess('Teammate added successfully');
       
       // Refresh available teammates list to update UI immediately
       await fetchAvailableTeammates();
+      
+      // Close modal after successful add
+      setShowTeammateModal(false);
     } catch (error) {
-      console.error('Error adding teammate:', error);
+      console.error('❌ Error adding teammate:', error);
       setError('Failed to add teammate');
     }
   };
 
   const handleRemoveTeammate = async (teammateId: string) => {
+    console.log('🔄 Removing teammate:', teammateId, 'from player:', player.id);
     try {
       const { error } = await supabase
         .from('player_teammates')
@@ -199,12 +205,13 @@ function PlayerCard({ player, onDelete, isAdmin, isPinned, onPinToggle, showPinI
         .eq('teammate_id', teammateId);
 
       if (error) throw error;
+      console.log('✅ Teammate removed successfully');
       setSuccess('Teammate removed successfully');
       
       // Refresh available teammates list to update UI immediately
       await fetchAvailableTeammates();
     } catch (error) {
-      console.error('Error removing teammate:', error);
+      console.error('❌ Error removing teammate:', error);
       setError('Failed to remove teammate');
     }
   };
@@ -981,7 +988,7 @@ function PlayerCard({ player, onDelete, isAdmin, isPinned, onPinToggle, showPinI
 
     return (
       <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-        <div className="bg-white dark:bg-gray-800 rounded-lg p-6 max-w-4xl w-full mx-4 max-h-[90vh] overflow-y-auto">
+        <div className="bg-white dark:bg-gray-800 rounded-lg p-6 max-w-2xl w-full mx-4 max-h-[90vh] overflow-y-auto">
           <h3 className="text-xl font-bold mb-4">Manage Teammates</h3>
           
           <div className="space-y-4">
@@ -997,23 +1004,23 @@ function PlayerCard({ player, onDelete, isAdmin, isPinned, onPinToggle, showPinI
             </div>
 
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-              <div className="space-y-4">
+              <div className="space-y-2">
                 <h4 className="font-medium text-gray-700 dark:text-gray-300">Current Teammates</h4>
                 {playerData.teammates?.length === 0 ? (
                   <p className="text-gray-500 text-sm">No teammates added yet.</p>
                 ) : (
-                  <div className="space-y-3">
+                  <div className={`space-y-2 ${(playerData.teammates?.length || 0) > 4 ? 'max-h-40 overflow-y-auto pr-2' : ''}`}>
                     {playerData.teammates?.map(teammate => (
                       <div
                         key={teammate.teammate.id}
-                        className="flex items-center justify-between p-4 bg-gray-50 dark:bg-gray-700/50 rounded-lg"
+                        className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-700/50 rounded-lg"
                       >
-                        <div className="flex-1">
-                          <div className="flex items-center gap-2 mb-2">
-                            <span className="font-medium">{teammate.teammate.alias}</span>
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2 mb-1">
+                            <span className="font-medium truncate">{teammate.teammate.alias}</span>
                             <button
                               onClick={() => handleRemoveTeammate(teammate.teammate.id)}
-                              className="text-red-600 hover:text-red-700 p-1"
+                              className="text-red-600 hover:text-red-700 p-1 flex-shrink-0"
                               title="Remove teammate"
                             >
                               <X size={16} />
@@ -1023,8 +1030,8 @@ function PlayerCard({ player, onDelete, isAdmin, isPinned, onPinToggle, showPinI
                           {/* Show teammate's accounts and status */}
                           {teammate.teammate.accounts && teammate.teammate.accounts.length > 0 ? (
                             <div className="space-y-1">
-                              {teammate.teammate.accounts.map(account => (
-                                <div key={account.id} className="flex items-center gap-2 text-sm">
+                              {teammate.teammate.accounts.slice(0, 2).map(account => (
+                                <div key={account.id} className="flex items-center gap-2 text-xs">
                                   <RobloxStatus 
                                     username={account.status?.username || account.user_id.toString()}
                                     isOnline={account.status?.isOnline || false}
@@ -1036,7 +1043,7 @@ function PlayerCard({ player, onDelete, isAdmin, isPinned, onPinToggle, showPinI
                                     <img
                                       src={getAccountRank(account)?.image_url}
                                       alt={getAccountRank(account)?.name}
-                                      className="w-4 h-4"
+                                      className="w-3 h-3"
                                       title={getAccountRank(account)?.name}
                                     />
                                   )}
@@ -1044,15 +1051,18 @@ function PlayerCard({ player, onDelete, isAdmin, isPinned, onPinToggle, showPinI
                                     <img
                                       src={BEDWARS_ICON_URL}
                                       alt="BedWars"
-                                      className="w-4 h-4"
+                                      className="w-3 h-3"
                                       title="In BedWars"
                                     />
                                   )}
                                 </div>
                               ))}
+                              {teammate.teammate.accounts.length > 2 && (
+                                <p className="text-gray-500 text-xs">+{teammate.teammate.accounts.length - 2} more accounts</p>
+                              )}
                             </div>
                           ) : (
-                            <p className="text-gray-500 text-sm">No accounts found</p>
+                            <p className="text-gray-500 text-xs">No accounts found</p>
                           )}
                         </div>
                       </div>
@@ -1061,23 +1071,23 @@ function PlayerCard({ player, onDelete, isAdmin, isPinned, onPinToggle, showPinI
                 )}
               </div>
 
-              <div className="space-y-4">
+              <div className="space-y-2">
                 <h4 className="font-medium text-gray-700 dark:text-gray-300">Available Players</h4>
                 {filteredTeammates.length === 0 ? (
                   <p className="text-gray-500 text-sm">No available players found.</p>
                 ) : (
-                  <div className="space-y-3">
+                  <div className={`space-y-2 ${filteredTeammates.length > 6 ? 'max-h-60 overflow-y-auto pr-2' : ''}`}>
                     {filteredTeammates.map(teammate => (
                       <div
                         key={teammate.id}
-                        className="flex items-center justify-between p-4 bg-gray-50 dark:bg-gray-700/50 rounded-lg"
+                        className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-700/50 rounded-lg"
                       >
-                        <div className="flex-1">
-                          <div className="flex items-center gap-2 mb-2">
-                            <span className="font-medium">{teammate.alias}</span>
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2 mb-1">
+                            <span className="font-medium truncate">{teammate.alias}</span>
                             <button
                               onClick={() => handleAddTeammate(teammate.id)}
-                              className="text-green-600 hover:text-green-700 p-1"
+                              className="text-green-600 hover:text-green-700 p-1 flex-shrink-0"
                               title="Add as teammate"
                             >
                               <Plus size={16} />
@@ -1087,8 +1097,8 @@ function PlayerCard({ player, onDelete, isAdmin, isPinned, onPinToggle, showPinI
                           {/* Show available player's accounts and status */}
                           {teammate.accounts && teammate.accounts.length > 0 ? (
                             <div className="space-y-1">
-                              {teammate.accounts.map(account => (
-                                <div key={account.id} className="flex items-center gap-2 text-sm">
+                              {teammate.accounts.slice(0, 2).map(account => (
+                                <div key={account.id} className="flex items-center gap-2 text-xs">
                                   <RobloxStatus 
                                     username={account.status?.username || account.user_id.toString()}
                                     isOnline={account.status?.isOnline || false}
@@ -1100,7 +1110,7 @@ function PlayerCard({ player, onDelete, isAdmin, isPinned, onPinToggle, showPinI
                                     <img
                                       src={getAccountRank(account)?.image_url}
                                       alt={getAccountRank(account)?.name}
-                                      className="w-4 h-4"
+                                      className="w-3 h-3"
                                       title={getAccountRank(account)?.name}
                                     />
                                   )}
@@ -1108,15 +1118,18 @@ function PlayerCard({ player, onDelete, isAdmin, isPinned, onPinToggle, showPinI
                                     <img
                                       src={BEDWARS_ICON_URL}
                                       alt="BedWars"
-                                      className="w-4 h-4"
+                                      className="w-3 h-3"
                                       title="In BedWars"
                                     />
                                   )}
                                 </div>
                               ))}
+                              {teammate.accounts.length > 2 && (
+                                <p className="text-gray-500 text-xs">+{teammate.accounts.length - 2} more accounts</p>
+                              )}
                             </div>
                           ) : (
-                            <p className="text-gray-500 text-sm">No accounts found</p>
+                            <p className="text-gray-500 text-xs">No accounts found</p>
                           )}
                         </div>
                       </div>
