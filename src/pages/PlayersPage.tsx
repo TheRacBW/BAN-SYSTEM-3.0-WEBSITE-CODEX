@@ -509,6 +509,7 @@ export default function PlayersPage() {
             onPinToggle={handlePinToggle}
             showPinIcon={!!user}
             onTeammateClick={handleTeammateClick}
+            onPlayerUpdate={loadPlayers}
           />
         ))}
       </div>

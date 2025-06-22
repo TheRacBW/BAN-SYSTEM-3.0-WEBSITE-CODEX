@@ -37,9 +37,10 @@ interface PlayerCardProps {
   onPinToggle?: (playerId: string, e: React.MouseEvent) => void;
   showPinIcon?: boolean;
   onTeammateClick?: (teammate: Player) => void;
+  onPlayerUpdate?: (playerId: string) => void;
 }
 
-function PlayerCard({ player, onDelete, isAdmin, isPinned, onPinToggle, showPinIcon, onTeammateClick }: PlayerCardProps) {
+function PlayerCard({ player, onDelete, isAdmin, isPinned, onPinToggle, showPinIcon, onTeammateClick, onPlayerUpdate }: PlayerCardProps) {
   console.log('🎯 MAIN PlayerCard rendering:', player.alias, {
     hasAccounts: player.accounts?.length || 0,
     hasStatus: player.accounts?.[0]?.status ? 'yes' : 'no',
@@ -146,11 +147,7 @@ function PlayerCard({ player, onDelete, isAdmin, isPinned, onPinToggle, showPinI
           *,
           accounts:player_accounts(
             id,
-            user_id,
-            rank:player_account_ranks(
-              rank_id,
-              account_ranks(*)
-            )
+            user_id
           )
         `)
         .neq('id', player.id);
@@ -158,8 +155,64 @@ function PlayerCard({ player, onDelete, isAdmin, isPinned, onPinToggle, showPinI
       if (error) throw error;
       
       if (data) {
-        console.log('✅ Fetched available teammates:', data.length);
-        setAvailableTeammates(data || []);
+        // Fetch status data for all accounts
+        const allUserIds = data.flatMap(p => p.accounts?.map(a => a.user_id) || []);
+        
+        if (allUserIds.length > 0) {
+          console.log('📊 Fetching status data for user IDs:', allUserIds);
+          
+          const { data: statusData, error: statusError } = await supabase
+            .from('roblox_user_status')
+            .select('*')
+            .in('user_id', allUserIds);
+
+          if (statusError) {
+            console.error('❌ Error fetching status data:', statusError);
+          } else if (statusData) {
+            console.log('✅ Fetched status data for', statusData.length, 'accounts');
+            
+            // Create a map of user_id to status
+            const statusMap = new Map();
+            statusData.forEach((status: any) => {
+              statusMap.set(status.user_id, status);
+            });
+            
+            // Map status data to players
+            const playersWithStatus = data.map(player => ({
+              ...player,
+              accounts: player.accounts?.map(account => ({
+                ...account,
+                status: statusMap.get(account.user_id) ? {
+                  isOnline: statusMap.get(account.user_id).is_online,
+                  isInGame: statusMap.get(account.user_id).is_in_game ?? false,
+                  inBedwars: typeof statusMap.get(account.user_id).in_bedwars === 'boolean'
+                    ? statusMap.get(account.user_id).in_bedwars
+                    : (statusMap.get(account.user_id).is_in_game ?? false) && (
+                        Number(statusMap.get(account.user_id).place_id) === BEDWARS_PLACE_ID ||
+                        Number(statusMap.get(account.user_id).root_place_id) === BEDWARS_PLACE_ID ||
+                        Number(statusMap.get(account.user_id).universe_id) === BEDWARS_UNIVERSE_ID
+                      ),
+                  userPresenceType: statusMap.get(account.user_id).user_presence_type,
+                  placeId: statusMap.get(account.user_id).place_id,
+                  rootPlaceId: statusMap.get(account.user_id).root_place_id,
+                  universeId: statusMap.get(account.user_id).universe_id,
+                  presenceMethod: statusMap.get(account.user_id).presence_method,
+                  username: statusMap.get(account.user_id).username,
+                  lastUpdated: new Date(statusMap.get(account.user_id).last_updated).getTime(),
+                } : null
+              })) || []
+            }));
+            
+            console.log('✅ Available teammates with status:', playersWithStatus.length);
+            setAvailableTeammates(playersWithStatus);
+          } else {
+            console.log('⚠️ No status data found, setting players without status');
+            setAvailableTeammates(data);
+          }
+        } else {
+          console.log('⚠️ No user IDs found, setting players without status');
+          setAvailableTeammates(data);
+        }
       } else {
         console.log('⚠️ No available teammates found');
         setAvailableTeammates([]);
@@ -184,6 +237,14 @@ function PlayerCard({ player, onDelete, isAdmin, isPinned, onPinToggle, showPinI
       console.log('✅ Teammate added successfully');
       setSuccess('Teammate added successfully');
       
+      // Notify parent component to refresh player data
+      if (onPlayerUpdate) {
+        console.log('📞 Notifying parent to refresh player data');
+        onPlayerUpdate(player.id);
+      } else {
+        console.log('⚠️ No onPlayerUpdate callback provided');
+      }
+      
       // Refresh available teammates list to update UI immediately
       await fetchAvailableTeammates();
       
@@ -207,6 +268,14 @@ function PlayerCard({ player, onDelete, isAdmin, isPinned, onPinToggle, showPinI
       if (error) throw error;
       console.log('✅ Teammate removed successfully');
       setSuccess('Teammate removed successfully');
+      
+      // Notify parent component to refresh player data
+      if (onPlayerUpdate) {
+        console.log('📞 Notifying parent to refresh player data');
+        onPlayerUpdate(player.id);
+      } else {
+        console.log('⚠️ No onPlayerUpdate callback provided');
+      }
       
       // Refresh available teammates list to update UI immediately
       await fetchAvailableTeammates();
@@ -1032,28 +1101,16 @@ function PlayerCard({ player, onDelete, isAdmin, isPinned, onPinToggle, showPinI
                             <div className="space-y-1">
                               {teammate.teammate.accounts.slice(0, 2).map(account => (
                                 <div key={account.id} className="flex items-center gap-2 text-xs">
-                                  <RobloxStatus 
-                                    username={account.status?.username || account.user_id.toString()}
-                                    isOnline={account.status?.isOnline || false}
-                                    isInGame={account.status?.isInGame || false}
-                                    inBedwars={account.status?.inBedwars || false}
-                                    lastUpdated={account.status?.lastUpdated}
-                                  />
-                                  {getAccountRank(account) && (
-                                    <img
-                                      src={getAccountRank(account)?.image_url}
-                                      alt={getAccountRank(account)?.name}
-                                      className="w-3 h-3"
-                                      title={getAccountRank(account)?.name}
-                                    />
-                                  )}
-                                  {account.status?.inBedwars && (
-                                    <img
-                                      src={BEDWARS_ICON_URL}
-                                      alt="BedWars"
-                                      className="w-3 h-3"
-                                      title="In BedWars"
-                                    />
+                                  <div className={`w-2 h-2 rounded-full ${
+                                    account.status?.isOnline ? 'bg-green-500' : 'bg-gray-400'
+                                  }`} />
+                                  <span className="font-mono text-blue-600 dark:text-blue-400">
+                                    {account.status?.username || `User ${account.user_id}`}
+                                  </span>
+                                  {account.status?.isOnline && (
+                                    <span className="text-green-600 text-xs">
+                                      {account.status.inBedwars ? 'Bedwars' : 'Online'}
+                                    </span>
                                   )}
                                 </div>
                               ))}
@@ -1099,28 +1156,16 @@ function PlayerCard({ player, onDelete, isAdmin, isPinned, onPinToggle, showPinI
                             <div className="space-y-1">
                               {teammate.accounts.slice(0, 2).map(account => (
                                 <div key={account.id} className="flex items-center gap-2 text-xs">
-                                  <RobloxStatus 
-                                    username={account.status?.username || account.user_id.toString()}
-                                    isOnline={account.status?.isOnline || false}
-                                    isInGame={account.status?.isInGame || false}
-                                    inBedwars={account.status?.inBedwars || false}
-                                    lastUpdated={account.status?.lastUpdated}
-                                  />
-                                  {getAccountRank(account) && (
-                                    <img
-                                      src={getAccountRank(account)?.image_url}
-                                      alt={getAccountRank(account)?.name}
-                                      className="w-3 h-3"
-                                      title={getAccountRank(account)?.name}
-                                    />
-                                  )}
-                                  {account.status?.inBedwars && (
-                                    <img
-                                      src={BEDWARS_ICON_URL}
-                                      alt="BedWars"
-                                      className="w-3 h-3"
-                                      title="In BedWars"
-                                    />
+                                  <div className={`w-2 h-2 rounded-full ${
+                                    account.status?.isOnline ? 'bg-green-500' : 'bg-gray-400'
+                                  }`} />
+                                  <span className="font-mono text-blue-600 dark:text-blue-400">
+                                    {account.status?.username || `User ${account.user_id}`}
+                                  </span>
+                                  {account.status?.isOnline && (
+                                    <span className="text-green-600 text-xs">
+                                      {account.status.inBedwars ? 'Bedwars' : 'Online'}
+                                    </span>
                                   )}
                                 </div>
                               ))}
