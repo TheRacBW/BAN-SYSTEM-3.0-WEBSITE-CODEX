@@ -26,7 +26,6 @@ export default function PlayersPage() {
   const [showPinnedOnly, setShowPinnedOnly] = useState(false);
   const [sortBy, setSortBy] = useState<SortOption>('alias_asc');
   const [newYoutubeChannel, setNewYoutubeChannel] = useState('');
-  const [isLoading, setIsLoading] = useState(false);
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
   const [filterOnline, setFilterOnline] = useState(false);
   const [filterInGame, setFilterInGame] = useState(false);
@@ -36,12 +35,81 @@ export default function PlayersPage() {
   const [playerToDelete, setPlayerToDelete] = useState<Player | null>(null);
   const [selectedTeammate, setSelectedTeammate] = useState<Player | null>(null);
 
+  // Centralized data loading function that handles all state management
+  const loadPlayers = async () => {
+    console.log('🔄 loadPlayers: Starting centralized data load...');
+    setLoading(true);
+    setDataReady(false);
+    setError(null);
+    
+    try {
+      // Fetch players with their accounts and related data
+      const { data: playersData, error: playersError } = await supabase
+        .from('players')
+        .select(`
+          *,
+          accounts:player_accounts(
+            id,
+            user_id,
+            rank:player_account_ranks(
+              rank_id,
+              account_ranks(*)
+            )
+          ),
+          teammates:player_teammates!player_id(
+            teammate:players!teammate_id(*)
+          ),
+          strategies:player_strategies(
+            id,
+            image_url,
+            kit_ids,
+            teammate_ids,
+            starred_kit_id,
+            created_at
+          )
+        `)
+        .order('alias');
+
+      if (playersError) {
+        console.error('❌ loadPlayers: Database error:', playersError);
+        throw playersError;
+      }
+
+      console.log('✅ loadPlayers: Successfully fetched players:', playersData?.length || 0);
+
+      if (playersData) {
+        // Fetch statuses for all accounts
+        console.log('🔄 loadPlayers: Calling fetchAccountStatuses...');
+        const playersWithStatuses = await fetchAccountStatuses(playersData);
+        console.log('✅ loadPlayers: Players with statuses:', playersWithStatuses.length);
+        
+        // Update state with the new data
+        setPlayers(playersWithStatuses);
+        
+        // Set dataReady to true if we have data (even if empty array)
+        console.log('✅ loadPlayers: Setting dataReady to true - data loaded');
+        setDataReady(true);
+      } else {
+        console.log('⚠️ loadPlayers: No playersData received, setting empty array');
+        setPlayers([]);
+        setDataReady(true);
+      }
+    } catch (error) {
+      console.error('❌ loadPlayers: Error loading players:', error);
+      setError('Failed to load players');
+      setDataReady(false); // Don't show UI on error
+    } finally {
+      console.log('🏁 loadPlayers: Setting loading to false');
+      setLoading(false);
+    }
+  };
+
   useEffect(() => {
     if (user) {
-      console.log('🔍 PlayersPage: User authenticated, fetching players...');
-      fetchPlayers();
+      console.log('🔍 PlayersPage: User authenticated, loading players...');
+      loadPlayers();
     } else {
-      console.log('🔍 PlayersPage: No user, skipping fetch');
+      console.log('🔍 PlayersPage: No user, skipping load');
     }
   }, [user]);
 
@@ -134,76 +202,6 @@ export default function PlayersPage() {
     }
   };
 
-  const fetchPlayers = async () => {
-    try {
-      console.log('🚀 fetchPlayers: Starting to fetch players from Supabase...');
-      setLoading(true);
-      setDataReady(false);
-      setError(null);
-      
-      // Fetch players with their accounts and related data
-      const { data: playersData, error: playersError } = await supabase
-        .from('players')
-        .select(`
-          *,
-          accounts:player_accounts(
-            id,
-            user_id,
-            rank:player_account_ranks(
-              rank_id,
-              account_ranks(*)
-            )
-          ),
-          teammates:player_teammates!player_id(
-            teammate:players!teammate_id(*)
-          ),
-          strategies:player_strategies(
-            id,
-            image_url,
-            kit_ids,
-            teammate_ids,
-            starred_kit_id,
-            created_at
-          )
-        `)
-        .order('alias');
-
-      if (playersError) {
-        console.error('❌ fetchPlayers: Database error:', playersError);
-        throw playersError;
-      }
-
-      console.log('✅ fetchPlayers: Successfully fetched players:', playersData?.length || 0);
-      console.log('📊 fetchPlayers: Sample player data:', playersData?.[0]);
-
-      if (playersData) {
-        // Fetch statuses for all accounts
-        console.log('🔄 fetchPlayers: Calling fetchAccountStatuses...');
-        const playersWithStatuses = await fetchAccountStatuses(playersData);
-        console.log('✅ fetchPlayers: Players with statuses:', playersWithStatuses.length);
-        setPlayers(playersWithStatuses);
-        
-        // Only set dataReady to true if we actually have data
-        if (playersWithStatuses && playersWithStatuses.length > 0) {
-          console.log('✅ fetchPlayers: Setting dataReady to true - we have data');
-          setDataReady(true);
-        } else {
-          console.log('⚠️ fetchPlayers: No player data available, keeping dataReady false');
-        }
-      } else {
-        console.log('⚠️ fetchPlayers: No playersData received, keeping dataReady false');
-      }
-    } catch (error) {
-      console.error('❌ fetchPlayers: Error fetching players:', error);
-      setError('Failed to fetch players');
-      // Don't set dataReady to true on error
-    } finally {
-      console.log('🏁 fetchPlayers: Setting loading to false');
-      setLoading(false);
-      // Note: dataReady is now set conditionally above, not here
-    }
-  };
-
   const handleAddPlayer = async () => {
     if (!newAlias.trim()) {
       setError('Please enter an alias');
@@ -227,7 +225,7 @@ export default function PlayersPage() {
       setShowAddModal(false);
       setNewAlias('');
       setNewYoutubeChannel('');
-      fetchPlayers();
+      loadPlayers();
     } catch (error) {
       console.error('Error adding player:', error);
       setError('Failed to add player');
@@ -243,7 +241,7 @@ export default function PlayersPage() {
 
       if (error) throw error;
       setSuccess('Player deleted successfully');
-      fetchPlayers();
+      loadPlayers();
     } catch (error) {
       console.error('Error deleting player:', error);
       setError('Failed to delete player');
@@ -308,14 +306,16 @@ export default function PlayersPage() {
 
   const sortedPlayers = sortPlayers(filteredPlayers);
 
-  // Debug logging for state management
+  // Comprehensive debug logging for state management
   console.log('🔍 PlayersPage State Debug:', {
     playersCount: players.length,
     loading,
     dataReady,
     filteredPlayersCount: filteredPlayers.length,
     sortedPlayersCount: sortedPlayers.length,
-    shouldShowLoading: loading || !dataReady
+    shouldShowLoading: loading || !dataReady,
+    renderCondition: loading || !dataReady ? 'SHOWING_LOADING' : 'SHOWING_CONTENT',
+    timestamp: new Date().toISOString()
   });
 
   const handleRefreshAll = async () => {
@@ -326,8 +326,8 @@ export default function PlayersPage() {
     
     try {
       // Fetch fresh player data with updated statuses
-      // fetchPlayers() will handle setting dataReady = true when data is available
-      await fetchPlayers();
+      // loadPlayers() will handle setting dataReady = true when data is available
+      await loadPlayers();
       console.log('✅ handleRefreshAll: Refresh completed successfully');
       
     } catch (error) {
