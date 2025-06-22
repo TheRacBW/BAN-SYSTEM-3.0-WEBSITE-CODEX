@@ -38,9 +38,12 @@ interface PlayerCardProps {
   showPinIcon?: boolean;
   onTeammateClick?: (teammate: Player) => void;
   onPlayerUpdate?: (playerId: string) => void;
+  onNavigateToPlayer?: (playerId: string) => void;
+  onClose?: () => void;
+  isModal?: boolean;
 }
 
-function PlayerCard({ player, onDelete, isAdmin, isPinned, onPinToggle, showPinIcon, onTeammateClick, onPlayerUpdate }: PlayerCardProps) {
+function PlayerCard({ player, onDelete, isAdmin, isPinned, onPinToggle, showPinIcon, onTeammateClick, onPlayerUpdate, onNavigateToPlayer, onClose, isModal }: PlayerCardProps) {
   console.log('🎯 MAIN PlayerCard rendering:', player.alias, {
     hasAccounts: player.accounts?.length || 0,
     hasStatus: player.accounts?.[0]?.status ? 'yes' : 'no',
@@ -328,16 +331,26 @@ function PlayerCard({ player, onDelete, isAdmin, isPinned, onPinToggle, showPinI
   const handleAddTeammate = async (teammateId: string) => {
     console.log('🔄 Adding teammate:', teammateId, 'to player:', player.id);
     try {
-      const { error } = await supabase
+      // Add relationship A -> B
+      const { error: error1 } = await supabase
         .from('player_teammates')
         .insert({
           player_id: player.id,
           teammate_id: teammateId
         });
 
-      if (error) throw error;
-      console.log('✅ Teammate added successfully');
-      setSuccess('Teammate added successfully');
+      // Add inverse relationship B -> A
+      const { error: error2 } = await supabase
+        .from('player_teammates')
+        .insert({
+          player_id: teammateId,
+          teammate_id: player.id
+        });
+
+      if (error1 || error2) throw error1 || error2;
+
+      console.log('✅ Teammate added successfully (bidirectional)');
+      setSuccess('Teammate added successfully (bidirectional)');
       
       // Notify parent component to refresh player data
       if (onPlayerUpdate) {
@@ -362,15 +375,24 @@ function PlayerCard({ player, onDelete, isAdmin, isPinned, onPinToggle, showPinI
   const handleRemoveTeammate = async (teammateId: string) => {
     console.log('🔄 Removing teammate:', teammateId, 'from player:', player.id);
     try {
-      const { error } = await supabase
+      // Remove relationship A -> B
+      const { error: error1 } = await supabase
         .from('player_teammates')
         .delete()
         .eq('player_id', player.id)
         .eq('teammate_id', teammateId);
 
-      if (error) throw error;
-      console.log('✅ Teammate removed successfully');
-      setSuccess('Teammate removed successfully');
+      // Remove inverse relationship B -> A
+      const { error: error2 } = await supabase
+        .from('player_teammates')
+        .delete()
+        .eq('player_id', teammateId)
+        .eq('teammate_id', player.id);
+
+      if (error1 || error2) throw error1 || error2;
+      
+      console.log('✅ Teammate removed successfully (bidirectional)');
+      setSuccess('Teammate removed successfully (bidirectional)');
       
       // Notify parent component to refresh player data
       if (onPlayerUpdate) {
@@ -568,6 +590,12 @@ function PlayerCard({ player, onDelete, isAdmin, isPinned, onPinToggle, showPinI
     }
   };
 
+  const handleTeammateNavigation = (teammateId: string) => {
+    console.log(`Navigating to teammate ${teammateId}`);
+    if (onClose) onClose(); // Close current modal
+    if (onNavigateToPlayer) onNavigateToPlayer(teammateId); // Open new modal
+  };
+
   const handleTeammateClick = (teammate: Player) => {
     // Close current modal
     setShowModal(false);
@@ -597,7 +625,7 @@ function PlayerCard({ player, onDelete, isAdmin, isPinned, onPinToggle, showPinI
     return (
       <div 
         className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-6 cursor-pointer hover:shadow-lg transition-shadow"
-        onClick={() => setShowModal(true)}
+        onClick={() => onTeammateClick && onTeammateClick(player)}
       >
         <div className="flex justify-between items-start mb-4">
           <div>
@@ -732,7 +760,7 @@ function PlayerCard({ player, onDelete, isAdmin, isPinned, onPinToggle, showPinI
             </div>
           </div>
           <button
-            onClick={() => setShowModal(false)}
+            onClick={onClose}
             className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
           >
             <X size={24} />
@@ -858,10 +886,17 @@ function PlayerCard({ player, onDelete, isAdmin, isPinned, onPinToggle, showPinI
                     <div 
                       key={teammate.teammate.id}
                       className="bg-gray-50 dark:bg-gray-700/50 p-4 rounded-lg flex items-center justify-between cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-600/50 transition-colors"
-                      onClick={() => handleTeammateClick(teammate.teammate)}
+                      onClick={() => handleTeammateNavigation(teammate.teammate.id)}
                     >
                       <div className="flex-1">
-                        <div className="font-medium">{teammate.teammate.alias}</div>
+                        <div className="flex flex-col">
+                          <span className="font-medium">{teammate.teammate.alias}</span>
+                          {displayAccount?.status?.username && (
+                            <span className="text-sm text-gray-500">
+                              ({displayAccount.status.username})
+                            </span>
+                          )}
+                        </div>
                         <div className={`text-sm ${statusColor}`}>
                           {statusText}
                         </div>
@@ -1481,15 +1516,13 @@ function PlayerCard({ player, onDelete, isAdmin, isPinned, onPinToggle, showPinI
     </div>
   );
 
+  if (isModal) {
+    return renderModal();
+  }
+
   return (
     <>
       {renderCard()}
-      {showModal && renderModal()}
-      {showAddAccountModal && renderAddAccountModal()}
-      {showAddStrategyModal && renderAddStrategyModal()}
-      {showRankClaimModal && renderRankClaimModal()}
-      {showTeammateModal && renderTeammateModal()}
-      {showEditModal && renderEditModal()}
     </>
   );
 }

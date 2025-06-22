@@ -34,6 +34,7 @@ export default function PlayersPage() {
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [playerToDelete, setPlayerToDelete] = useState<Player | null>(null);
   const [selectedTeammate, setSelectedTeammate] = useState<Player | null>(null);
+  const [modalPlayer, setModalPlayer] = useState<Player | null>(null);
 
   // Centralized data loading function that handles all state management
   const loadPlayers = async () => {
@@ -341,6 +342,16 @@ export default function PlayersPage() {
     }
   };
 
+  const handleNavigateToPlayer = (playerId: string) => {
+    const targetPlayer = players.find(p => p.id === playerId);
+    if (targetPlayer) {
+      console.log(`Navigating to player: ${targetPlayer.alias}`);
+      setModalPlayer(targetPlayer);
+    } else {
+      console.warn(`Could not find player with ID: ${playerId} to navigate to.`);
+    }
+  };
+
   // New targeted update function that only updates a specific player
   const handlePlayerUpdate = async (playerId: string) => {
     console.log('🔄 handlePlayerUpdate: Updating specific player:', playerId);
@@ -604,19 +615,35 @@ export default function PlayersPage() {
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         {sortedPlayers.map(player => (
-          <PlayerCard
-            key={player.id}
-            player={player}
-            isAdmin={isAdmin}
-            onDelete={handleDeletePlayer}
-            isPinned={isPinned(player.id)}
-            onPinToggle={handlePinToggle}
-            showPinIcon={!!user}
-            onTeammateClick={handleTeammateClick}
-            onPlayerUpdate={handlePlayerUpdate}
-          />
+          <div key={player.id} onClick={() => setModalPlayer(player)}>
+            <PlayerCard
+              player={player}
+              isAdmin={isAdmin}
+              onDelete={handleDeletePlayer}
+              isPinned={isPinned(player.id)}
+              onPinToggle={handlePinToggle}
+              showPinIcon={!!user}
+              onPlayerUpdate={handlePlayerUpdate}
+            />
+          </div>
         ))}
       </div>
+
+      {modalPlayer && (
+        <PlayerCard
+          key={modalPlayer.id}
+          player={modalPlayer}
+          isAdmin={isAdmin}
+          onDelete={handleDeletePlayer}
+          isPinned={isPinned(modalPlayer.id)}
+          onPinToggle={handlePinToggle}
+          showPinIcon={!!user}
+          onPlayerUpdate={handlePlayerUpdate}
+          onNavigateToPlayer={handleNavigateToPlayer}
+          onClose={() => setModalPlayer(null)}
+          isModal={true}
+        />
+      )}
 
       {showAddModal && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
