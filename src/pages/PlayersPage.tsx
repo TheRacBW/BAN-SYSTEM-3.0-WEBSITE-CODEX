@@ -320,13 +320,13 @@ export default function PlayersPage() {
 
   const handleRefreshAll = async () => {
     console.log('🔄 handleRefreshAll: Starting refresh...');
-    setIsLoading(true);
+    setLoading(true);
     setDataReady(false);
     setError(null);
     
     try {
       // Fetch fresh player data with updated statuses
-      // fetchPlayers() will handle setting dataReady = true when complete
+      // fetchPlayers() will handle setting dataReady = true when data is available
       await fetchPlayers();
       console.log('✅ handleRefreshAll: Refresh completed successfully');
       
@@ -335,7 +335,7 @@ export default function PlayersPage() {
       setError(error instanceof Error ? error.message : 'Failed to refresh player data');
       // Don't set dataReady = true on error, let user retry
     } finally {
-      setIsLoading(false);
+      setLoading(false);
       console.log('🏁 handleRefreshAll: Refresh operation finished');
     }
   };
@@ -402,10 +402,10 @@ export default function PlayersPage() {
         <div className="flex gap-2">
           <button
             onClick={handleRefreshAll}
-            disabled={isLoading}
+            disabled={loading}
             className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50"
           >
-            {isLoading ? (
+            {loading ? (
               <>
                 <RefreshCw className="w-4 h-4 animate-spin" />
                 Refreshing...
