@@ -256,11 +256,11 @@ function PlayerCard({ player, onDelete, isAdmin, isPinned, onPinToggle, showPinI
           }
         }
         
-        console.log('✅ Player data refreshed successfully');
-        setPlayerData(data);
+        // Don't call setPlayerData here - it overwrites good props data!
+        // setPlayerData(data);
       }
     } catch (error) {
-      console.error('❌ Error refreshing player data:', error);
+      console.error('❌ Error fetching available teammates:', error);
     }
   };
 
