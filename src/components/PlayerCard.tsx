@@ -29,6 +29,17 @@ import {
 const BEDWARS_ICON_URL =
   'https://cdn2.steamgriddb.com/icon/3ad9ecf4b4a26b7671e09283f001d626.png';
 
+// Rank icon mapping with provided URLs
+const RANK_ICONS = {
+  'Bronze': 'https://static.wikia.nocookie.net/robloxbedwars/images/5/5a/Bronze_Rank_Icon.png/revision/latest/scale-to-width-down/250?cb=20211107172921',
+  'Silver': 'https://static.wikia.nocookie.net/robloxbedwars/images/6/64/Silver_Rank_Icon.png/revision/latest/scale-to-width-down/250?cb=20211107172857',
+  'Gold': 'https://static.wikia.nocookie.net/robloxbedwars/images/9/92/Gold_Rank_Icon.png/revision/latest/scale-to-width-down/250?cb=20211107172909',
+  'Platinum': 'https://static.wikia.nocookie.net/robloxbedwars/images/0/08/Platinum_Rank_Icon.png/revision/latest/scale-to-width-down/250?cb=20211107172934',
+  'Diamond': 'https://static.wikia.nocookie.net/robloxbedwars/images/c/cb/Diamond_Rank_Icon.png/revision/latest/scale-to-width-down/250?cb=20211105223753',
+  'Emerald': 'https://static.wikia.nocookie.net/robloxbedwars/images/0/06/Emerald_Rank_Icon.png/revision/latest?cb=20230407130803',
+  'Nightmare': 'https://static.wikia.nocookie.net/robloxbedwars/images/7/76/Nightmare_Rank_Icon.png/revision/latest?cb=20211107172948'
+};
+
 // Type for teammate relationship from database
 interface TeammateRelationship {
   teammate: Player & {
@@ -622,6 +633,12 @@ function PlayerCard({ player, onDelete, isAdmin, isPinned, onPinToggle, showPinI
     return account.rank;
   };
 
+  // Get rank icon URL with fallback
+  const getRankIconUrl = (rank: AccountRank) => {
+    const fallbackUrl = RANK_ICONS[rank.name as keyof typeof RANK_ICONS];
+    return fallbackUrl || rank.image_url;
+  };
+
   // Sort accounts by priority: Bedwars > In Game > Online > Offline
   const getSortedAccounts = () => {
     if (!playerData.accounts) return [];
@@ -657,10 +674,11 @@ function PlayerCard({ player, onDelete, isAdmin, isPinned, onPinToggle, showPinI
 
     return (
       <div 
-        className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-6 cursor-pointer hover:shadow-lg transition-shadow h-64 flex flex-col"
+        className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-4 h-80 flex flex-col cursor-pointer hover:shadow-lg transition-shadow"
         onClick={() => onTeammateClick && onTeammateClick(player)}
       >
-        <div className="flex justify-between items-start mb-4">
+        {/* Header with pin, edit, delete buttons */}
+        <div className="flex items-center justify-between mb-3">
           <div className="flex-1">
             <div className="flex items-center gap-2">
               <h3 className="text-xl font-semibold">{playerData.alias}</h3>
@@ -678,58 +696,6 @@ function PlayerCard({ player, onDelete, isAdmin, isPinned, onPinToggle, showPinI
                 </button>
               )}
             </div>
-            
-            {/* Known Accounts Section */}
-            {accountCount > 0 && (
-              <div className="mt-3">
-                <div className="flex items-center gap-2 mb-2">
-                  <h4 className="text-sm font-semibold text-gray-700 dark:text-gray-300">
-                    Known Accounts
-                  </h4>
-                  {showAccountCount && (
-                    <span className="text-xs text-red-500 dark:text-red-400 font-medium">
-                      👥 {accountCount}
-                    </span>
-                  )}
-                </div>
-                
-                {/* Scrollable Account List */}
-                <div className={`space-y-1 ${showAccountCount ? 'max-h-20 overflow-y-auto pr-1' : ''}`}>
-                  {sortedAccounts.slice(0, showAccountCount ? undefined : 2).map(account => (
-                    <div key={account.id} className="flex items-center gap-2">
-                      <RobloxStatus 
-                        username={account.status?.username || ''}
-                        isOnline={account.status?.isOnline || false}
-                        isInGame={account.status?.isInGame || false}
-                        inBedwars={account.status?.inBedwars || false}
-                        lastUpdated={account.status?.lastUpdated}
-                      />
-                      {getAccountRank(account) ? (
-                        <img
-                          src={getAccountRank(account)?.image_url}
-                          alt={getAccountRank(account)?.name}
-                          className="w-5 h-5"
-                          title={getAccountRank(account)?.name}
-                        />
-                      ) : (
-                        <HelpCircle
-                          size={14}
-                          className="text-gray-400"
-                        />
-                      )}
-                      {account.status?.inBedwars && (
-                        <img
-                          src={BEDWARS_ICON_URL}
-                          alt="BedWars"
-                          className="w-5 h-5"
-                          title="In BedWars"
-                        />
-                      )}
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
           </div>
 
           {isAdmin && (
@@ -756,6 +722,66 @@ function PlayerCard({ player, onDelete, isAdmin, isPinned, onPinToggle, showPinI
           )}
         </div>
 
+        {/* Known Accounts section with proper spacing */}
+        {accountCount > 0 && (
+          <div className="flex-1 min-h-0 mb-4">
+            <div className="flex items-center justify-between mb-2">
+              <h4 className="text-sm font-semibold text-gray-700 dark:text-gray-300">
+                Known Accounts
+              </h4>
+              {showAccountCount && (
+                <div className="flex items-center gap-1 text-xs text-red-500 dark:text-red-400">
+                  <Users size={12} />
+                  <span>{accountCount}</span>
+                </div>
+              )}
+            </div>
+            
+            {/* Scrollable account container with proper spacing */}
+            <div className={`space-y-2 ${showAccountCount ? 'max-h-28 overflow-y-auto pr-2' : ''}`}>
+              {sortedAccounts.slice(0, showAccountCount ? undefined : 2).map(account => (
+                <div key={account.id} className="flex items-center gap-2">
+                  <RobloxStatus 
+                    username={account.status?.username || `User ${account.user_id}`}
+                    isOnline={account.status?.isOnline || false}
+                    isInGame={account.status?.isInGame || false}
+                    inBedwars={account.status?.inBedwars || false}
+                    lastUpdated={account.status?.lastUpdated}
+                  />
+                  
+                  {/* Rank icon inline with username */}
+                  {getAccountRank(account) ? (
+                    <img 
+                      src={getRankIconUrl(getAccountRank(account)!)}
+                      alt={getAccountRank(account)!.name}
+                      className="w-4 h-4 object-contain"
+                      onError={(e) => {
+                        // Fallback if image fails to load
+                        e.currentTarget.style.display = 'none';
+                      }}
+                    />
+                  ) : (
+                    <HelpCircle
+                      size={14}
+                      className="text-gray-400"
+                    />
+                  )}
+                  
+                  {account.status?.inBedwars && (
+                    <img
+                      src={BEDWARS_ICON_URL}
+                      alt="BedWars"
+                      className="w-4 h-4"
+                      title="In BedWars"
+                    />
+                  )}
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Strategy kits */}
         <div className="flex gap-2 mb-4">
           {playerData.strategies?.slice(0, 3).map(strategy => (
             strategy.kit_ids?.slice(0, 3).map(kitId => {
@@ -770,6 +796,7 @@ function PlayerCard({ player, onDelete, isAdmin, isPinned, onPinToggle, showPinI
           ))}
         </div>
 
+        {/* Action buttons at bottom */}
         <div className="flex gap-2 mt-auto">
           <button
             onClick={(e) => {
@@ -838,10 +865,10 @@ function PlayerCard({ player, onDelete, isAdmin, isPinned, onPinToggle, showPinI
                     </div>
                     {getAccountRank(account) ? (
                       <img
-                        src={getAccountRank(account)?.image_url}
-                        alt={getAccountRank(account)?.name}
+                        src={getRankIconUrl(getAccountRank(account)!)}
+                        alt={getAccountRank(account)!.name}
                         className="w-8 h-8"
-                        title={getAccountRank(account)?.name}
+                        title={getAccountRank(account)!.name}
                       />
                     ) : (
                       <div className="flex items-center gap-1 text-gray-500">
