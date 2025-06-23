@@ -11,214 +11,215 @@ export const useLeaderboard = () => {
     hottestGainers: [],
     biggestLosers: [],
     lastUpdate: '',
-    isLoading: true,
+    isLoading: false,
     error: null,
     searchQuery: '',
     activeTab: 'main'
   });
 
-  const fetchData = useCallback(async () => {
+  const [refreshInterval, setRefreshInterval] = useState<NodeJS.Timeout | null>(null);
+
+  /**
+   * Fetch leaderboard data with comprehensive error handling
+   */
+  const fetchLeaderboardData = useCallback(async () => {
     try {
-      console.log('Starting data fetch...');
+      console.log('🔄 Starting leaderboard data fetch...');
       setState(prev => ({ ...prev, isLoading: true, error: null }));
 
-      // Fetch data with individual error handling
-      let entries: LeaderboardEntry[] = [];
-      let gainers: LeaderboardStats[] = [];
-      let losers: LeaderboardStats[] = [];
-      let lastUpdate = '';
+      // Fetch main leaderboard data
+      const entries = await leaderboardService.fetchLeaderboardData();
+      console.log('✅ Fetched', entries.length, 'leaderboard entries');
 
-      try {
-        console.log('Fetching leaderboard entries...');
-        entries = await leaderboardService.getCurrentLeaderboard();
-        console.log('Leaderboard entries fetched:', entries.length);
-      } catch (error) {
-        console.error('Failed to fetch leaderboard entries:', error);
-        entries = [];
-      }
+      // Fetch RP changes for gainers/losers
+      const [hottestGainers, biggestLosers] = await Promise.all([
+        leaderboardService.getHottestGainers(),
+        leaderboardService.getBiggestLosers()
+      ]);
 
-      try {
-        console.log('Fetching hottest gainers...');
-        gainers = await leaderboardService.getHottestGainers();
-        console.log('Hottest gainers fetched:', gainers.length);
-      } catch (error) {
-        console.error('Failed to fetch hottest gainers:', error);
-        gainers = [];
-      }
+      console.log('✅ Fetched', hottestGainers.length, 'hottest gainers');
+      console.log('✅ Fetched', biggestLosers.length, 'biggest losers');
 
-      try {
-        console.log('Fetching biggest losers...');
-        losers = await leaderboardService.getBiggestLosers();
-        console.log('Biggest losers fetched:', losers.length);
-      } catch (error) {
-        console.error('Failed to fetch biggest losers:', error);
-        losers = [];
-      }
-
-      try {
-        console.log('Fetching last update time...');
-        lastUpdate = await leaderboardService.getLastUpdateTime();
-        console.log('Last update time fetched:', lastUpdate);
-      } catch (error) {
-        console.error('Failed to fetch last update time:', error);
-        lastUpdate = new Date().toISOString();
-      }
+      // Get last update time
+      const stats = await leaderboardService.getLeaderboardStats();
+      const lastUpdate = stats.lastUpdated;
 
       setState(prev => ({
         ...prev,
         entries,
-        hottestGainers: gainers,
-        biggestLosers: losers,
+        hottestGainers: hottestGainers.map(change => ({
+          username: change.username,
+          total_gain: change.rp_change,
+          profile_picture: null, // Will be enriched later
+          user_id: null
+        })),
+        biggestLosers: biggestLosers.map(change => ({
+          username: change.username,
+          total_loss: Math.abs(change.rp_change),
+          profile_picture: null, // Will be enriched later
+          user_id: null
+        })),
         lastUpdate,
-        isLoading: false
+        isLoading: false,
+        error: null
       }));
 
-      console.log('Data fetch completed successfully');
+      console.log('✅ Leaderboard state updated successfully');
     } catch (error) {
-      console.error('Error fetching leaderboard data:', error);
+      console.error('💥 Error fetching leaderboard data:', error);
       setState(prev => ({
         ...prev,
-        error: error instanceof Error ? error.message : 'Failed to fetch leaderboard data',
-        isLoading: false
+        isLoading: false,
+        error: error instanceof Error ? error.message : 'Failed to fetch leaderboard data'
       }));
     }
   }, []);
 
-  const setSearchQuery = useCallback((query: string) => {
-    setState(prev => ({ ...prev, searchQuery: query }));
+  /**
+   * Search leaderboard by username
+   */
+  const searchLeaderboard = useCallback(async (query: string) => {
+    try {
+      console.log('🔍 Searching leaderboard for:', query);
+      setState(prev => ({ ...prev, isLoading: true, error: null, searchQuery: query }));
+
+      const entries = await leaderboardService.searchLeaderboard(query);
+      console.log('✅ Search results:', entries.length, 'entries');
+
+      setState(prev => ({
+        ...prev,
+        entries,
+        isLoading: false,
+        error: null
+      }));
+    } catch (error) {
+      console.error('💥 Search error:', error);
+      setState(prev => ({
+        ...prev,
+        isLoading: false,
+        error: error instanceof Error ? error.message : 'Search failed'
+      }));
+    }
   }, []);
 
+  /**
+   * Change active tab
+   */
   const setActiveTab = useCallback((tab: TabType) => {
+    console.log('📑 Switching to tab:', tab);
     setState(prev => ({ ...prev, activeTab: tab }));
   }, []);
 
-  const refreshData = useCallback(() => {
-    fetchData();
-  }, [fetchData]);
+  /**
+   * Clear search and reload main leaderboard
+   */
+  const clearSearch = useCallback(() => {
+    console.log('🧹 Clearing search and reloading main leaderboard');
+    setState(prev => ({ ...prev, searchQuery: '' }));
+    fetchLeaderboardData();
+  }, [fetchLeaderboardData]);
+
+  /**
+   * Start auto-refresh
+   */
+  const startAutoRefresh = useCallback(() => {
+    console.log('🔄 Starting auto-refresh (30 seconds)');
+    if (refreshInterval) {
+      clearInterval(refreshInterval);
+    }
+    
+    const interval = setInterval(() => {
+      console.log('🔄 Auto-refreshing leaderboard data...');
+      fetchLeaderboardData();
+    }, 30000); // 30 seconds
+    
+    setRefreshInterval(interval);
+  }, [fetchLeaderboardData, refreshInterval]);
+
+  /**
+   * Stop auto-refresh
+   */
+  const stopAutoRefresh = useCallback(() => {
+    console.log('⏹️ Stopping auto-refresh');
+    if (refreshInterval) {
+      clearInterval(refreshInterval);
+      setRefreshInterval(null);
+    }
+  }, [refreshInterval]);
+
+  /**
+   * Manual refresh
+   */
+  const refresh = useCallback(() => {
+    console.log('🔄 Manual refresh triggered');
+    fetchLeaderboardData();
+  }, [fetchLeaderboardData]);
 
   // Initial data fetch
   useEffect(() => {
-    fetchData();
-  }, [fetchData]);
+    console.log('🚀 Initial leaderboard data fetch');
+    fetchLeaderboardData();
+  }, [fetchLeaderboardData]);
 
-  // Auto-refresh every 10 minutes
+  // Start auto-refresh on mount
   useEffect(() => {
-    const interval = setInterval(fetchData, REFRESH_INTERVAL);
-    return () => clearInterval(interval);
-  }, [fetchData]);
+    console.log('🔄 Starting auto-refresh on mount');
+    startAutoRefresh();
+
+    // Cleanup on unmount
+    return () => {
+      console.log('🧹 Cleaning up auto-refresh on unmount');
+      stopAutoRefresh();
+    };
+  }, [startAutoRefresh, stopAutoRefresh]);
+
+  // Debug logging for state changes
+  useEffect(() => {
+    console.log('📊 Leaderboard state updated:', {
+      entriesCount: state.entries.length,
+      isLoading: state.isLoading,
+      error: state.error,
+      searchQuery: state.searchQuery,
+      activeTab: state.activeTab,
+      lastUpdate: state.lastUpdate
+    });
+  }, [state]);
 
   // Filter entries based on search query
-  const filteredEntries = useMemo(() => {
-    if (!state.searchQuery.trim()) {
-      return state.entries;
+  const filteredEntries = state.searchQuery
+    ? state.entries.filter(entry =>
+        entry.username.toLowerCase().includes(state.searchQuery.toLowerCase())
+      )
+    : state.entries;
+
+  // Filter gainers and losers based on search query
+  const filteredGainers = state.searchQuery
+    ? state.hottestGainers.filter(entry =>
+        entry.username.toLowerCase().includes(state.searchQuery.toLowerCase())
+      )
+    : state.hottestGainers;
+
+  const filteredLosers = state.searchQuery
+    ? state.biggestLosers.filter(entry =>
+        entry.username.toLowerCase().includes(state.searchQuery.toLowerCase())
+      )
+    : state.biggestLosers;
+
+  // Check if data is live (updated within last 5 minutes)
+  const isLive = (() => {
+    try {
+      const lastUpdateTime = new Date(state.lastUpdate).getTime();
+      const now = Date.now();
+      const fiveMinutes = 5 * 60 * 1000;
+      return now - lastUpdateTime < fiveMinutes;
+    } catch (error) {
+      console.warn('Error checking if data is live:', error);
+      return false;
     }
-
-    const query = state.searchQuery.toLowerCase();
-    return state.entries.filter(entry => {
-      try {
-        // Search by username
-        if (entry.username && entry.username.toLowerCase().includes(query)) {
-          return true;
-        }
-
-        // Search by calculated rank
-        let calculatedRank: CalculatedRank | null = null;
-        try {
-          calculatedRank = entry.calculatedRank || 
-            (entry.rp !== undefined ? calculateRankFromRPCached(entry.rp) : null);
-        } catch (error) {
-          console.warn(`Failed to calculate rank for search for ${entry.username}:`, error);
-        }
-        
-        if (calculatedRank) {
-          const rankName = `${calculatedRank.tier} ${calculatedRank.level}`.toLowerCase();
-          if (rankName.includes(query)) {
-            return true;
-          }
-        }
-
-        // Search by raw rank title (legacy)
-        if (entry.rank_title && entry.rank_title.toLowerCase().includes(query)) {
-          return true;
-        }
-
-        return false;
-      } catch (error) {
-        console.error('Error in search filter for entry:', entry, error);
-        return false;
-      }
-    });
-  }, [state.entries, state.searchQuery]);
-
-  // Filter gainers/losers based on search query
-  const filteredGainers = useMemo(() => {
-    if (!state.searchQuery.trim()) {
-      return state.hottestGainers;
-    }
-
-    const query = state.searchQuery.toLowerCase();
-    return state.hottestGainers.filter(gainer => {
-      try {
-        if (gainer.username && gainer.username.toLowerCase().includes(query)) {
-          return true;
-        }
-
-        let calculatedRank: CalculatedRank | null = null;
-        try {
-          calculatedRank = gainer.calculatedRank || 
-            (gainer.total_rp !== undefined ? calculateRankFromRPCached(gainer.total_rp) : null);
-        } catch (error) {
-          console.warn(`Failed to calculate rank for gainer search for ${gainer.username}:`, error);
-        }
-        
-        if (calculatedRank) {
-          const rankName = `${calculatedRank.tier} ${calculatedRank.level}`.toLowerCase();
-          return rankName.includes(query);
-        }
-
-        return false;
-      } catch (error) {
-        console.error('Error in gainer search filter for entry:', gainer, error);
-        return false;
-      }
-    });
-  }, [state.hottestGainers, state.searchQuery]);
-
-  const filteredLosers = useMemo(() => {
-    if (!state.searchQuery.trim()) {
-      return state.biggestLosers;
-    }
-
-    const query = state.searchQuery.toLowerCase();
-    return state.biggestLosers.filter(loser => {
-      try {
-        if (loser.username && loser.username.toLowerCase().includes(query)) {
-          return true;
-        }
-
-        let calculatedRank: CalculatedRank | null = null;
-        try {
-          calculatedRank = loser.calculatedRank || 
-            (loser.total_rp !== undefined ? calculateRankFromRPCached(loser.total_rp) : null);
-        } catch (error) {
-          console.warn(`Failed to calculate rank for loser search for ${loser.username}:`, error);
-        }
-        
-        if (calculatedRank) {
-          const rankName = `${calculatedRank.tier} ${calculatedRank.level}`.toLowerCase();
-          return rankName.includes(query);
-        }
-
-        return false;
-      } catch (error) {
-        console.error('Error in loser search filter for entry:', loser, error);
-        return false;
-      }
-    });
-  }, [state.biggestLosers, state.searchQuery]);
+  })();
 
   // Get current data based on active tab
-  const getCurrentData = useCallback(() => {
+  const getCurrentData = () => {
     switch (state.activeTab) {
       case 'gainers':
         return filteredGainers;
@@ -227,40 +228,41 @@ export const useLeaderboard = () => {
       default:
         return filteredEntries;
     }
-  }, [state.activeTab, filteredEntries, filteredGainers, filteredLosers]);
-
-  // Check if data is live (updated within last 5 minutes)
-  const isLive = useMemo(() => {
-    return leaderboardService.isLive(state.lastUpdate);
-  }, [state.lastUpdate]);
+  };
 
   // Get rank statistics
-  const getRankStatistics = useCallback(async () => {
-    try {
-      return await leaderboardService.getRankStatistics();
-    } catch (error) {
-      console.error('Error fetching rank statistics:', error);
-      return [];
-    }
-  }, []);
-
-  // Calculate rank changes for animations
-  const getPreviousEntry = useCallback((currentEntry: LeaderboardEntry) => {
-    // Find the previous entry by username
-    return state.entries.find(entry => entry.username === currentEntry.username);
-  }, [state.entries]);
+  const getRankStatistics = () => {
+    const rankCounts = new Map<string, number>();
+    
+    state.entries.forEach(entry => {
+      const rankKey = entry.calculatedRank?.calculatedRank || entry.rank_title || 'Unknown';
+      rankCounts.set(rankKey, (rankCounts.get(rankKey) || 0) + 1);
+    });
+    
+    return Array.from(rankCounts.entries()).map(([rank, count]) => ({
+      rank,
+      count
+    }));
+  };
 
   return {
-    ...state,
     entries: filteredEntries,
     hottestGainers: filteredGainers,
     biggestLosers: filteredLosers,
+    lastUpdate: state.lastUpdate,
+    isLoading: state.isLoading,
+    error: state.error,
+    searchQuery: state.searchQuery,
+    activeTab: state.activeTab,
     isLive,
-    setSearchQuery,
+    searchLeaderboard,
     setActiveTab,
-    refreshData,
+    clearSearch,
+    refresh,
+    startAutoRefresh,
+    stopAutoRefresh,
+    isRefreshing: !!refreshInterval,
     getCurrentData,
-    getRankStatistics,
-    getPreviousEntry
+    getRankStatistics
   };
 }; 

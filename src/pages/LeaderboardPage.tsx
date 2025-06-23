@@ -4,7 +4,7 @@ import { useLeaderboard } from '../hooks/useLeaderboard';
 import { TabType } from '../types/leaderboard';
 import LeaderboardEntryComponent from '../components/leaderboard/LeaderboardEntry';
 import StatsCard from '../components/leaderboard/StatsCard';
-import TestLeaderboardData from '../components/TestLeaderboardData';
+import { TestLeaderboardData } from '../components/TestLeaderboardData';
 
 const LeaderboardPage: React.FC = () => {
   const {
@@ -17,9 +17,15 @@ const LeaderboardPage: React.FC = () => {
     searchQuery,
     activeTab,
     isLive,
-    setSearchQuery,
+    searchLeaderboard,
     setActiveTab,
-    refreshData
+    clearSearch,
+    refresh,
+    startAutoRefresh,
+    stopAutoRefresh,
+    isRefreshing,
+    getCurrentData,
+    getRankStatistics
   } = useLeaderboard();
 
   const [previousEntries, setPreviousEntries] = useState(filteredEntries);
@@ -62,10 +68,10 @@ const LeaderboardPage: React.FC = () => {
       <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
         <div className="container mx-auto px-4 py-6">
           <div className="flex justify-between items-center mb-4">
-            <h1 className="text-2xl font-bold">Leaderboard Data Test</h1>
+            <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Leaderboard Data Test</h1>
             <button
               onClick={() => setShowTest(false)}
-              className="btn btn-primary"
+              className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
             >
               Show Real Leaderboard
             </button>
@@ -88,8 +94,8 @@ const LeaderboardPage: React.FC = () => {
           </h2>
           <p className="text-gray-600 dark:text-gray-400 mb-4">{error}</p>
           <button
-            onClick={refreshData}
-            className="btn btn-primary flex items-center gap-2"
+            onClick={refresh}
+            className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 flex items-center gap-2 mx-auto"
           >
             <RefreshCw size={16} />
             Try Again
@@ -123,9 +129,9 @@ const LeaderboardPage: React.FC = () => {
 
             <div className="flex items-center gap-3">
               <button
-                onClick={refreshData}
+                onClick={refresh}
                 disabled={isLoading}
-                className="btn btn-outline flex items-center gap-2"
+                className="px-4 py-2 border border-gray-300 dark:border-gray-600 rounded hover:bg-gray-50 dark:hover:bg-gray-700 flex items-center gap-2"
               >
                 <RefreshCw size={16} className={isLoading ? 'animate-spin' : ''} />
                 Refresh
@@ -138,16 +144,27 @@ const LeaderboardPage: React.FC = () => {
       <div className="container mx-auto px-4 py-6">
         {/* Search Bar */}
         <div className="mb-6">
-          <div className="relative max-w-md">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={20} />
-            <input
-              type="text"
-              placeholder="Search players..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full pl-10 pr-4 py-3 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-primary-500 dark:focus:ring-primary-400 focus:border-transparent"
-            />
-          </div>
+          <form onSubmit={(e) => {
+            e.preventDefault();
+            const formData = new FormData(e.currentTarget);
+            const query = formData.get('search') as string;
+            if (query.trim()) {
+              searchLeaderboard(query);
+            } else {
+              clearSearch();
+            }
+          }}>
+            <div className="relative max-w-md">
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={20} />
+              <input
+                type="text"
+                name="search"
+                placeholder="Search players..."
+                defaultValue={searchQuery}
+                className="w-full pl-10 pr-4 py-3 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              />
+            </div>
+          </form>
         </div>
 
         {/* Tabs */}
@@ -174,7 +191,7 @@ const LeaderboardPage: React.FC = () => {
         {isLoading ? (
           <div className="flex items-center justify-center py-12">
             <div className="text-center">
-              <RefreshCw className="animate-spin text-primary-600 dark:text-primary-400 mx-auto mb-4" size={32} />
+              <RefreshCw className="animate-spin text-blue-600 dark:text-blue-400 mx-auto mb-4" size={32} />
               <p className="text-gray-600 dark:text-gray-400">Loading leaderboard...</p>
             </div>
           </div>
@@ -198,13 +215,12 @@ const LeaderboardPage: React.FC = () => {
                     </p>
                   </div>
                 ) : (
-                  <div className="space-y-3">
+                  <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm overflow-hidden">
                     {filteredEntries.map((entry, index) => (
                       <LeaderboardEntryComponent
-                        key={`${entry.username}-${entry.rank_position}`}
+                        key={entry.id || `${entry.username}-${index}`}
                         entry={entry}
                         index={index}
-                        previousEntry={previousEntries.find(e => e.username === entry.username)}
                         isAnimating={isAnimating}
                       />
                     ))}
@@ -213,42 +229,46 @@ const LeaderboardPage: React.FC = () => {
               </div>
             )}
 
-            {activeTab === 'gainers' && (
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                <StatsCard
-                  stats={hottestGainers}
-                  type="gainers"
-                  title="Hottest Gainers"
-                  icon={<TrendingUp size={24} />}
-                />
-                <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-6">
-                  <h3 className="font-semibold text-gray-900 dark:text-gray-100 mb-4">
-                    About Hottest Gainers
-                  </h3>
-                  <p className="text-gray-600 dark:text-gray-400 text-sm">
-                    These players have gained the most RP in the last 2 days. 
-                    Click on any player to view their full profile and track their progress.
-                  </p>
+            {(activeTab === 'gainers' || activeTab === 'losers') && (
+              <div>
+                <div className="flex items-center justify-between mb-4">
+                  <h2 className="text-xl font-semibold text-gray-900 dark:text-gray-100">
+                    {activeTab === 'gainers' ? 'Hottest Gainers' : 'Biggest Losers'}
+                  </h2>
+                  <span className="text-sm text-gray-600 dark:text-gray-400">
+                    Last 24 hours
+                  </span>
                 </div>
-              </div>
-            )}
 
-            {activeTab === 'losers' && (
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                <StatsCard
-                  stats={biggestLosers}
-                  type="losers"
-                  title="Biggest Losers"
-                  icon={<TrendingDown size={24} />}
-                />
-                <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-6">
-                  <h3 className="font-semibold text-gray-900 dark:text-gray-100 mb-4">
-                    About Biggest Losers
-                  </h3>
-                  <p className="text-gray-600 dark:text-gray-400 text-sm">
-                    These players have lost the most RP in the last 2 days. 
-                    Click on any player to view their full profile and track their progress.
-                  </p>
+                <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm overflow-hidden">
+                  {(activeTab === 'gainers' ? hottestGainers : biggestLosers).map((entry, index) => (
+                    <div
+                      key={`${entry.username}-${index}`}
+                      className="flex items-center justify-between p-4 border-b border-gray-200 dark:border-gray-700 last:border-b-0"
+                    >
+                      <div className="flex items-center space-x-4">
+                        <div className="w-8 h-8 bg-gray-200 dark:bg-gray-600 rounded-full flex items-center justify-center text-sm font-bold">
+                          {index + 1}
+                        </div>
+                        <div>
+                          <div className="font-semibold text-gray-900 dark:text-white">
+                            {entry.username}
+                          </div>
+                          <div className="text-sm text-gray-500 dark:text-gray-400">
+                            {entry.calculatedRank?.calculatedRank || 'Unknown Rank'}
+                          </div>
+                        </div>
+                      </div>
+                      <div className="text-right">
+                        <div className={`font-bold text-lg ${
+                          activeTab === 'gainers' ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'
+                        }`}>
+                          {activeTab === 'gainers' ? '+' : '-'}{activeTab === 'gainers' ? entry.total_gain : entry.total_loss}
+                        </div>
+                        <div className="text-sm text-gray-500 dark:text-gray-400">RP</div>
+                      </div>
+                    </div>
+                  ))}
                 </div>
               </div>
             )}

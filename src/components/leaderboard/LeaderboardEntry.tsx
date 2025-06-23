@@ -1,9 +1,9 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { ExternalLink, TrendingUp, TrendingDown, ArrowUp, ArrowDown } from 'lucide-react';
 import { LeaderboardEntry } from '../../types/leaderboard';
 import { robloxApi } from '../../services/robloxApi';
-import { calculateRankFromRPCached, getRankDisplayName, isTierPromotion, isTierDemotion } from '../../utils/rankingSystem';
+import { calculateRankFromRPCached, getRankDisplayName, isTierPromotion, isTierDemotion, getRankTierInfo } from '../../utils/rankingSystem';
 import RankBadge from './RankBadge';
 
 interface LeaderboardEntryProps {
@@ -19,6 +19,34 @@ const LeaderboardEntryComponent: React.FC<LeaderboardEntryProps> = ({
   previousEntry,
   isAnimating = false
 }) => {
+  const [profilePicture, setProfilePicture] = useState<string | null>(entry.profile_picture || null);
+  const [isLoadingProfile, setIsLoadingProfile] = useState(false);
+  const [hasError, setHasError] = useState(false);
+
+  // Load profile picture if not available
+  useEffect(() => {
+    const loadProfilePicture = async () => {
+      if (profilePicture || isLoadingProfile || hasError) return;
+
+      try {
+        setIsLoadingProfile(true);
+        console.log(`Loading profile picture for ${entry.username}...`);
+        
+        const picture = await robloxApi.getProfilePictureByUsername(entry.username);
+        setProfilePicture(picture);
+        
+        console.log(`Profile picture loaded for ${entry.username}:`, picture);
+      } catch (error) {
+        console.error(`Failed to load profile picture for ${entry.username}:`, error);
+        setHasError(true);
+      } finally {
+        setIsLoadingProfile(false);
+      }
+    };
+
+    loadProfilePicture();
+  }, [entry.username, profilePicture, isLoadingProfile, hasError]);
+
   // Get calculated rank (use existing or calculate from raw RP)
   const currentRank = entry.calculatedRank || calculateRankFromRPCached(entry.rp || 0);
   const previousRank = previousEntry?.calculatedRank || 
@@ -35,6 +63,30 @@ const LeaderboardEntryComponent: React.FC<LeaderboardEntryProps> = ({
   const hasLostRP = rpChange < 0;
   const hasTierUp = isTierPromotion(previousRank!, currentRank);
   const hasTierDown = isTierDemotion(previousRank!, currentRank);
+
+  // Get rank information
+  const rankInfo = entry.calculatedRank ? getRankTierInfo(entry.calculatedRank.tier) : null;
+  const displayRank = entry.calculatedRank?.calculatedRank || entry.rank_title || 'Unknown';
+
+  // Format RP with commas
+  const formatRP = (rp: number) => {
+    return rp.toLocaleString();
+  };
+
+  // Get Roblox profile URL
+  const getRobloxProfileUrl = () => {
+    if (entry.user_id) {
+      return robloxApi.getRobloxProfileUrl(entry.user_id);
+    }
+    return `https://www.roblox.com/user/${entry.username}/profile`;
+  };
+
+  // Handle profile picture error
+  const handleProfileError = () => {
+    console.warn(`Profile picture failed to load for ${entry.username}, using default`);
+    setProfilePicture('/default-avatar.png');
+    setHasError(true);
+  };
 
   const getPositionBadgeColor = (position: number) => {
     if (position <= 3) return 'bg-yellow-500 text-white';
@@ -71,22 +123,16 @@ const LeaderboardEntryComponent: React.FC<LeaderboardEntryProps> = ({
 
       {/* Profile Picture */}
       <div className="flex-shrink-0">
-        {entry.profile_picture ? (
-          <img
-            src={entry.profile_picture}
-            alt={`${entry.username}'s profile`}
-            className="w-12 h-12 rounded-full border-2 border-gray-200 dark:border-gray-600"
-            onError={(e) => {
-              const target = e.target as HTMLImageElement;
-              target.style.display = 'none';
-            }}
-          />
+        {isLoadingProfile ? (
+          <div className="w-12 h-12 bg-gray-200 dark:bg-gray-600 rounded-full animate-pulse" />
         ) : (
-          <div className="w-12 h-12 rounded-full bg-gray-200 dark:bg-gray-600 flex items-center justify-center">
-            <span className="text-gray-500 dark:text-gray-400 text-lg font-bold">
-              {entry.username.charAt(0).toUpperCase()}
-            </span>
-          </div>
+          <img
+            src={profilePicture || '/default-avatar.png'}
+            alt={`${entry.username}'s profile`}
+            className="w-12 h-12 rounded-full border-2 border-gray-200 dark:border-gray-600 object-cover"
+            onError={handleProfileError}
+            loading="lazy"
+          />
         )}
       </div>
 
@@ -145,7 +191,7 @@ const LeaderboardEntryComponent: React.FC<LeaderboardEntryProps> = ({
       {/* RP Points */}
       <div className="flex-shrink-0 text-right">
         <div className="font-bold text-lg text-gray-900 dark:text-gray-100">
-          {currentRank.totalRP.toLocaleString()}
+          {formatRP(currentRank.totalRP)}
         </div>
         
         {/* RP Change Indicator */}
@@ -167,7 +213,7 @@ const LeaderboardEntryComponent: React.FC<LeaderboardEntryProps> = ({
       <div className="flex-shrink-0 flex items-center gap-2">
         {entry.user_id && (
           <a
-            href={robloxApi.getRobloxProfileUrl(entry.user_id)}
+            href={getRobloxProfileUrl()}
             target="_blank"
             rel="noopener noreferrer"
             className="p-2 text-gray-500 hover:text-primary-600 dark:hover:text-primary-400 transition-colors"
