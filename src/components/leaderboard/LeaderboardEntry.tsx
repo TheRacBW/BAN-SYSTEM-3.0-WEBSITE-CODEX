@@ -47,6 +47,16 @@ const LeaderboardEntryComponent: React.FC<LeaderboardEntryProps> = ({
     loadProfilePicture();
   }, [entry.username, profilePicture, isLoadingProfile, hasError]);
 
+  // Use calculated rank for badge/progress/sorting only
+  const calculatedRank = entry.calculatedRank || calculateRankFromRPCached(entry.rp || 0);
+  const rankInfo = calculatedRank ? getRankTierInfo(calculatedRank.tier) : null;
+
+  // Progress bar logic
+  const isNightmare = entry.rank_title?.toLowerCase().includes('nightmare');
+  const progressMax = isNightmare ? 900 : 99;
+  const progressValue = isNightmare ? entry.rp : calculatedRank.displayRP;
+  const progressPercent = Math.min((progressValue / progressMax) * 100, 100);
+
   // Get calculated rank (use existing or calculate from raw RP)
   const currentRank = entry.calculatedRank || calculateRankFromRPCached(entry.rp || 0);
   const previousRank = previousEntry?.calculatedRank || 
@@ -65,7 +75,6 @@ const LeaderboardEntryComponent: React.FC<LeaderboardEntryProps> = ({
   const hasTierDown = isTierDemotion(previousRank!, currentRank);
 
   // Get rank information
-  const rankInfo = entry.calculatedRank ? getRankTierInfo(entry.calculatedRank.tier) : null;
   const displayRank = entry.calculatedRank?.calculatedRank || entry.rank_title || 'Unknown';
 
   // Format RP with commas
@@ -175,15 +184,15 @@ const LeaderboardEntryComponent: React.FC<LeaderboardEntryProps> = ({
         {/* Rank Display */}
         <div className="flex items-center gap-2 mt-1">
           <RankBadge
-            rankTier={currentRank.tier}
-            rankNumber={currentRank.level}
-            displayRp={currentRank.displayRP}
-            totalRp={currentRank.totalRP}
+            rankTier={calculatedRank.tier}
+            rankNumber={calculatedRank.level}
+            displayRp={calculatedRank.displayRP}
+            totalRp={calculatedRank.totalRP}
             size="sm"
             showProgress={false}
           />
           <span className="text-sm text-gray-600 dark:text-gray-400">
-            {getRankDisplayName(currentRank.tier, currentRank.level)}
+            {entry.rank_title}
           </span>
         </div>
       </div>
@@ -191,7 +200,7 @@ const LeaderboardEntryComponent: React.FC<LeaderboardEntryProps> = ({
       {/* RP Points */}
       <div className="flex-shrink-0 text-right">
         <div className="font-bold text-lg text-gray-900 dark:text-gray-100">
-          {formatRP(currentRank.totalRP)}
+          {formatRP(entry.rp)}
         </div>
         
         {/* RP Change Indicator */}
@@ -205,7 +214,7 @@ const LeaderboardEntryComponent: React.FC<LeaderboardEntryProps> = ({
         
         {/* Display RP within tier */}
         <div className="text-xs text-gray-500 dark:text-gray-400">
-          {currentRank.displayRP}/100 RP
+          {calculatedRank.displayRP}/100 RP
         </div>
       </div>
 

@@ -209,10 +209,9 @@ class LeaderboardService {
             previous_rp: oldest.rp,
             new_rp: newest.rp,
             rp_change: rpChange,
-            previous_rank: oldest.rank_position || 0,
-            new_rank: newest.rank_position || 0,
-            rank_change: (newest.rank_position || 0) - (oldest.rank_position || 0),
-            change_timestamp: newest.created_at || new Date().toISOString()
+            previous_rank_title: oldest.rank_title,
+            new_rank_title: newest.rank_title,
+            rank_position_change: (newest.rank_position || 0) - (oldest.rank_position || 0)
           });
         }
       }

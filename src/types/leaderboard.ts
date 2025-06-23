@@ -30,19 +30,9 @@ export interface RPChange {
   previous_rp: number;
   new_rp: number;
   rp_change: number;
-  previous_rank: number;
-  new_rank: number;
-  rank_change: number;
-  change_timestamp: string;
-  
-  // Legacy calculated rank change fields
-  previous_calculated_rank?: string;
-  new_calculated_rank?: string;
-  rank_tier_change?: number;
-  
-  // New frontend-calculated fields
-  previousCalculatedRank?: CalculatedRank | null;
-  newCalculatedRank?: CalculatedRank | null;
+  previous_rank_title: string; // RAW from game data
+  new_rank_title: string;      // RAW from game data
+  rank_position_change: number;
 }
 
 export interface LeaderboardStats {
