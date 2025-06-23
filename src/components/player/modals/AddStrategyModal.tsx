@@ -57,45 +57,79 @@ export default function AddStrategyModal({ player, onClose, onSuccess }: AddStra
   };
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-      <div className="bg-white dark:bg-gray-800 rounded-lg p-6 max-w-2xl w-full mx-4">
-        <div className="flex justify-between items-center mb-4">
-          <h3 className="text-xl font-bold">Add Strategy</h3>
-          <button onClick={onClose} className="text-gray-500 hover:text-gray-700">
-            <X size={24} />
-          </button>
-        </div>
-
-        {error && (
-          <div className="mb-4 p-3 bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-300 rounded">
-            {error}
+    <div 
+      className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[9999] p-4"
+      onClick={(e) => {
+        if (e.target === e.currentTarget) {
+          onClose();
+        }
+      }}
+    >
+      <div 
+        className="bg-white dark:bg-gray-800 rounded-lg p-6 w-full max-w-5xl shadow-2xl max-h-[95vh] overflow-y-auto"
+        style={{
+          minWidth: 'min(800px, 90vw)',
+          minHeight: 'min(600px, 80vh)'
+        }}
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="space-y-6">
+          {/* Header */}
+          <div className="flex justify-between items-center">
+            <h3 className="text-xl font-semibold">Add Strategy</h3>
+            <button 
+              onClick={onClose} 
+              className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
+            >
+              <X size={24} />
+            </button>
           </div>
-        )}
 
-        <div className="space-y-4">
+          {error && (
+            <div className="p-3 bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-300 rounded">
+              {error}
+            </div>
+          )}
+
+          {/* Image URL Input */}
           <div>
-            <label className="block text-sm font-medium mb-1">Image URL</label>
+            <label className="block text-sm font-medium mb-2">Image URL</label>
             <input
               type="url"
               value={imageUrl}
               onChange={(e) => setImageUrl(e.target.value)}
-              className="w-full p-2 border rounded dark:bg-gray-700 dark:border-gray-600"
+              placeholder="https://example.com/strategy-image.png"
+              className="w-full p-3 border rounded-lg dark:bg-gray-700 dark:border-gray-600"
+              onClick={(e) => e.stopPropagation()}
+              onFocus={(e) => e.stopPropagation()}
             />
           </div>
 
+          {/* Kit Selection Section with More Space */}
           <div>
-            <label className="block text-sm font-medium mb-2">Select 5 Kits</label>
+            <div className="flex justify-between items-center mb-4">
+              <label className="block text-sm font-medium">Select 5 Kits</label>
+              <span className="text-sm text-gray-500">
+                {selectedKits.length}/5 selected
+              </span>
+            </div>
+            
+            {/* Search bar */}
             <div className="relative mb-4">
               <input
                 type="text"
                 placeholder="Search kits..."
                 value={kitSearchQuery}
                 onChange={(e) => setKitSearchQuery(e.target.value)}
-                className="w-full p-2 pl-8 border rounded dark:bg-gray-700 dark:border-gray-600"
+                className="w-full p-3 pl-10 border rounded-lg dark:bg-gray-700 dark:border-gray-600"
+                onClick={(e) => e.stopPropagation()}
+                onFocus={(e) => e.stopPropagation()}
               />
-              <Search className="absolute left-2 top-2.5 text-gray-400" size={16} />
+              <Search className="absolute left-3 top-3.5 text-gray-400" size={16} />
             </div>
-            <div className="grid grid-cols-4 gap-2 max-h-[200px] overflow-y-auto">
+
+            {/* Kit grid with better spacing */}
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4 mb-6 min-h-[400px] max-h-[500px] overflow-y-auto">
               {displayKits.map(kit => (
                 <div
                   key={kit.id}
@@ -144,16 +178,27 @@ export default function AddStrategyModal({ player, onClose, onSuccess }: AddStra
                 </div>
               ))}
             </div>
-            <p className="text-sm text-yellow-500 dark:text-yellow-400 mt-6 font-medium flex items-center gap-2 bg-yellow-50 dark:bg-yellow-900/20 p-3 rounded-lg">
-              <Star size={16} className="text-yellow-400" fill="currentColor" /> Important: Star the kit that {player.alias} uses in this strategy
-            </p>
+            
+            {/* Star instruction */}
+            <div className="text-sm text-yellow-500 dark:text-yellow-400 font-medium flex items-center gap-2 bg-yellow-50 dark:bg-yellow-900/20 p-3 rounded-lg">
+              <Star size={16} className="text-yellow-400" fill="currentColor" /> 
+              Important: Star the kit that {player.alias} uses in this strategy
+            </div>
           </div>
 
-          <div className="flex justify-end gap-3">
-            <button onClick={onClose} className="btn btn-outline">
+          {/* Action buttons */}
+          <div className="flex gap-3 pt-4 border-t">
+            <button 
+              onClick={onClose}
+              className="btn btn-outline flex-1"
+            >
               Cancel
             </button>
-            <button onClick={handleAddStrategy} className="btn btn-primary">
+            <button 
+              onClick={handleAddStrategy}
+              className="btn btn-primary flex-1"
+              disabled={selectedKits.length !== 5 || !starredKitId}
+            >
               Add Strategy
             </button>
           </div>

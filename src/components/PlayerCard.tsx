@@ -1023,7 +1023,7 @@ function PlayerCard({ player, onDelete, isAdmin, isPinned, onPinToggle, showPinI
                       <select
                         value={getAccountRank(account)?.id || ''}
                         onChange={(e) => handleUpdateRank(account.id, e.target.value)}
-                        className="rounded border-gray-300 dark:border-gray-600 dark:bg-gray-700"
+                        className="rounded border-gray-300 dark:border-gray-600"
                         disabled={isUpdatingRank}
                       >
                         <option value="">Set Rank</option>
@@ -1093,6 +1093,11 @@ function PlayerCard({ player, onDelete, isAdmin, isPinned, onPinToggle, showPinI
                       statusColor = 'text-green-600 dark:text-green-400';
                     }
                   }
+                  
+                  // Don't show players who are already teammates
+                  const isNotCurrentTeammate = !(playerData.teammates as any)?.some((pt: any) => 
+                    pt.teammate.id === teammate.id
+                  );
                   
                   return (
                     <div 
@@ -1219,7 +1224,7 @@ function PlayerCard({ player, onDelete, isAdmin, isPinned, onPinToggle, showPinI
 
   const renderAddStrategyModal = () => (
     <div 
-      className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[9999]"
+      className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[9999] p-4"
       onClick={(e) => {
         // Only close if clicking the overlay, not the modal content
         if (e.target === e.currentTarget) {
@@ -1228,58 +1233,72 @@ function PlayerCard({ player, onDelete, isAdmin, isPinned, onPinToggle, showPinI
       }}
     >
       <div 
-        className="bg-white dark:bg-gray-800 rounded-lg p-6 max-w-2xl w-full mx-4 shadow-2xl max-h-[90vh] overflow-y-auto"
+        className="bg-white dark:bg-gray-800 rounded-lg p-6 w-full max-w-5xl shadow-2xl max-h-[95vh] overflow-y-auto"
+        style={{
+          minWidth: 'min(800px, 90vw)',
+          minHeight: 'min(600px, 80vh)'
+        }}
         onClick={(e) => {
           // Prevent clicks inside modal from bubbling up
           e.stopPropagation();
         }}
       >
-        <div className="flex justify-between items-center mb-4">
-          <h3 className="text-xl font-bold">Add Strategy</h3>
-          <button
-            onClick={(e) => {
-              e.stopPropagation();
-              setShowAddStrategyModal(false);
-            }}
-            className="text-gray-500 hover:text-gray-700"
-          >
-            <X size={24} />
-          </button>
-        </div>
+        <div className="space-y-6">
+          {/* Header */}
+          <div className="flex justify-between items-center">
+            <h3 className="text-xl font-semibold">Add Strategy</h3>
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                setShowAddStrategyModal(false);
+              }}
+              className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
+            >
+              <X size={24} />
+            </button>
+          </div>
 
-        <div className="space-y-4">
+          {/* Image URL Input */}
           <div>
-            <label className="block text-sm font-medium mb-1">
+            <label className="block text-sm font-medium mb-2">
               Image URL
             </label>
             <input
               type="url"
               value={imageUrl}
               onChange={(e) => setImageUrl(e.target.value)}
-              className="w-full p-2 border rounded dark:bg-gray-700 dark:border-gray-600"
+              className="w-full p-3 border rounded-lg dark:bg-gray-700 dark:border-gray-600"
               placeholder="https://example.com/strategy-image.png"
               onClick={(e) => e.stopPropagation()}
               onFocus={(e) => e.stopPropagation()}
             />
           </div>
 
+          {/* Kit Selection Section with More Space */}
           <div>
-            <label className="block text-sm font-medium mb-2">
-              Select 5 Kits
-            </label>
+            <div className="flex justify-between items-center mb-4">
+              <label className="block text-sm font-medium">Select 5 Kits</label>
+              <span className="text-sm text-gray-500">
+                {selectedKits.length}/5 selected
+              </span>
+            </div>
+            
+            {/* Search bar */}
             <div className="relative mb-4">
               <input
                 type="text"
                 placeholder="Search kits..."
                 value={kitSearchQuery}
                 onChange={(e) => setKitSearchQuery(e.target.value)}
-                className="w-full p-2 pl-8 border rounded dark:bg-gray-700 dark:border-gray-600"
+                className="w-full p-3 pl-10 border rounded-lg dark:bg-gray-700 dark:border-gray-600"
                 onClick={(e) => e.stopPropagation()}
                 onFocus={(e) => e.stopPropagation()}
               />
-              <Search className="absolute left-2 top-2.5 text-gray-400" size={16} />
+              <Search className="absolute left-3 top-3.5 text-gray-400" size={16} />
             </div>
-            <div className="grid grid-cols-4 gap-2 max-h-[200px] overflow-y-auto">
+
+            {/* Kit grid with better spacing */}
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4 mb-6 min-h-[400px] max-h-[500px] overflow-y-auto">
               {displayKits.map(kit => {
                 if (!kit) return null;
                 const isSelected = selectedKits.includes(kit.id);
@@ -1350,9 +1369,12 @@ function PlayerCard({ player, onDelete, isAdmin, isPinned, onPinToggle, showPinI
                 );
               })}
             </div>
-            <p className="text-sm text-gray-500 mt-2">
-              Star the kit that {player.alias} uses in this strategy
-            </p>
+            
+            {/* Star instruction */}
+            <div className="text-sm text-gray-500 font-medium flex items-center gap-2 bg-yellow-50 dark:bg-yellow-900/20 p-3 rounded-lg">
+              <Star size={16} className="text-yellow-400" fill="currentColor" />
+              Important: Star the kit that {player.alias} uses in this strategy
+            </div>
           </div>
 
           {commonKits.length > 0 && (
@@ -1360,8 +1382,8 @@ function PlayerCard({ player, onDelete, isAdmin, isPinned, onPinToggle, showPinI
               <h4 className="text-sm font-medium mb-2">Commonly Used Kits:</h4>
               <div className="flex gap-2">
                 {commonKits.map(({ kit, count }) => (
-                  <div key={kit.id} className="relative">
-                    <KitCard kit={kit} size="sm" />
+                  <div key={kit?.id} className="relative">
+                    {kit && <KitCard kit={kit} size="sm" />}
                     <div className="absolute -top-2 -right-2 bg-primary-500 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center">
                       {count}
                     </div>
@@ -1371,13 +1393,14 @@ function PlayerCard({ player, onDelete, isAdmin, isPinned, onPinToggle, showPinI
             </div>
           )}
 
-          <div className="flex justify-end gap-3">
+          {/* Action buttons */}
+          <div className="flex gap-3 pt-4 border-t">
             <button
               onClick={(e) => {
                 e.stopPropagation();
                 setShowAddStrategyModal(false);
               }}
-              className="btn btn-outline"
+              className="btn btn-outline flex-1"
             >
               Cancel
             </button>
@@ -1386,7 +1409,8 @@ function PlayerCard({ player, onDelete, isAdmin, isPinned, onPinToggle, showPinI
                 e.stopPropagation();
                 handleAddStrategy();
               }}
-              className="btn btn-primary"
+              className="btn btn-primary flex-1"
+              disabled={selectedKits.length !== 5 || !starredKitId}
             >
               Add Strategy
             </button>
@@ -1483,7 +1507,7 @@ function PlayerCard({ player, onDelete, isAdmin, isPinned, onPinToggle, showPinI
       );
       
       // Don't show players who are already teammates
-      const isNotCurrentTeammate = !playerData.teammates?.some(pt => 
+      const isNotCurrentTeammate = !(playerData.teammates as any)?.some((pt: any) => 
         pt.teammate.id === teammate.id
       );
       
@@ -1521,12 +1545,12 @@ function PlayerCard({ player, onDelete, isAdmin, isPinned, onPinToggle, showPinI
                   <p className="text-gray-500 text-sm">No teammates added yet.</p>
                 ) : (
                   <div className={`space-y-2 ${(playerData.teammates?.length || 0) > 4 ? 'max-h-40 overflow-y-auto pr-2' : ''}`}>
-                    {playerData.teammates?.map(teammate => {
+                    {(playerData.teammates as any)?.map((teammate: any) => {
                       const accountCount = teammate.teammate.accounts?.length || 0;
                       const hasMultipleAccounts = accountCount > 1;
 
                       // Find the best account to display (online first, then any account)
-                      const onlineAccount = teammate.teammate.accounts?.find(acc => 
+                      const onlineAccount = teammate.teammate.accounts?.find((acc: any) => 
                         acc.status?.isOnline === true
                       );
                       const anyAccount = teammate.teammate.accounts?.[0];
