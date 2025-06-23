@@ -1,14 +1,64 @@
 import { supabase } from '../lib/supabase';
-import { LeaderboardEntry, LeaderboardStats, calculateRankFromRP } from '../types/leaderboard';
+import { LeaderboardEntry, LeaderboardStats, RawLeaderboardEntry } from '../types/leaderboard';
 import { robloxApi } from './robloxApi';
+import { calculateRankFromRPCached, CalculatedRank, isValidRP } from '../utils/rankingSystem';
 
 class LeaderboardService {
+  /**
+   * Process raw leaderboard data and calculate ranks on frontend
+   */
+  private processRawData(rawData: RawLeaderboardEntry[]): LeaderboardEntry[] {
+    return rawData.map(entry => {
+      // Calculate rank from raw RP
+      const calculatedRank = isValidRP(entry.rp) ? calculateRankFromRPCached(entry.rp) : null;
+      
+      return {
+        ...entry,
+        // Legacy fields for backward compatibility
+        calculated_rank_tier: calculatedRank?.tier,
+        calculated_rank_number: calculatedRank?.level,
+        display_rp: calculatedRank?.displayRP,
+        total_rp: calculatedRank?.totalRP,
+        // New frontend-calculated field
+        calculatedRank
+      };
+    });
+  }
+
+  /**
+   * Sort entries by calculated rank tier and total RP
+   */
+  private sortEntriesByRank(entries: LeaderboardEntry[]): LeaderboardEntry[] {
+    return entries.sort((a, b) => {
+      // Use calculated rank if available, otherwise fall back to raw RP
+      const aRank = a.calculatedRank || (a.total_rp !== undefined ? calculateRankFromRPCached(a.total_rp) : null);
+      const bRank = b.calculatedRank || (b.total_rp !== undefined ? calculateRankFromRPCached(b.total_rp) : null);
+      
+      if (aRank && bRank) {
+        // Sort by tier index (higher = better)
+        const tierDiff = bRank.tierIndex - aRank.tierIndex;
+        if (tierDiff !== 0) return tierDiff;
+        
+        // If same tier, sort by total RP
+        return bRank.totalRP - aRank.totalRP;
+      }
+      
+      // Fallback to raw RP sorting
+      const rpDiff = (b.rp || 0) - (a.rp || 0);
+      if (rpDiff !== 0) return rpDiff;
+      
+      // If RP is the same, sort by username
+      return a.username.localeCompare(b.username);
+    });
+  }
+
   async getCurrentLeaderboard(): Promise<LeaderboardEntry[]> {
     try {
+      // Fetch raw data from database (no calculated fields needed)
       const { data, error } = await supabase
         .from('leaderboard')
-        .select('*')
-        .order('total_rp', { ascending: false })
+        .select('id, username, rank_position, rp, rank_title, inserted_at, profile_picture, user_id')
+        .order('rp', { ascending: false })
         .limit(200);
 
       if (error) {
@@ -16,9 +66,12 @@ class LeaderboardService {
         throw error;
       }
 
+      // Process raw data and calculate ranks on frontend
+      const processedData = this.processRawData(data || []);
+
       // Enrich entries with Roblox data (profile pictures, user IDs)
       const enrichedData = await Promise.all(
-        data.map(async (entry) => {
+        processedData.map(async (entry) => {
           try {
             return await robloxApi.enrichLeaderboardEntry(entry);
           } catch (error) {
@@ -29,17 +82,10 @@ class LeaderboardService {
       );
 
       // Sort by calculated rank tier and total RP
-      const sortedData = enrichedData.sort((a: LeaderboardEntry, b: LeaderboardEntry) => {
-        // First sort by total RP (descending)
-        const rpDiff = (b.total_rp || b.rp || 0) - (a.total_rp || a.rp || 0);
-        if (rpDiff !== 0) return rpDiff;
-        
-        // If RP is the same, sort by username
-        return a.username.localeCompare(b.username);
-      });
+      const sortedData = this.sortEntriesByRank(enrichedData);
 
       // Update rank positions based on sorted order
-      return sortedData.map((entry: LeaderboardEntry, index: number) => ({
+      return sortedData.map((entry, index) => ({
         ...entry,
         rank_position: index + 1
       }));
@@ -51,13 +97,14 @@ class LeaderboardService {
 
   async getHottestGainers(): Promise<LeaderboardStats[]> {
     try {
+      // Fetch raw RP changes data
       const { data, error } = await supabase
         .from('rp_changes')
-        .select('username, rp_change, new_calculated_rank, total_rp')
+        .select('username, rp_change, new_rp, change_timestamp')
         .gte('change_timestamp', new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString())
         .gt('rp_change', 0)
         .order('rp_change', { ascending: false })
-        .limit(20); // Get more data to account for grouping
+        .limit(20);
 
       if (error) {
         console.error('Error fetching hottest gainers:', error);
@@ -65,23 +112,31 @@ class LeaderboardService {
       }
 
       // Group by username and sum the gains
-      const gainsMap = new Map<string, { total_gain: number; calculated_rank_tier?: string; total_rp?: number }>();
+      const gainsMap = new Map<string, { total_gain: number; total_rp: number }>();
       data.forEach(change => {
-        const current = gainsMap.get(change.username) || { total_gain: 0 };
+        const current = gainsMap.get(change.username) || { total_gain: 0, total_rp: 0 };
         gainsMap.set(change.username, {
           total_gain: current.total_gain + change.rp_change,
-          calculated_rank_tier: change.new_calculated_rank,
-          total_rp: change.total_rp
+          total_rp: change.new_rp // Use the latest RP value
         });
       });
 
       const gainers: LeaderboardStats[] = Array.from(gainsMap.entries())
-        .map(([username, data]) => ({ 
-          username, 
-          total_gain: data.total_gain,
-          calculated_rank_tier: data.calculated_rank_tier as any,
-          total_rp: data.total_rp
-        }))
+        .map(([username, data]) => {
+          const calculatedRank = isValidRP(data.total_rp) ? calculateRankFromRPCached(data.total_rp) : null;
+          
+          return {
+            username,
+            total_gain: data.total_gain,
+            total_rp: data.total_rp,
+            // Legacy fields for backward compatibility
+            calculated_rank_tier: calculatedRank?.tier,
+            calculated_rank_number: calculatedRank?.level,
+            display_rp: calculatedRank?.displayRP,
+            // New frontend-calculated field
+            calculatedRank
+          };
+        })
         .sort((a, b) => (b.total_gain || 0) - (a.total_gain || 0))
         .slice(0, 4);
 
@@ -115,13 +170,14 @@ class LeaderboardService {
 
   async getBiggestLosers(): Promise<LeaderboardStats[]> {
     try {
+      // Fetch raw RP changes data
       const { data, error } = await supabase
         .from('rp_changes')
-        .select('username, rp_change, new_calculated_rank, total_rp')
+        .select('username, rp_change, new_rp, change_timestamp')
         .gte('change_timestamp', new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString())
         .lt('rp_change', 0)
         .order('rp_change', { ascending: true })
-        .limit(20); // Get more data to account for grouping
+        .limit(20);
 
       if (error) {
         console.error('Error fetching biggest losers:', error);
@@ -129,23 +185,31 @@ class LeaderboardService {
       }
 
       // Group by username and sum the losses
-      const lossesMap = new Map<string, { total_loss: number; calculated_rank_tier?: string; total_rp?: number }>();
+      const lossesMap = new Map<string, { total_loss: number; total_rp: number }>();
       data.forEach(change => {
-        const current = lossesMap.get(change.username) || { total_loss: 0 };
+        const current = lossesMap.get(change.username) || { total_loss: 0, total_rp: 0 };
         lossesMap.set(change.username, {
           total_loss: current.total_loss + change.rp_change,
-          calculated_rank_tier: change.new_calculated_rank,
-          total_rp: change.total_rp
+          total_rp: change.new_rp // Use the latest RP value
         });
       });
 
       const losers: LeaderboardStats[] = Array.from(lossesMap.entries())
-        .map(([username, data]) => ({ 
-          username, 
-          total_loss: data.total_loss,
-          calculated_rank_tier: data.calculated_rank_tier as any,
-          total_rp: data.total_rp
-        }))
+        .map(([username, data]) => {
+          const calculatedRank = isValidRP(data.total_rp) ? calculateRankFromRPCached(data.total_rp) : null;
+          
+          return {
+            username,
+            total_loss: data.total_loss,
+            total_rp: data.total_rp,
+            // Legacy fields for backward compatibility
+            calculated_rank_tier: calculatedRank?.tier,
+            calculated_rank_number: calculatedRank?.level,
+            display_rp: calculatedRank?.displayRP,
+            // New frontend-calculated field
+            calculatedRank
+          };
+        })
         .sort((a, b) => (a.total_loss || 0) - (b.total_loss || 0))
         .slice(0, 4);
 
@@ -200,17 +264,56 @@ class LeaderboardService {
 
   async getRankStatistics(): Promise<any[]> {
     try {
+      // Get raw data and calculate statistics on frontend
       const { data, error } = await supabase
-        .from('rank_statistics')
-        .select('*')
-        .order('calculated_rank_tier, calculated_rank_number');
+        .from('leaderboard')
+        .select('rp')
+        .order('rp', { ascending: false });
 
       if (error) {
         console.error('Error fetching rank statistics:', error);
         return [];
       }
 
-      return data || [];
+      // Calculate statistics on frontend
+      const calculatedRanks = (data || [])
+        .filter(entry => isValidRP(entry.rp))
+        .map(entry => calculateRankFromRPCached(entry.rp));
+
+      // Group by tier and level
+      const statsMap = new Map<string, { count: number; totalRP: number; minRP: number; maxRP: number }>();
+      
+      calculatedRanks.forEach(rank => {
+        const key = `${rank.tier}_${rank.level}`;
+        const current = statsMap.get(key) || { count: 0, totalRP: 0, minRP: rank.totalRP, maxRP: rank.totalRP };
+        
+        statsMap.set(key, {
+          count: current.count + 1,
+          totalRP: current.totalRP + rank.totalRP,
+          minRP: Math.min(current.minRP, rank.totalRP),
+          maxRP: Math.max(current.maxRP, rank.totalRP)
+        });
+      });
+
+      // Convert to array format
+      const stats = Array.from(statsMap.entries()).map(([key, data]) => {
+        const [tier, level] = key.split('_');
+        return {
+          calculated_rank_tier: tier,
+          calculated_rank_number: parseInt(level),
+          player_count: data.count,
+          avg_rp: Math.round(data.totalRP / data.count),
+          min_rp: data.minRP,
+          max_rp: data.maxRP
+        };
+      });
+
+      // Sort by tier index
+      return stats.sort((a, b) => {
+        const aIndex = calculateRankFromRPCached(a.min_rp).tierIndex;
+        const bIndex = calculateRankFromRPCached(b.min_rp).tierIndex;
+        return aIndex - bIndex;
+      });
     } catch (error) {
       console.error('Error in getRankStatistics:', error);
       return [];
@@ -224,22 +327,31 @@ class LeaderboardService {
     return now - lastUpdateTime < fiveMinutes;
   }
 
-  // Helper method to calculate rank changes
+  // Helper method to calculate rank changes between two entries
   calculateRankChanges(previousEntry: LeaderboardEntry, currentEntry: LeaderboardEntry) {
-    const previousRank = calculateRankFromRP(previousEntry.total_rp || previousEntry.rp || 0);
-    const currentRank = calculateRankFromRP(currentEntry.total_rp || currentEntry.rp || 0);
+    const previousRank = previousEntry.calculatedRank || 
+      (previousEntry.total_rp !== undefined ? calculateRankFromRPCached(previousEntry.total_rp) : null);
+    const currentRank = currentEntry.calculatedRank || 
+      (currentEntry.total_rp !== undefined ? calculateRankFromRPCached(currentEntry.total_rp) : null);
     
-    const previousRankIndex = this.getRankTierIndex(previousRank.rank_tier, previousRank.rank_number);
-    const currentRankIndex = this.getRankTierIndex(currentRank.rank_tier, currentRank.rank_number);
+    if (!previousRank || !currentRank) {
+      return {
+        rankTierChange: 0,
+        previousRank: null,
+        currentRank: null,
+        rpChange: (currentEntry.rp || 0) - (previousEntry.rp || 0)
+      };
+    }
     
     return {
-      rankTierChange: currentRankIndex - previousRankIndex,
+      rankTierChange: currentRank.tierIndex - previousRank.tierIndex,
       previousRank,
       currentRank,
-      rpChange: (currentEntry.total_rp || currentEntry.rp || 0) - (previousEntry.total_rp || previousEntry.rp || 0)
+      rpChange: currentRank.totalRP - previousRank.totalRP
     };
   }
 
+  // Helper method to get rank tier index for sorting
   private getRankTierIndex(rankTier: string, rankNumber: number): number {
     const tierIndex = {
       'Bronze': 1,

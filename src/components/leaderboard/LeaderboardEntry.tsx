@@ -1,8 +1,9 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
 import { ExternalLink, TrendingUp, TrendingDown, ArrowUp, ArrowDown } from 'lucide-react';
-import { LeaderboardEntry, calculateRankFromRP, getRankDisplayName, getRankTierIndex } from '../../types/leaderboard';
+import { LeaderboardEntry } from '../../types/leaderboard';
 import { robloxApi } from '../../services/robloxApi';
+import { calculateRankFromRPCached, getRankDisplayName, isTierPromotion, isTierDemotion } from '../../utils/rankingSystem';
 import RankBadge from './RankBadge';
 
 interface LeaderboardEntryProps {
@@ -18,22 +19,22 @@ const LeaderboardEntryComponent: React.FC<LeaderboardEntryProps> = ({
   previousEntry,
   isAnimating = false
 }) => {
-  // Calculate current and previous ranks
-  const currentRank = calculateRankFromRP(entry.total_rp || entry.rp || 0);
-  const previousRank = previousEntry ? calculateRankFromRP(previousEntry.total_rp || previousEntry.rp || 0) : null;
+  // Get calculated rank (use existing or calculate from raw RP)
+  const currentRank = entry.calculatedRank || calculateRankFromRPCached(entry.rp || 0);
+  const previousRank = previousEntry?.calculatedRank || 
+    (previousEntry ? calculateRankFromRPCached(previousEntry.rp || 0) : null);
   
   // Calculate changes
   const rankPositionChange = previousEntry ? previousEntry.rank_position - entry.rank_position : 0;
-  const rpChange = previousEntry ? (entry.total_rp || entry.rp || 0) - (previousEntry.total_rp || previousEntry.rp || 0) : 0;
-  const rankTierChange = previousRank ? 
-    getRankTierIndex(currentRank.rank_tier, currentRank.rank_number) - getRankTierIndex(previousRank.rank_tier, previousRank.rank_number) : 0;
+  const rpChange = previousEntry ? (entry.rp || 0) - (previousEntry.rp || 0) : 0;
+  const rankTierChange = previousRank ? currentRank.tierIndex - previousRank.tierIndex : 0;
   
   const isMovingUp = rankPositionChange > 0;
   const isMovingDown = rankPositionChange < 0;
   const hasGainedRP = rpChange > 0;
   const hasLostRP = rpChange < 0;
-  const hasTierUp = rankTierChange > 0;
-  const hasTierDown = rankTierChange < 0;
+  const hasTierUp = isTierPromotion(previousRank!, currentRank);
+  const hasTierDown = isTierDemotion(previousRank!, currentRank);
 
   const getPositionBadgeColor = (position: number) => {
     if (position <= 3) return 'bg-yellow-500 text-white';
@@ -118,7 +119,7 @@ const LeaderboardEntryComponent: React.FC<LeaderboardEntryProps> = ({
                   hasTierUp ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'
                 }`}>
                   {hasTierUp ? <TrendingUp size={12} /> : <TrendingDown size={12} />}
-                  {getRankDisplayName(previousRank!.rank_tier, previousRank!.rank_number)} → {getRankDisplayName(currentRank.rank_tier, currentRank.rank_number)}
+                  {previousRank && `${getRankDisplayName(previousRank.tier, previousRank.level)} → ${getRankDisplayName(currentRank.tier, currentRank.level)}`}
                 </div>
               )}
             </div>
@@ -128,15 +129,15 @@ const LeaderboardEntryComponent: React.FC<LeaderboardEntryProps> = ({
         {/* Rank Display */}
         <div className="flex items-center gap-2 mt-1">
           <RankBadge
-            rankTier={currentRank.rank_tier}
-            rankNumber={currentRank.rank_number}
-            displayRp={currentRank.display_rp}
-            totalRp={entry.total_rp || entry.rp || 0}
+            rankTier={currentRank.tier}
+            rankNumber={currentRank.level}
+            displayRp={currentRank.displayRP}
+            totalRp={currentRank.totalRP}
             size="sm"
             showProgress={false}
           />
           <span className="text-sm text-gray-600 dark:text-gray-400">
-            {getRankDisplayName(currentRank.rank_tier, currentRank.rank_number)}
+            {getRankDisplayName(currentRank.tier, currentRank.level)}
           </span>
         </div>
       </div>
@@ -144,7 +145,7 @@ const LeaderboardEntryComponent: React.FC<LeaderboardEntryProps> = ({
       {/* RP Points */}
       <div className="flex-shrink-0 text-right">
         <div className="font-bold text-lg text-gray-900 dark:text-gray-100">
-          {(entry.total_rp || entry.rp || 0).toLocaleString()}
+          {currentRank.totalRP.toLocaleString()}
         </div>
         
         {/* RP Change Indicator */}
@@ -158,7 +159,7 @@ const LeaderboardEntryComponent: React.FC<LeaderboardEntryProps> = ({
         
         {/* Display RP within tier */}
         <div className="text-xs text-gray-500 dark:text-gray-400">
-          {currentRank.display_rp}/100 RP
+          {currentRank.displayRP}/100 RP
         </div>
       </div>
 

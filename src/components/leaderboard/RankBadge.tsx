@@ -1,5 +1,5 @@
 import React from 'react';
-import { RankTier, getRankDisplayName, getRankTierColor, getRankTierEmoji, getProgressToNextTier, RANK_TIERS } from '../../types/leaderboard';
+import { RankTier, getRankTierInfo, getRankDisplayName, getProgressToNextTier } from '../../utils/rankingSystem';
 
 interface RankBadgeProps {
   rankTier: RankTier;
@@ -20,8 +20,7 @@ const RankBadge: React.FC<RankBadgeProps> = ({
   size = 'md',
   className = ''
 }) => {
-  const rankColor = getRankTierColor(rankTier);
-  const rankEmoji = getRankTierEmoji(rankTier);
+  const rankInfo = getRankTierInfo(rankTier);
   const displayName = getRankDisplayName(rankTier, rankNumber);
   const progress = getProgressToNextTier(displayRp);
   
@@ -31,48 +30,6 @@ const RankBadge: React.FC<RankBadgeProps> = ({
     lg: 'w-16 h-16 text-base'
   };
 
-  const getRankGradient = (tier: RankTier) => {
-    switch (tier) {
-      case 'Bronze':
-        return 'from-amber-600 to-amber-800';
-      case 'Silver':
-        return 'from-gray-400 to-gray-600';
-      case 'Gold':
-        return 'from-yellow-400 to-yellow-600';
-      case 'Platinum':
-        return 'from-gray-200 to-gray-400';
-      case 'Diamond':
-        return 'from-cyan-300 to-cyan-500';
-      case 'Emerald':
-        return 'from-green-400 to-green-600';
-      case 'Nightmare':
-        return 'from-red-800 to-red-900';
-      default:
-        return 'from-gray-500 to-gray-700';
-    }
-  };
-
-  const getRankGlow = (tier: RankTier) => {
-    switch (tier) {
-      case 'Bronze':
-        return 'shadow-amber-500/30';
-      case 'Silver':
-        return 'shadow-gray-400/30';
-      case 'Gold':
-        return 'shadow-yellow-400/50';
-      case 'Platinum':
-        return 'shadow-gray-300/30';
-      case 'Diamond':
-        return 'shadow-cyan-400/50';
-      case 'Emerald':
-        return 'shadow-green-400/50';
-      case 'Nightmare':
-        return 'shadow-red-600/50';
-      default:
-        return 'shadow-gray-500/30';
-    }
-  };
-
   return (
     <div className={`relative ${className}`}>
       {/* Main Rank Badge */}
@@ -80,19 +37,19 @@ const RankBadge: React.FC<RankBadgeProps> = ({
         className={`
           ${sizeClasses[size]} 
           rounded-full flex items-center justify-center font-bold text-white
-          bg-gradient-to-br ${getRankGradient(rankTier)}
-          shadow-lg ${getRankGlow(rankTier)}
+          bg-gradient-to-br ${rankInfo.gradient}
+          shadow-lg ${rankInfo.glow}
           border-2 border-white dark:border-gray-800
           relative overflow-hidden
         `}
         style={{
-          background: `linear-gradient(135deg, ${rankColor}22, ${rankColor}44)`,
-          borderColor: rankColor
+          background: `linear-gradient(135deg, ${rankInfo.color}22, ${rankInfo.color}44)`,
+          borderColor: rankInfo.color
         }}
       >
         {/* Rank Emoji */}
         <span className="text-center leading-none">
-          {rankEmoji}
+          {rankInfo.emoji}
         </span>
         
         {/* Progress Ring (for higher tiers) */}
@@ -147,7 +104,7 @@ const RankBadge: React.FC<RankBadgeProps> = ({
               className="h-1.5 rounded-full transition-all duration-300"
               style={{
                 width: `${progress}%`,
-                background: `linear-gradient(90deg, ${rankColor}, ${rankColor}88)`
+                background: `linear-gradient(90deg, ${rankInfo.color}, ${rankInfo.color}88)`
               }}
             />
           </div>

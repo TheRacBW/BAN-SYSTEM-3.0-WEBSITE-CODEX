@@ -1,26 +1,27 @@
-export type RankTier = 'Bronze' | 'Silver' | 'Gold' | 'Platinum' | 'Diamond' | 'Emerald' | 'Nightmare';
+import { RankTier, CalculatedRank } from '../utils/rankingSystem';
 
-export interface CalculatedRank {
-  rank_tier: RankTier;
-  rank_number: number;
-  display_rp: number;
-}
-
-export interface LeaderboardEntry {
+// Raw data structure from simplified Roblox script
+export interface RawLeaderboardEntry {
   id?: string;
   username: string;
   rank_position: number;
-  rp: number; // Legacy field - use total_rp instead
-  rank_title: string; // Legacy field - use calculated_rank_tier instead
+  rp: number; // Raw RP value from game (total RP)
+  rank_title: string; // Raw rank title from game (may not match our 21-tier system)
   inserted_at: string;
   profile_picture?: string | null;
   user_id?: number | null;
-  
-  // New calculated fields
+}
+
+// Enhanced entry with calculated ranks (for backward compatibility)
+export interface LeaderboardEntry extends RawLeaderboardEntry {
+  // Legacy calculated fields (may be present in existing data)
   calculated_rank_tier?: RankTier;
   calculated_rank_number?: number;
-  display_rp?: number; // RP within current tier (0-99)
-  total_rp?: number; // Total RP across all tiers
+  display_rp?: number;
+  total_rp?: number;
+  
+  // New frontend-calculated fields
+  calculatedRank?: CalculatedRank | null;
 }
 
 export interface RPChange {
@@ -34,10 +35,14 @@ export interface RPChange {
   rank_change: number;
   change_timestamp: string;
   
-  // New calculated rank change fields
+  // Legacy calculated rank change fields
   previous_calculated_rank?: string;
   new_calculated_rank?: string;
   rank_tier_change?: number;
+  
+  // New frontend-calculated fields
+  previousCalculatedRank?: CalculatedRank | null;
+  newCalculatedRank?: CalculatedRank | null;
 }
 
 export interface LeaderboardStats {
@@ -47,11 +52,14 @@ export interface LeaderboardStats {
   profile_picture?: string | null;
   user_id?: number | null;
   
-  // New calculated fields
+  // Legacy calculated fields
   calculated_rank_tier?: RankTier;
   calculated_rank_number?: number;
   display_rp?: number;
   total_rp?: number;
+  
+  // New frontend-calculated fields
+  calculatedRank?: CalculatedRank | null;
 }
 
 export interface RobloxUser {
@@ -79,7 +87,7 @@ export interface LeaderboardState {
 
 export type TabType = 'main' | 'gainers' | 'losers';
 
-// Rank tier configuration
+// Legacy rank tier configuration (kept for backward compatibility)
 export const RANK_TIERS: Record<RankTier, { minRp: number; maxRp: number; color: string; emoji: string }> = {
   Bronze: { minRp: 0, maxRp: 399, color: '#CD7F32', emoji: '🥉' },
   Silver: { minRp: 400, maxRp: 799, color: '#C0C0C0', emoji: '🥈' },
@@ -90,7 +98,7 @@ export const RANK_TIERS: Record<RankTier, { minRp: number; maxRp: number; color:
   Nightmare: { minRp: 2000, maxRp: Infinity, color: '#8B0000', emoji: '👹' }
 };
 
-// Rank tier index for sorting
+// Legacy rank tier index (kept for backward compatibility)
 export const RANK_TIER_INDEX: Record<RankTier, number> = {
   Bronze: 1,
   Silver: 2,
@@ -101,80 +109,34 @@ export const RANK_TIER_INDEX: Record<RankTier, number> = {
   Nightmare: 7
 };
 
-// Utility functions for rank calculations
+// Legacy utility functions (kept for backward compatibility)
 export const calculateRankFromRP = (totalRp: number): CalculatedRank => {
-  if (totalRp < 0) totalRp = 0;
-  
-  if (totalRp >= 2000) {
-    return {
-      rank_tier: 'Nightmare',
-      rank_number: 0,
-      display_rp: totalRp - 2000
-    };
-  } else if (totalRp >= 1900) {
-    return {
-      rank_tier: 'Emerald',
-      rank_number: 0,
-      display_rp: totalRp - 1900
-    };
-  } else if (totalRp >= 1600) {
-    const diamondTier = Math.min(Math.floor((totalRp - 1600) / 100) + 1, 3);
-    return {
-      rank_tier: 'Diamond',
-      rank_number: diamondTier,
-      display_rp: totalRp - (1600 + (diamondTier - 1) * 100)
-    };
-  } else if (totalRp >= 1200) {
-    const platinumTier = Math.min(Math.floor((totalRp - 1200) / 100) + 1, 4);
-    return {
-      rank_tier: 'Platinum',
-      rank_number: platinumTier,
-      display_rp: totalRp - (1200 + (platinumTier - 1) * 100)
-    };
-  } else if (totalRp >= 800) {
-    const goldTier = Math.min(Math.floor((totalRp - 800) / 100) + 1, 4);
-    return {
-      rank_tier: 'Gold',
-      rank_number: goldTier,
-      display_rp: totalRp - (800 + (goldTier - 1) * 100)
-    };
-  } else if (totalRp >= 400) {
-    const silverTier = Math.min(Math.floor((totalRp - 400) / 100) + 1, 4);
-    return {
-      rank_tier: 'Silver',
-      rank_number: silverTier,
-      display_rp: totalRp - (400 + (silverTier - 1) * 100)
-    };
-  } else {
-    const bronzeTier = Math.min(Math.floor(totalRp / 100) + 1, 4);
-    return {
-      rank_tier: 'Bronze',
-      rank_number: bronzeTier,
-      display_rp: totalRp - ((bronzeTier - 1) * 100)
-    };
-  }
+  // Import and use the new utility function
+  const { calculateRankFromRPCached } = require('../utils/rankingSystem');
+  return calculateRankFromRPCached(totalRp);
 };
 
 export const getRankDisplayName = (rankTier: RankTier, rankNumber: number): string => {
-  if (rankTier === 'Emerald' || rankTier === 'Nightmare') {
-    return rankTier;
-  }
-  return `${rankTier} ${rankNumber}`;
+  const { getRankDisplayName: getDisplayName } = require('../utils/rankingSystem');
+  return getDisplayName(rankTier, rankNumber);
 };
 
 export const getRankTierColor = (rankTier: RankTier): string => {
-  return RANK_TIERS[rankTier].color;
+  const { getRankTierInfo } = require('../utils/rankingSystem');
+  return getRankTierInfo(rankTier).color;
 };
 
 export const getRankTierEmoji = (rankTier: RankTier): string => {
-  return RANK_TIERS[rankTier].emoji;
+  const { getRankTierInfo } = require('../utils/rankingSystem');
+  return getRankTierInfo(rankTier).emoji;
 };
 
 export const getRankTierIndex = (rankTier: RankTier, rankNumber: number): number => {
-  const baseIndex = RANK_TIER_INDEX[rankTier] * 1000;
-  return baseIndex + rankNumber;
+  const { getRankTierIndex: getTierIndex } = require('../utils/rankingSystem');
+  return getTierIndex(rankTier, rankNumber);
 };
 
 export const getProgressToNextTier = (displayRp: number): number => {
-  return Math.min((displayRp / 100) * 100, 100);
+  const { getProgressToNextTier: getProgress } = require('../utils/rankingSystem');
+  return getProgress(displayRp);
 }; 

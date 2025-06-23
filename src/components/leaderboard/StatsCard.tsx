@@ -1,8 +1,9 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
 import { ExternalLink, TrendingUp, TrendingDown } from 'lucide-react';
-import { LeaderboardStats, calculateRankFromRP, getRankDisplayName } from '../../types/leaderboard';
+import { LeaderboardStats } from '../../types/leaderboard';
 import { robloxApi } from '../../services/robloxApi';
+import { calculateRankFromRPCached, getRankDisplayName } from '../../utils/rankingSystem';
 import RankBadge from './RankBadge';
 
 interface StatsCardProps {
@@ -31,8 +32,9 @@ const StatsCard: React.FC<StatsCardProps> = ({ stats, type, title, icon }) => {
 
       <div className="space-y-3">
         {stats.map((stat, index) => {
-          // Calculate rank from total RP
-          const calculatedRank = calculateRankFromRP(stat.total_rp || 0);
+          // Get calculated rank (use existing or calculate from raw RP)
+          const calculatedRank = stat.calculatedRank || 
+            (stat.total_rp !== undefined ? calculateRankFromRPCached(stat.total_rp) : null);
           
           return (
             <div
@@ -80,19 +82,21 @@ const StatsCard: React.FC<StatsCardProps> = ({ stats, type, title, icon }) => {
                 </Link>
                 
                 {/* Rank Display */}
-                <div className="flex items-center gap-2 mt-1">
-                  <RankBadge
-                    rankTier={calculatedRank.rank_tier}
-                    rankNumber={calculatedRank.rank_number}
-                    displayRp={calculatedRank.display_rp}
-                    totalRp={stat.total_rp || 0}
-                    size="sm"
-                    showProgress={false}
-                  />
-                  <span className="text-xs text-gray-600 dark:text-gray-400">
-                    {getRankDisplayName(calculatedRank.rank_tier, calculatedRank.rank_number)}
-                  </span>
-                </div>
+                {calculatedRank && (
+                  <div className="flex items-center gap-2 mt-1">
+                    <RankBadge
+                      rankTier={calculatedRank.tier}
+                      rankNumber={calculatedRank.level}
+                      displayRp={calculatedRank.displayRP}
+                      totalRp={calculatedRank.totalRP}
+                      size="sm"
+                      showProgress={false}
+                    />
+                    <span className="text-xs text-gray-600 dark:text-gray-400">
+                      {getRankDisplayName(calculatedRank.tier, calculatedRank.level)}
+                    </span>
+                  </div>
+                )}
               </div>
 
               {/* RP Change */}
