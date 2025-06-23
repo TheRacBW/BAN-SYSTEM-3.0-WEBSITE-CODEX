@@ -452,106 +452,125 @@
   background-size: 200px 100%;
 }
 
-/* --- Leaderboard Sliding Animations & RP Change Indicators --- */
+/* --- Glow Breathing Room --- */
+.leaderboard-container {
+  padding: 20px 10px;
+  overflow: visible;
+}
+.leaderboard-list {
+  padding: 0 15px;
+  margin: 10px 0;
+  overflow: visible;
+}
+.leaderboard-wrapper,
+.top-players-section {
+  overflow: visible !important;
+}
+
+/* --- Entry Spacing and Subtle Animation --- */
 .leaderboard-entry {
+  margin: 8px 0;
   position: relative;
-  transition: transform 0.8s cubic-bezier(0.4, 0, 0.2, 1), box-shadow 0.8s cubic-bezier(0.4, 0, 0.2, 1), background 0.8s;
-  will-change: transform, box-shadow, background;
+  transition: all 0.2s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+  border-radius: 12px;
+  overflow: visible;
+  cursor: pointer;
+  border: 1px solid transparent;
+  transform: translateY(0) scale(1);
+  transform-origin: center;
+  opacity: 1;
+  animation: none;
+}
+.leaderboard-entry.initial-load {
+  animation: fadeIn 0.4s ease-out forwards;
+}
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
 }
 
-.entry-position-improved {
-  animation: slideToNewPositionUp 0.8s cubic-bezier(0.4, 0, 0.2, 1);
-  box-shadow: 0 4px 20px rgba(34, 197, 94, 0.18);
-  background: linear-gradient(90deg, #dcfce7 0%, #f0fdf4 100%);
-}
-
-.entry-position-declined {
-  animation: slideToNewPositionDown 0.8s cubic-bezier(0.4, 0, 0.2, 1);
-  box-shadow: 0 4px 20px rgba(239, 68, 68, 0.18);
-  background: linear-gradient(90deg, #fee2e2 0%, #fef2f2 100%);
-}
-
-@keyframes slideToNewPositionUp {
-  0% {
-    transform: translateY(32px);
-    opacity: 0.7;
-  }
-  100% {
-    transform: translateY(0);
-    opacity: 1;
-  }
-}
-
-@keyframes slideToNewPositionDown {
-  0% {
-    transform: translateY(-32px);
-    opacity: 0.7;
-  }
-  100% {
-    transform: translateY(0);
-    opacity: 1;
-  }
-}
-
-.rp-change {
-  display: inline-flex;
-  align-items: center;
-  font-weight: 600;
-  border-radius: 9999px;
-  padding: 0.15rem 0.6rem;
-  margin-left: 0.5rem;
-  box-shadow: 0 1px 4px rgba(0,0,0,0.04);
-  transition: background 0.3s, color 0.3s;
-}
-.rp-change.gain {
-  color: #16a34a;
-  background: rgba(34, 197, 94, 0.12);
-  border: 1px solid #bbf7d0;
-}
-.rp-change.loss {
-  color: #dc2626;
-  background: rgba(239, 68, 68, 0.12);
-  border: 1px solid #fecaca;
-}
-.position-change {
-  font-size: 0.95em;
-  font-weight: 500;
-  margin-left: 0.25em;
-  color: #64748b;
-  opacity: 0.85;
-}
-
-/* Optional: subtle hover effect for leaderboard entries */
+/* --- Subtle, Fast Hover Effects --- */
 .leaderboard-entry:hover {
-  background: linear-gradient(90deg, #f1f5f9 0%, #f8fafc 100%);
-  box-shadow: 0 2px 12px rgba(59, 130, 246, 0.06);
+  transform: translateY(-1px) scale(1.01);
+  transition: all 0.15s cubic-bezier(0.25, 0.46, 0.45, 0.94);
 }
 
-.refresh-indicator {
-  position: absolute;
-  top: 10px;
-  right: 10px;
-  background: rgba(59, 130, 246, 0.1);
-  color: #3b82f6;
-  padding: 8px 16px;
-  border-radius: 20px;
-  font-size: 0.875rem;
-  z-index: 10;
-  animation: pulse 2s infinite;
+.leaderboard-entry[data-rank="nightmare"]:hover,
+.leaderboard-entry[data-rank="NIGHTMARE"]:hover {
+  transform: translateY(-1px) scale(1.01);
+  border-color: rgba(156, 39, 176, 0.6);
+  box-shadow: 0 4px 15px rgba(156, 39, 176, 0.25), 0 0 15px rgba(156, 39, 176, 0.3);
+  background: linear-gradient(135deg, rgba(156, 39, 176, 0.03) 0%, rgba(123, 31, 162, 0.05) 100%);
+}
+.leaderboard-entry[data-rank="emerald"]:hover,
+.leaderboard-entry[data-rank="EMERALD"]:hover {
+  transform: translateY(-1px) scale(1.01);
+  border-color: rgba(76, 175, 80, 0.6);
+  box-shadow: 0 4px 15px rgba(76, 175, 80, 0.25), 0 0 15px rgba(76, 175, 80, 0.3);
+  background: linear-gradient(135deg, rgba(76, 175, 80, 0.03) 0%, rgba(56, 142, 60, 0.05) 100%);
+}
+.leaderboard-entry[data-rank="diamond"]:hover,
+.leaderboard-entry[data-rank="DIAMOND"]:hover {
+  transform: translateY(-1px) scale(1.01);
+  border-color: rgba(33, 150, 243, 0.6);
+  box-shadow: 0 4px 15px rgba(33, 150, 243, 0.25), 0 0 15px rgba(33, 150, 243, 0.3);
+  background: linear-gradient(135deg, rgba(33, 150, 243, 0.03) 0%, rgba(25, 118, 210, 0.05) 100%);
+}
+.leaderboard-entry[data-rank="platinum"]:hover,
+.leaderboard-entry[data-rank="PLATINUM"]:hover {
+  transform: translateY(-1px) scale(1.01);
+  border-color: rgba(0, 188, 212, 0.6);
+  box-shadow: 0 4px 15px rgba(0, 188, 212, 0.25), 0 0 15px rgba(0, 188, 212, 0.3);
+  background: linear-gradient(135deg, rgba(0, 188, 212, 0.03) 0%, rgba(77, 208, 225, 0.05) 100%);
+}
+.leaderboard-entry[data-rank="gold"]:hover,
+.leaderboard-entry[data-rank="GOLD"]:hover {
+  transform: translateY(-1px) scale(1.01);
+  border-color: rgba(255, 215, 0, 0.6);
+  box-shadow: 0 4px 15px rgba(255, 215, 0, 0.25), 0 0 15px rgba(255, 215, 0, 0.3);
+  background: linear-gradient(135deg, rgba(255, 215, 0, 0.03) 0%, rgba(255, 165, 0, 0.05) 100%);
+}
+.leaderboard-entry[data-rank="silver"]:hover,
+.leaderboard-entry[data-rank="SILVER"]:hover {
+  transform: translateY(-1px) scale(1.01);
+  border-color: rgba(192, 192, 192, 0.6);
+  box-shadow: 0 4px 15px rgba(192, 192, 192, 0.25), 0 0 15px rgba(192, 192, 192, 0.3);
+  background: linear-gradient(135deg, rgba(192, 192, 192, 0.03) 0%, rgba(168, 168, 168, 0.05) 100%);
+}
+.leaderboard-entry[data-rank="bronze"]:hover,
+.leaderboard-entry[data-rank="BRONZE"]:hover {
+  transform: translateY(-1px) scale(1.01);
+  border-color: rgba(205, 127, 50, 0.6);
+  box-shadow: 0 4px 15px rgba(205, 127, 50, 0.25), 0 0 15px rgba(205, 127, 50, 0.3);
+  background: linear-gradient(135deg, rgba(205, 127, 50, 0.03) 0%, rgba(160, 82, 45, 0.05) 100%);
 }
 
-@keyframes pulse {
-  0%, 100% { opacity: 0.7; }
-  50% { opacity: 1; }
+/* --- Subtle Child Element Animations --- */
+.leaderboard-entry:hover .profile-picture {
+  transform: scale(1.05);
+  transition: transform 0.15s ease;
+}
+.leaderboard-entry:hover .rp-progress-bar {
+  filter: brightness(1.1) saturate(1.1);
+  transition: filter 0.15s ease;
+}
+.leaderboard-entry:hover .rank-badge {
+  transform: scale(1.02);
+  transition: transform 0.15s ease;
+}
+.leaderboard-entry:hover .username,
+.leaderboard-entry:hover .rank-title,
+.leaderboard-entry:hover .rp-value {
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.6);
+  transition: text-shadow 0.15s ease;
 }
 
-/* --- Leaderboard Entry Fade-in Animation --- */
-.fade-in-row {
-  animation: fadeInRow 0.7s cubic-bezier(0.4,0,0.2,1);
-}
-@keyframes fadeInRow {
-  from { opacity: 0; transform: translateY(16px); }
-  to { opacity: 1; transform: none; }
+/* --- Mobile-friendly hover (reduce effects on touch devices) --- */
+@media (hover: none) {
+  .leaderboard-entry:hover {
+    transform: none;
+    animation: none;
+  }
 }
 
 /* --- Avatar Hover Glow --- */
