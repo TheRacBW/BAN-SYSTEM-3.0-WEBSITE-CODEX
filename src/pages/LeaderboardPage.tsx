@@ -8,38 +8,38 @@ import { TestLeaderboardData } from '../components/TestLeaderboardData';
 
 const LeaderboardPage: React.FC = () => {
   const {
-    entries: filteredEntries,
-    hottestGainers,
-    biggestLosers,
-    lastUpdate,
+    entries,
+    previousEntries,
     isLoading,
     error,
+    lastUpdate,
     searchQuery,
+    setSearchQuery,
     activeTab,
-    isLive,
-    searchLeaderboard,
     setActiveTab,
-    clearSearch,
+    isLive,
+    isRefreshing,
     refresh,
     startAutoRefresh,
     stopAutoRefresh,
-    isRefreshing,
-    getCurrentData,
-    getRankStatistics
+    gainers,
+    losers,
+    gainersTimeRange,
+    setGainersTimeRange,
+    losersTimeRange,
+    setLosersTimeRange,
+    isLoadingGainers,
+    isLoadingLosers
   } = useLeaderboard();
 
-  const [previousEntries, setPreviousEntries] = useState(filteredEntries);
-  const [isAnimating, setIsAnimating] = useState(false);
   const [showTest, setShowTest] = useState(true); // Temporarily show test
 
-  // Handle animations when data updates
-  useEffect(() => {
-    if (filteredEntries.length > 0 && previousEntries.length > 0 && filteredEntries !== previousEntries) {
-      setIsAnimating(true);
-      setTimeout(() => setIsAnimating(false), 3000);
-    }
-    setPreviousEntries(filteredEntries);
-  }, [filteredEntries, previousEntries]);
+  // Time range options
+  const timeRangeOptions = [
+    { value: '12h', label: '12 Hours' },
+    { value: '1d', label: '1 Day' },
+    { value: '2d', label: '2 Days' }
+  ];
 
   const formatLastUpdate = (timestamp: string) => {
     const date = new Date(timestamp);
@@ -149,9 +149,9 @@ const LeaderboardPage: React.FC = () => {
             const formData = new FormData(e.currentTarget);
             const query = formData.get('search') as string;
             if (query.trim()) {
-              searchLeaderboard(query);
+              setSearchQuery(query);
             } else {
-              clearSearch();
+              setSearchQuery('');
             }
           }}>
             <div className="relative max-w-md">
@@ -191,7 +191,7 @@ const LeaderboardPage: React.FC = () => {
         {isLoading ? (
           <div className="flex items-center justify-center py-12">
             <div className="text-center">
-              <RefreshCw className="animate-spin text-blue-600 dark:text-blue-400 mx-auto mb-4" size={32} />
+              <span className="animate-spin text-blue-600 dark:text-blue-400 mx-auto mb-4">🔄</span>
               <p className="text-gray-600 dark:text-gray-400">Loading leaderboard...</p>
             </div>
           </div>
@@ -204,11 +204,10 @@ const LeaderboardPage: React.FC = () => {
                     Top 200 Players
                   </h2>
                   <span className="text-sm text-gray-600 dark:text-gray-400">
-                    {filteredEntries.length} players
+                    {entries.length} players
                   </span>
                 </div>
-
-                {filteredEntries.length === 0 ? (
+                {entries.length === 0 ? (
                   <div className="text-center py-12">
                     <p className="text-gray-600 dark:text-gray-400">
                       {searchQuery ? 'No players found matching your search.' : 'No players found.'}
@@ -216,59 +215,66 @@ const LeaderboardPage: React.FC = () => {
                   </div>
                 ) : (
                   <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm overflow-hidden">
-                    {filteredEntries.map((entry, index) => (
+                    {entries.map((entry, index) => (
                       <LeaderboardEntryComponent
-                        key={entry.id || `${entry.username}-${index}`}
+                        key={entry.username}
                         entry={entry}
                         index={index}
-                        isAnimating={isAnimating}
                       />
                     ))}
                   </div>
                 )}
               </div>
             )}
-
             {(activeTab === 'gainers' || activeTab === 'losers') && (
               <div>
                 <div className="flex items-center justify-between mb-4">
                   <h2 className="text-xl font-semibold text-gray-900 dark:text-gray-100">
-                    {activeTab === 'gainers' ? 'Hottest Gainers' : 'Biggest Losers'}
+                    {activeTab === 'gainers' ? 'Top RP Gainers' : 'Top RP Losers'}
                   </h2>
-                  <span className="text-sm text-gray-600 dark:text-gray-400">
-                    Last 24 hours
-                  </span>
-                </div>
-
-                <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm overflow-hidden">
-                  {(activeTab === 'gainers' ? hottestGainers : biggestLosers).map((entry, index) => (
-                    <div
-                      key={`${entry.username}-${index}`}
-                      className="flex items-center justify-between p-4 border-b border-gray-200 dark:border-gray-700 last:border-b-0"
+                  <div>
+                    <select
+                      className="border rounded px-2 py-1 text-sm bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100"
+                      value={activeTab === 'gainers' ? gainersTimeRange : losersTimeRange}
+                      onChange={e => activeTab === 'gainers' ? setGainersTimeRange(e.target.value as any) : setLosersTimeRange(e.target.value as any)}
                     >
-                      <div className="flex items-center space-x-4">
-                        <div className="w-8 h-8 bg-gray-200 dark:bg-gray-600 rounded-full flex items-center justify-center text-sm font-bold">
-                          {index + 1}
-                        </div>
-                        <div>
-                          <div className="font-semibold text-gray-900 dark:text-white">
-                            {entry.username}
+                      {timeRangeOptions.map(opt => (
+                        <option key={opt.value} value={opt.value}>{opt.label}</option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+                <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm overflow-hidden">
+                  {(activeTab === 'gainers' ? isLoadingGainers : isLoadingLosers) ? (
+                    <div className="text-center py-8 text-gray-500 dark:text-gray-400">Loading...</div>
+                  ) : (
+                    (activeTab === 'gainers' ? gainers : losers).length === 0 ? (
+                      <div className="text-center py-8 text-gray-500 dark:text-gray-400">No data found for this period.</div>
+                    ) : (
+                      (activeTab === 'gainers' ? gainers : losers).map((entry, idx) => (
+                        <div key={entry.username} className="flex items-center justify-between p-4 border-b border-gray-200 dark:border-gray-700 last:border-b-0">
+                          <div className="flex items-center space-x-4">
+                            <div className="w-8 h-8 bg-gray-200 dark:bg-gray-600 rounded-full flex items-center justify-center text-sm font-bold">
+                              {idx + 1}
+                            </div>
+                            <div>
+                              <div className="font-semibold text-gray-900 dark:text-white">
+                                {entry.username}
+                              </div>
+                              <div className="text-xs text-gray-500 dark:text-gray-400">
+                                {entry.previous_rank_title} → {entry.current_rank_title}
+                              </div>
+                            </div>
                           </div>
-                          <div className="text-sm text-gray-500 dark:text-gray-400">
-                            {entry.calculatedRank?.calculatedRank || 'Unknown Rank'}
+                          <div className="text-right">
+                            <div className={`font-bold text-lg ${activeTab === 'gainers' ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>
+                              {entry.rp_change > 0 ? '+' : ''}{entry.rp_change} RP ({entry.percentage_change.toFixed(1)}%)
+                            </div>
                           </div>
                         </div>
-                      </div>
-                      <div className="text-right">
-                        <div className={`font-bold text-lg ${
-                          activeTab === 'gainers' ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'
-                        }`}>
-                          {activeTab === 'gainers' ? '+' : '-'}{activeTab === 'gainers' ? entry.total_gain : entry.total_loss}
-                        </div>
-                        <div className="text-sm text-gray-500 dark:text-gray-400">RP</div>
-                      </div>
-                    </div>
-                  ))}
+                      ))
+                    )
+                  )}
                 </div>
               </div>
             )}

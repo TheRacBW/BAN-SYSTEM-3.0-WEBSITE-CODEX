@@ -129,4 +129,30 @@ export const getRankTierIndex = (rankTier: RankTier, rankNumber: number): number
 export const getProgressToNextTier = (displayRp: number): number => {
   const { getProgressToNextTier: getProgress } = require('../utils/rankingSystem');
   return getProgress(displayRp);
-}; 
+};
+
+export interface LeaderboardEntryWithChanges extends LeaderboardEntry {
+  rp_change: number; // +15 or -8
+  position_change: number; // +3 or -2
+  rank_title_change: string | null; // e.g. "Diamond 3 → Diamond 2" or null
+  has_changes: boolean;
+  previous_position?: number;
+  previous_rp?: number;
+  previous_rank_title?: string;
+}
+
+export type TimeRange = '12h' | '1d' | '2d';
+
+export interface RPChangeWithTimeRange {
+  username: string;
+  current_rp: number;
+  current_rank_title: string;
+  previous_rp: number;
+  previous_rank_title: string;
+  rp_change: number;
+  rank_change_direction: 'up' | 'down' | 'same';
+  time_period: TimeRange;
+  percentage_change: number;
+  profile_picture?: string | null;
+  user_id?: number | null;
+} 

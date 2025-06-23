@@ -1,268 +1,155 @@
-import { useState, useEffect, useCallback, useMemo } from 'react';
-import { LeaderboardState, TabType, LeaderboardEntry, LeaderboardStats } from '../types/leaderboard';
+import { useState, useEffect, useCallback } from 'react';
 import { leaderboardService } from '../services/leaderboardService';
-import { calculateRankFromRPCached, isValidRP, CalculatedRank } from '../utils/rankingSystem';
+import {
+  LeaderboardEntryWithChanges,
+  RPChangeWithTimeRange,
+  LeaderboardState,
+  TabType,
+  TimeRange
+} from '../types/leaderboard';
 
-const REFRESH_INTERVAL = 10 * 60 * 1000; // 10 minutes
+const DEFAULT_TIME_RANGE: TimeRange = '12h';
 
 export const useLeaderboard = () => {
-  const [state, setState] = useState<LeaderboardState>({
-    entries: [],
-    hottestGainers: [],
-    biggestLosers: [],
-    lastUpdate: '',
-    isLoading: false,
-    error: null,
-    searchQuery: '',
-    activeTab: 'main'
-  });
-
+  // Main leaderboard
+  const [entries, setEntries] = useState<LeaderboardEntryWithChanges[]>([]);
+  const [previousEntries, setPreviousEntries] = useState<LeaderboardEntryWithChanges[]>([]);
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [lastUpdate, setLastUpdate] = useState('');
+  const [searchQuery, setSearchQuery] = useState('');
+  const [activeTab, setActiveTab] = useState<TabType>('main');
+  const [isRefreshing, setIsRefreshing] = useState(false);
   const [refreshInterval, setRefreshInterval] = useState<NodeJS.Timeout | null>(null);
 
-  /**
-   * Fetch leaderboard data with comprehensive error handling
-   */
-  const fetchLeaderboardData = useCallback(async () => {
+  // Gainers/losers
+  const [gainers, setGainers] = useState<RPChangeWithTimeRange[]>([]);
+  const [losers, setLosers] = useState<RPChangeWithTimeRange[]>([]);
+  const [gainersTimeRange, setGainersTimeRange] = useState<TimeRange>(DEFAULT_TIME_RANGE);
+  const [losersTimeRange, setLosersTimeRange] = useState<TimeRange>(DEFAULT_TIME_RANGE);
+  const [isLoadingGainers, setIsLoadingGainers] = useState(false);
+  const [isLoadingLosers, setIsLoadingLosers] = useState(false);
+
+  // Fetch main leaderboard with changes
+  const fetchLeaderboard = useCallback(async () => {
+    setIsLoading(true);
+    setError(null);
     try {
-      console.log('🔄 Starting leaderboard data fetch...');
-      setState(prev => ({ ...prev, isLoading: true, error: null }));
-
-      // Fetch main leaderboard data
-      const entries = await leaderboardService.fetchLeaderboardData();
-      console.log('✅ Fetched', entries.length, 'leaderboard entries');
-
-      // Fetch RP changes for gainers/losers
-      const [hottestGainers, biggestLosers] = await Promise.all([
-        leaderboardService.getHottestGainers(),
-        leaderboardService.getBiggestLosers()
-      ]);
-
-      console.log('✅ Fetched', hottestGainers.length, 'hottest gainers');
-      console.log('✅ Fetched', biggestLosers.length, 'biggest losers');
-
+      const newEntries = await leaderboardService.getCurrentLeaderboardWithChanges();
+      setPreviousEntries(entries);
+      setEntries(newEntries);
       // Get last update time
       const stats = await leaderboardService.getLeaderboardStats();
-      const lastUpdate = stats.lastUpdated;
-
-      setState(prev => ({
-        ...prev,
-        entries,
-        hottestGainers: hottestGainers.map(change => ({
-          username: change.username,
-          total_gain: change.rp_change,
-          profile_picture: null, // Will be enriched later
-          user_id: null
-        })),
-        biggestLosers: biggestLosers.map(change => ({
-          username: change.username,
-          total_loss: Math.abs(change.rp_change),
-          profile_picture: null, // Will be enriched later
-          user_id: null
-        })),
-        lastUpdate,
-        isLoading: false,
-        error: null
-      }));
-
-      console.log('✅ Leaderboard state updated successfully');
-    } catch (error) {
-      console.error('💥 Error fetching leaderboard data:', error);
-      setState(prev => ({
-        ...prev,
-        isLoading: false,
-        error: error instanceof Error ? error.message : 'Failed to fetch leaderboard data'
-      }));
+      setLastUpdate(stats.lastUpdated);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to fetch leaderboard data');
+    } finally {
+      setIsLoading(false);
     }
-  }, []);
+  }, [entries]);
 
-  /**
-   * Search leaderboard by username
-   */
-  const searchLeaderboard = useCallback(async (query: string) => {
+  // Fetch gainers/losers for a time range
+  const fetchGainers = useCallback(async (timeRange: TimeRange) => {
+    setIsLoadingGainers(true);
     try {
-      console.log('🔍 Searching leaderboard for:', query);
-      setState(prev => ({ ...prev, isLoading: true, error: null, searchQuery: query }));
-
-      const entries = await leaderboardService.searchLeaderboard(query);
-      console.log('✅ Search results:', entries.length, 'entries');
-
-      setState(prev => ({
-        ...prev,
-        entries,
-        isLoading: false,
-        error: null
-      }));
-    } catch (error) {
-      console.error('💥 Search error:', error);
-      setState(prev => ({
-        ...prev,
-        isLoading: false,
-        error: error instanceof Error ? error.message : 'Search failed'
-      }));
+      const data = await leaderboardService.getRPGainers(timeRange);
+      setGainers(data);
+    } catch (err) {
+      setGainers([]);
+    } finally {
+      setIsLoadingGainers(false);
+    }
+  }, []);
+  const fetchLosers = useCallback(async (timeRange: TimeRange) => {
+    setIsLoadingLosers(true);
+    try {
+      const data = await leaderboardService.getRPLosers(timeRange);
+      setLosers(data);
+    } catch (err) {
+      setLosers([]);
+    } finally {
+      setIsLoadingLosers(false);
     }
   }, []);
 
-  /**
-   * Change active tab
-   */
-  const setActiveTab = useCallback((tab: TabType) => {
-    console.log('📑 Switching to tab:', tab);
-    setState(prev => ({ ...prev, activeTab: tab }));
-  }, []);
-
-  /**
-   * Clear search and reload main leaderboard
-   */
-  const clearSearch = useCallback(() => {
-    console.log('🧹 Clearing search and reloading main leaderboard');
-    setState(prev => ({ ...prev, searchQuery: '' }));
-    fetchLeaderboardData();
-  }, [fetchLeaderboardData]);
-
-  /**
-   * Start auto-refresh
-   */
+  // Auto-refresh
   const startAutoRefresh = useCallback(() => {
-    console.log('🔄 Starting auto-refresh (30 seconds)');
-    if (refreshInterval) {
-      clearInterval(refreshInterval);
-    }
-    
+    if (refreshInterval) clearInterval(refreshInterval);
     const interval = setInterval(() => {
-      console.log('🔄 Auto-refreshing leaderboard data...');
-      fetchLeaderboardData();
-    }, 30000); // 30 seconds
-    
+      setIsRefreshing(true);
+      fetchLeaderboard().finally(() => setIsRefreshing(false));
+    }, 30000);
     setRefreshInterval(interval);
-  }, [fetchLeaderboardData, refreshInterval]);
-
-  /**
-   * Stop auto-refresh
-   */
+  }, [fetchLeaderboard, refreshInterval]);
   const stopAutoRefresh = useCallback(() => {
-    console.log('⏹️ Stopping auto-refresh');
-    if (refreshInterval) {
-      clearInterval(refreshInterval);
-      setRefreshInterval(null);
-    }
+    if (refreshInterval) clearInterval(refreshInterval);
+    setRefreshInterval(null);
   }, [refreshInterval]);
 
-  /**
-   * Manual refresh
-   */
-  const refresh = useCallback(() => {
-    console.log('🔄 Manual refresh triggered');
-    fetchLeaderboardData();
-  }, [fetchLeaderboardData]);
-
-  // Initial data fetch
+  // Initial fetch
   useEffect(() => {
-    console.log('🚀 Initial leaderboard data fetch');
-    fetchLeaderboardData();
-  }, [fetchLeaderboardData]);
-
-  // Start auto-refresh on mount
-  useEffect(() => {
-    console.log('🔄 Starting auto-refresh on mount');
+    fetchLeaderboard();
+    fetchGainers(gainersTimeRange);
+    fetchLosers(losersTimeRange);
     startAutoRefresh();
+    return () => stopAutoRefresh();
+    // eslint-disable-next-line
+  }, []);
 
-    // Cleanup on unmount
-    return () => {
-      console.log('🧹 Cleaning up auto-refresh on unmount');
-      stopAutoRefresh();
-    };
-  }, [startAutoRefresh, stopAutoRefresh]);
-
-  // Debug logging for state changes
+  // Refetch gainers/losers when time range changes
   useEffect(() => {
-    console.log('📊 Leaderboard state updated:', {
-      entriesCount: state.entries.length,
-      isLoading: state.isLoading,
-      error: state.error,
-      searchQuery: state.searchQuery,
-      activeTab: state.activeTab,
-      lastUpdate: state.lastUpdate
-    });
-  }, [state]);
+    fetchGainers(gainersTimeRange);
+  }, [gainersTimeRange, fetchGainers]);
+  useEffect(() => {
+    fetchLosers(losersTimeRange);
+  }, [losersTimeRange, fetchLosers]);
 
-  // Filter entries based on search query
-  const filteredEntries = state.searchQuery
-    ? state.entries.filter(entry =>
-        entry.username.toLowerCase().includes(state.searchQuery.toLowerCase())
-      )
-    : state.entries;
+  // Search
+  const filteredEntries = searchQuery
+    ? entries.filter(e => e.username.toLowerCase().includes(searchQuery.toLowerCase()))
+    : entries;
 
-  // Filter gainers and losers based on search query
-  const filteredGainers = state.searchQuery
-    ? state.hottestGainers.filter(entry =>
-        entry.username.toLowerCase().includes(state.searchQuery.toLowerCase())
-      )
-    : state.hottestGainers;
-
-  const filteredLosers = state.searchQuery
-    ? state.biggestLosers.filter(entry =>
-        entry.username.toLowerCase().includes(state.searchQuery.toLowerCase())
-      )
-    : state.biggestLosers;
-
-  // Check if data is live (updated within last 5 minutes)
+  // Live status
   const isLive = (() => {
     try {
-      const lastUpdateTime = new Date(state.lastUpdate).getTime();
+      const lastUpdateTime = new Date(lastUpdate).getTime();
       const now = Date.now();
-      const fiveMinutes = 5 * 60 * 1000;
-      return now - lastUpdateTime < fiveMinutes;
-    } catch (error) {
-      console.warn('Error checking if data is live:', error);
+      return now - lastUpdateTime < 5 * 60 * 1000;
+    } catch {
       return false;
     }
   })();
 
-  // Get current data based on active tab
-  const getCurrentData = () => {
-    switch (state.activeTab) {
-      case 'gainers':
-        return filteredGainers;
-      case 'losers':
-        return filteredLosers;
-      default:
-        return filteredEntries;
-    }
-  };
-
-  // Get rank statistics
-  const getRankStatistics = () => {
-    const rankCounts = new Map<string, number>();
-    
-    state.entries.forEach(entry => {
-      const rankKey = entry.calculatedRank?.calculatedRank || entry.rank_title || 'Unknown';
-      rankCounts.set(rankKey, (rankCounts.get(rankKey) || 0) + 1);
-    });
-    
-    return Array.from(rankCounts.entries()).map(([rank, count]) => ({
-      rank,
-      count
-    }));
-  };
+  // Manual refresh
+  const refresh = useCallback(() => {
+    fetchLeaderboard();
+    fetchGainers(gainersTimeRange);
+    fetchLosers(losersTimeRange);
+  }, [fetchLeaderboard, fetchGainers, fetchLosers, gainersTimeRange, losersTimeRange]);
 
   return {
     entries: filteredEntries,
-    hottestGainers: filteredGainers,
-    biggestLosers: filteredLosers,
-    lastUpdate: state.lastUpdate,
-    isLoading: state.isLoading,
-    error: state.error,
-    searchQuery: state.searchQuery,
-    activeTab: state.activeTab,
-    isLive,
-    searchLeaderboard,
+    previousEntries,
+    isLoading,
+    error,
+    lastUpdate,
+    searchQuery,
+    setSearchQuery,
+    activeTab,
     setActiveTab,
-    clearSearch,
+    isLive,
+    isRefreshing,
     refresh,
     startAutoRefresh,
     stopAutoRefresh,
-    isRefreshing: !!refreshInterval,
-    getCurrentData,
-    getRankStatistics
+    // Gainers/losers
+    gainers,
+    losers,
+    gainersTimeRange,
+    setGainersTimeRange,
+    losersTimeRange,
+    setLosersTimeRange,
+    isLoadingGainers,
+    isLoadingLosers
   };
 }; 
