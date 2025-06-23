@@ -435,7 +435,8 @@ class LeaderboardService {
         time_period: timeRange,
         percentage_change,
         profile_picture: currentEntry.profile_picture || prev.profile_picture || null,
-        user_id: currentEntry.user_id || prev.user_id || null
+        user_id: currentEntry.user_id || prev.user_id || null,
+        inserted_at: prev.inserted_at
       });
     }
     // Sort and return top 10

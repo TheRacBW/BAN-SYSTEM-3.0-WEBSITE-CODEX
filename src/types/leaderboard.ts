@@ -141,7 +141,7 @@ export interface LeaderboardEntryWithChanges extends LeaderboardEntry {
   previous_rank_title?: string;
 }
 
-export type TimeRange = '12h' | '1d' | '2d';
+export type TimeRange = '6h' | '12h' | '1d' | '2d';
 
 export interface RPChangeWithTimeRange {
   username: string;
@@ -155,4 +155,5 @@ export interface RPChangeWithTimeRange {
   percentage_change: number;
   profile_picture?: string | null;
   user_id?: number | null;
+  inserted_at?: string;
 } 

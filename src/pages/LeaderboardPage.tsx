@@ -260,48 +260,77 @@ const LeaderboardPage: React.FC = () => {
                   <h2 className="text-xl font-semibold text-gray-900 dark:text-gray-100">
                     {activeTab === 'gainers' ? 'Top RP Gainers' : 'Top RP Losers'}
                   </h2>
-                  <div>
-                    <select
-                      className="border rounded px-2 py-1 text-sm bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100"
-                      value={activeTab === 'gainers' ? gainersTimeRange : losersTimeRange}
-                      onChange={e => activeTab === 'gainers' ? setGainersTimeRange(e.target.value as any) : setLosersTimeRange(e.target.value as any)}
-                    >
-                      {timeRangeOptions.map(opt => (
-                        <option key={opt.value} value={opt.value}>{opt.label}</option>
-                      ))}
-                    </select>
+                  {/* Modern Segmented Control for Time Filter */}
+                  <div className="flex gap-2">
+                    {['6h', '12h', '1d', '2d'].map(opt => (
+                      <button
+                        key={opt}
+                        type="button"
+                        className={`px-3 py-1.5 rounded-full text-sm font-medium transition-all border border-transparent focus:outline-none
+                          ${((activeTab === 'gainers' ? gainersTimeRange : losersTimeRange) === opt)
+                            ? 'bg-blue-600 text-white shadow dark:bg-blue-500 dark:text-white'
+                            : 'bg-gray-100 text-gray-700 hover:bg-blue-100 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-blue-900/30'}
+                        `}
+                        onClick={() => activeTab === 'gainers' ? setGainersTimeRange(opt as any) : setLosersTimeRange(opt as any)}
+                      >
+                        {opt === '6h' ? '6h' : opt === '12h' ? '12h' : opt === '1d' ? '1d' : '2d'}
+                      </button>
+                    ))}
                   </div>
                 </div>
                 <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm overflow-hidden">
                   {(activeTab === 'gainers' ? isLoadingGainers : isLoadingLosers) ? (
                     <div className="text-center py-8 text-gray-500 dark:text-gray-400">Loading...</div>
                   ) : (
-                    (activeTab === 'gainers' ? gainers : losers).length === 0 ? (
-                      <div className="text-center py-8 text-gray-500 dark:text-gray-400">No data found for this period.</div>
-                    ) : (
-                      (activeTab === 'gainers' ? gainers : losers).map((entry, idx) => (
-                        <div key={entry.username} className="flex items-center justify-between p-4 border-b border-gray-200 dark:border-gray-700 last:border-b-0">
-                          <div className="flex items-center space-x-4">
-                            <div className="w-8 h-8 bg-gray-200 dark:bg-gray-600 rounded-full flex items-center justify-center text-sm font-bold">
-                              {idx + 1}
-                            </div>
-                            <div>
-                              <div className="font-semibold text-gray-900 dark:text-white">
-                                {entry.username}
+                    (() => {
+                      const data = activeTab === 'gainers' ? gainers : losers;
+                      if (!data || data.length === 0) {
+                        return <div className="text-center py-8 text-gray-500 dark:text-gray-400">No RP changes found in the selected period.</div>;
+                      }
+                      // Find the oldest inserted_at timestamp in the data
+                      const timestamps = data.map(e => e.inserted_at ? new Date(e.inserted_at) : null).filter(Boolean) as Date[];
+                      let oldest = null;
+                      if (timestamps.length > 0) {
+                        oldest = timestamps.reduce((min, d) => d < min ? d : min, timestamps[0]);
+                      }
+                      let periodMsg = '';
+                      if (oldest) {
+                        const now = new Date();
+                        const hours = Math.round((now.getTime() - oldest.getTime()) / (1000 * 60 * 60));
+                        const requested = (activeTab === 'gainers' ? gainersTimeRange : losersTimeRange);
+                        const requestedHours = requested === '6h' ? 6 : requested === '12h' ? 12 : requested === '1d' ? 24 : 48;
+                        if (hours < requestedHours) {
+                          periodMsg = `Partial data: Only last ${hours} hours available for this period.`;
+                        } else {
+                          periodMsg = `Showing last ${requestedHours} hours of data.`;
+                        }
+                      }
+                      return <>
+                        {periodMsg && <div className="text-center py-2 text-xs text-gray-500 dark:text-gray-400">{periodMsg}</div>}
+                        {data.map((entry, idx) => (
+                          <div key={entry.username} className="flex items-center justify-between p-4 border-b border-gray-200 dark:border-gray-700 last:border-b-0">
+                            <div className="flex items-center space-x-4">
+                              <div className="w-8 h-8 bg-gray-200 dark:bg-gray-600 rounded-full flex items-center justify-center text-sm font-bold">
+                                {idx + 1}
                               </div>
-                              <div className="text-xs text-gray-500 dark:text-gray-400">
-                                {entry.previous_rank_title} → {entry.current_rank_title}
+                              <div>
+                                <div className="font-semibold text-gray-900 dark:text-white">
+                                  {entry.username}
+                                </div>
+                                <div className="text-xs text-gray-500 dark:text-gray-400">
+                                  {entry.previous_rank_title} → {entry.current_rank_title}
+                                </div>
+                              </div>
+                            </div>
+                            <div className="text-right">
+                              <div className={`font-bold text-lg ${activeTab === 'gainers' ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>
+                                {entry.rp_change > 0 ? '+' : ''}{entry.rp_change} RP ({entry.percentage_change.toFixed(1)}%)
                               </div>
                             </div>
                           </div>
-                          <div className="text-right">
-                            <div className={`font-bold text-lg ${activeTab === 'gainers' ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>
-                              {entry.rp_change > 0 ? '+' : ''}{entry.rp_change} RP ({entry.percentage_change.toFixed(1)}%)
-                            </div>
-                          </div>
-                        </div>
-                      ))
-                    )
+                        ))}
+                      </>;
+                    })()
                   )}
                 </div>
               </div>
