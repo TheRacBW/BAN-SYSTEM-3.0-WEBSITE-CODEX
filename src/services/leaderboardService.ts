@@ -1,5 +1,5 @@
 import { supabase } from '../lib/supabase';
-import { LeaderboardEntry, LeaderboardStats } from '../types/leaderboard';
+import { LeaderboardEntry, LeaderboardStats, calculateRankFromRP } from '../types/leaderboard';
 import { robloxApi } from './robloxApi';
 
 class LeaderboardService {
@@ -8,7 +8,7 @@ class LeaderboardService {
       const { data, error } = await supabase
         .from('leaderboard')
         .select('*')
-        .order('rank_position')
+        .order('total_rp', { ascending: false })
         .limit(200);
 
       if (error) {
@@ -28,7 +28,21 @@ class LeaderboardService {
         })
       );
 
-      return enrichedData;
+      // Sort by calculated rank tier and total RP
+      const sortedData = enrichedData.sort((a: LeaderboardEntry, b: LeaderboardEntry) => {
+        // First sort by total RP (descending)
+        const rpDiff = (b.total_rp || b.rp || 0) - (a.total_rp || a.rp || 0);
+        if (rpDiff !== 0) return rpDiff;
+        
+        // If RP is the same, sort by username
+        return a.username.localeCompare(b.username);
+      });
+
+      // Update rank positions based on sorted order
+      return sortedData.map((entry: LeaderboardEntry, index: number) => ({
+        ...entry,
+        rank_position: index + 1
+      }));
     } catch (error) {
       console.error('Error in getCurrentLeaderboard:', error);
       throw error;
@@ -39,11 +53,11 @@ class LeaderboardService {
     try {
       const { data, error } = await supabase
         .from('rp_changes')
-        .select('username, rp_change')
+        .select('username, rp_change, new_calculated_rank, total_rp')
         .gte('change_timestamp', new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString())
         .gt('rp_change', 0)
         .order('rp_change', { ascending: false })
-        .limit(4);
+        .limit(20); // Get more data to account for grouping
 
       if (error) {
         console.error('Error fetching hottest gainers:', error);
@@ -51,14 +65,23 @@ class LeaderboardService {
       }
 
       // Group by username and sum the gains
-      const gainsMap = new Map<string, number>();
+      const gainsMap = new Map<string, { total_gain: number; calculated_rank_tier?: string; total_rp?: number }>();
       data.forEach(change => {
-        const current = gainsMap.get(change.username) || 0;
-        gainsMap.set(change.username, current + change.rp_change);
+        const current = gainsMap.get(change.username) || { total_gain: 0 };
+        gainsMap.set(change.username, {
+          total_gain: current.total_gain + change.rp_change,
+          calculated_rank_tier: change.new_calculated_rank,
+          total_rp: change.total_rp
+        });
       });
 
       const gainers: LeaderboardStats[] = Array.from(gainsMap.entries())
-        .map(([username, total_gain]) => ({ username, total_gain }))
+        .map(([username, data]) => ({ 
+          username, 
+          total_gain: data.total_gain,
+          calculated_rank_tier: data.calculated_rank_tier as any,
+          total_rp: data.total_rp
+        }))
         .sort((a, b) => (b.total_gain || 0) - (a.total_gain || 0))
         .slice(0, 4);
 
@@ -94,11 +117,11 @@ class LeaderboardService {
     try {
       const { data, error } = await supabase
         .from('rp_changes')
-        .select('username, rp_change')
+        .select('username, rp_change, new_calculated_rank, total_rp')
         .gte('change_timestamp', new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString())
         .lt('rp_change', 0)
         .order('rp_change', { ascending: true })
-        .limit(4);
+        .limit(20); // Get more data to account for grouping
 
       if (error) {
         console.error('Error fetching biggest losers:', error);
@@ -106,14 +129,23 @@ class LeaderboardService {
       }
 
       // Group by username and sum the losses
-      const lossesMap = new Map<string, number>();
+      const lossesMap = new Map<string, { total_loss: number; calculated_rank_tier?: string; total_rp?: number }>();
       data.forEach(change => {
-        const current = lossesMap.get(change.username) || 0;
-        lossesMap.set(change.username, current + change.rp_change);
+        const current = lossesMap.get(change.username) || { total_loss: 0 };
+        lossesMap.set(change.username, {
+          total_loss: current.total_loss + change.rp_change,
+          calculated_rank_tier: change.new_calculated_rank,
+          total_rp: change.total_rp
+        });
       });
 
       const losers: LeaderboardStats[] = Array.from(lossesMap.entries())
-        .map(([username, total_loss]) => ({ username, total_loss }))
+        .map(([username, data]) => ({ 
+          username, 
+          total_loss: data.total_loss,
+          calculated_rank_tier: data.calculated_rank_tier as any,
+          total_rp: data.total_rp
+        }))
         .sort((a, b) => (a.total_loss || 0) - (b.total_loss || 0))
         .slice(0, 4);
 
@@ -166,11 +198,61 @@ class LeaderboardService {
     }
   }
 
+  async getRankStatistics(): Promise<any[]> {
+    try {
+      const { data, error } = await supabase
+        .from('rank_statistics')
+        .select('*')
+        .order('calculated_rank_tier, calculated_rank_number');
+
+      if (error) {
+        console.error('Error fetching rank statistics:', error);
+        return [];
+      }
+
+      return data || [];
+    } catch (error) {
+      console.error('Error in getRankStatistics:', error);
+      return [];
+    }
+  }
+
   isLive(lastUpdate: string): boolean {
     const lastUpdateTime = new Date(lastUpdate).getTime();
     const now = Date.now();
     const fiveMinutes = 5 * 60 * 1000;
     return now - lastUpdateTime < fiveMinutes;
+  }
+
+  // Helper method to calculate rank changes
+  calculateRankChanges(previousEntry: LeaderboardEntry, currentEntry: LeaderboardEntry) {
+    const previousRank = calculateRankFromRP(previousEntry.total_rp || previousEntry.rp || 0);
+    const currentRank = calculateRankFromRP(currentEntry.total_rp || currentEntry.rp || 0);
+    
+    const previousRankIndex = this.getRankTierIndex(previousRank.rank_tier, previousRank.rank_number);
+    const currentRankIndex = this.getRankTierIndex(currentRank.rank_tier, currentRank.rank_number);
+    
+    return {
+      rankTierChange: currentRankIndex - previousRankIndex,
+      previousRank,
+      currentRank,
+      rpChange: (currentEntry.total_rp || currentEntry.rp || 0) - (previousEntry.total_rp || previousEntry.rp || 0)
+    };
+  }
+
+  private getRankTierIndex(rankTier: string, rankNumber: number): number {
+    const tierIndex = {
+      'Bronze': 1,
+      'Silver': 2,
+      'Gold': 3,
+      'Platinum': 4,
+      'Diamond': 5,
+      'Emerald': 6,
+      'Nightmare': 7
+    };
+    
+    const baseIndex = (tierIndex[rankTier as keyof typeof tierIndex] || 0) * 1000;
+    return baseIndex + rankNumber;
   }
 }
 
