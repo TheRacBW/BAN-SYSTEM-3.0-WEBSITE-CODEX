@@ -5,17 +5,36 @@ import { LeaderboardEntry, RPChange, LeaderboardEntryWithChanges, RPChangeWithTi
 
 // --- Rank Sorting Utility ---
 function getRankSortValue(rankTitle: string, rp: number): number {
+  console.log('Sorting rank_title from DB:', rankTitle); // Debug log
   const rankMapping: Record<string, number> = {
     'Nightmare': 7000,
     'Emerald': 6000,
-    'Diamond 3': 5003, 'Diamond 2': 5002, 'Diamond 1': 5001,
-    'Platinum 4': 4004, 'Platinum 3': 4003, 'Platinum 2': 4002, 'Platinum 1': 4001,
-    'Gold 4': 3004, 'Gold 3': 3003, 'Gold 2': 3002, 'Gold 1': 3001,
-    'Silver 4': 2004, 'Silver 3': 2003, 'Silver 2': 2002, 'Silver 1': 2001,
-    'Bronze 4': 1004, 'Bronze 3': 1003, 'Bronze 2': 1002, 'Bronze 1': 1001
+    'Diamond 3': 5003,
+    'Diamond 2': 5002,
+    'Diamond 1': 5001,
+    'Platinum 4': 4004,
+    'Platinum 3': 4003,
+    'Platinum 2': 4002,
+    'Platinum 1': 4001,
+    'Gold 4': 3004,
+    'Gold 3': 3003,
+    'Gold 2': 3002,
+    'Gold 1': 3001,
+    'Silver 4': 2004,
+    'Silver 3': 2003,
+    'Silver 2': 2002,
+    'Silver 1': 2001,
+    'Bronze 4': 1004,
+    'Bronze 3': 1003,
+    'Bronze 2': 1002,
+    'Bronze 1': 1001
   };
-  const baseValue = rankMapping[rankTitle] || 0;
-  const rpBonus = rankTitle === 'Nightmare' ? rp : Math.min(rp, 99);
+  const baseValue = rankMapping[rankTitle];
+  if (!baseValue) {
+    console.error('Unknown rank_title:', rankTitle);
+    return 0; // Put unknown ranks at bottom
+  }
+  const rpBonus = rankTitle === 'Nightmare' ? Math.min(rp, 999) : Math.min(rp, 99);
   return baseValue + rpBonus;
 }
 

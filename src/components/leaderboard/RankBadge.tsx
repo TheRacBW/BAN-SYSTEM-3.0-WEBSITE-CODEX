@@ -61,52 +61,52 @@ const RankBadge: React.FC<RankBadgeProps> = ({ rankTitle, rp, size = 'medium', c
     leaderboardService.getRankIcons().then(setRankIcons);
   }, []);
 
-  // Extract tier and level
-  const tier = rankTitle.split(' ')[0];
-  const level = rankTitle.split(' ')[1] || '';
+  // Remove @ from rank title for display
+  const displayRankTitle = rankTitle.startsWith('@') ? rankTitle.slice(1) : rankTitle;
+  const tier = displayRankTitle.split(' ')[0];
+  const level = displayRankTitle.split(' ')[1] || '';
   const iconUrl = rankIcons.get(tier);
   const colorScheme = rankColorSchemes[tier] || rankColorSchemes['Bronze'];
 
   // Sizing
   const sizeMap = {
     small: { icon: 20, font: '0.85rem', pad: '4px 8px' },
-    medium: { icon: 32, font: '1rem', pad: '8px 12px' },
+    medium: { icon: 32, font: '1rem', pad: '8px 16px' },
     large: { icon: 48, font: '1.15rem', pad: '12px 18px' }
   };
   const s = sizeMap[size];
 
   return (
     <div
-      className={`rank-badge rank-badge--${size} ${className}`}
+      className={`rank-badge rank-badge--${size} rank-badge--${tier.toLowerCase()} ${className}`}
       style={{
-        background: colorScheme.background,
-        boxShadow: `0 0 20px ${colorScheme.glow}`,
         padding: s.pad,
         borderRadius: 12,
-        border: '2px solid rgba(255,255,255,0.2)',
+        border: '1px solid rgba(255,255,255,0.1)',
         display: 'flex',
         alignItems: 'center',
-        gap: 8,
+        gap: 12,
         position: 'relative',
-        ...(tier === 'Nightmare' ? { animation: 'nightmareGlow 2s ease-in-out infinite alternate' } : {})
+        overflow: 'hidden',
+        backdropFilter: 'blur(8px)'
       }}
       data-tier={tier}
     >
       {iconUrl && !iconError && (
-        <img
-          src={iconUrl}
-          alt={`${tier} rank`}
-          className="rank-icon"
-          style={{ width: s.icon, height: s.icon }}
-          onError={() => setIconError(true)}
-        />
+        <div className="rank-icon-container">
+          <img
+            src={iconUrl}
+            alt={`${tier} rank`}
+            className="rank-icon"
+            style={{ width: s.icon, height: s.icon }}
+            onError={() => setIconError(true)}
+          />
+        </div>
       )}
-      <div className="rank-info" style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-        <span className="rank-tier" style={{ color: colorScheme.primary, fontWeight: 'bold', fontSize: s.font, textShadow: '0 1px 2px rgba(0,0,0,0.5)' }}>{tier}</span>
-        {level && (
-          <span className="rank-level" style={{ color: colorScheme.secondary, fontSize: '0.85em', opacity: 0.9 }}>{level}</span>
-        )}
-        <span className="rank-rp" style={{ fontSize: '0.8em', color: 'rgba(255,255,255,0.8)' }}>{rp} RP</span>
+      <div className="rank-text-container">
+        <div className="rank-tier">{tier}</div>
+        {level && <div className="rank-level">{level}</div>}
+        <div className="rank-rp">{rp} RP</div>
       </div>
     </div>
   );

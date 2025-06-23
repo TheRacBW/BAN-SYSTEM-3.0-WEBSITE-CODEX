@@ -113,81 +113,109 @@
     @apply text-gray-700 dark:text-gray-300;
   }
 
-  /* --- Official Rank Badge Styles --- */
+  /* --- Modern Official Rank Badge Styles --- */
   .rank-badge {
     display: flex;
     align-items: center;
-    gap: 8px;
-    padding: 8px 12px;
+    gap: 12px;
+    padding: 8px 16px;
     border-radius: 12px;
-    border: 2px solid rgba(255, 255, 255, 0.2);
-    backdrop-filter: blur(4px);
+    backdrop-filter: blur(8px);
+    border: 1px solid rgba(255, 255, 255, 0.1);
     transition: all 0.3s ease;
+    position: relative;
+    overflow: hidden;
   }
 
-  .rank-badge:hover {
-    transform: scale(1.05);
-    filter: brightness(1.1);
+  .rank-badge::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; right: 0; bottom: 0;
+    opacity: 0.15;
+    z-index: 0;
   }
 
-  .rank-badge--small {
-    padding: 4px 8px;
-    gap: 4px;
+  .rank-badge--nightmare {
+    background: linear-gradient(135deg, rgba(156, 39, 176, 0.3) 0%, rgba(123, 31, 162, 0.3) 100%);
+    border-color: rgba(156, 39, 176, 0.4);
+    box-shadow: 0 0 20px rgba(156, 39, 176, 0.3);
+    animation: nightmareGlow 2s ease-in-out infinite alternate;
+  }
+  .rank-badge--emerald {
+    background: linear-gradient(135deg, rgba(76, 175, 80, 0.3) 0%, rgba(56, 142, 60, 0.3) 100%);
+    border-color: rgba(76, 175, 80, 0.4);
+  }
+  .rank-badge--diamond {
+    background: linear-gradient(135deg, rgba(63, 81, 181, 0.3) 0%, rgba(25, 118, 210, 0.3) 100%);
+    border-color: rgba(63, 81, 181, 0.4);
+  }
+  .rank-badge--platinum {
+    background: linear-gradient(135deg, rgba(77, 208, 225, 0.3) 0%, rgba(0, 188, 212, 0.3) 100%);
+    border-color: rgba(77, 208, 225, 0.4);
+  }
+  .rank-badge--gold {
+    background: linear-gradient(135deg, rgba(255, 215, 0, 0.3) 0%, rgba(255, 165, 0, 0.3) 100%);
+    border-color: rgba(255, 215, 0, 0.4);
+  }
+  .rank-badge--silver {
+    background: linear-gradient(135deg, rgba(192, 192, 192, 0.3) 0%, rgba(168, 168, 168, 0.3) 100%);
+    border-color: rgba(192, 192, 192, 0.4);
+  }
+  .rank-badge--bronze {
+    background: linear-gradient(135deg, rgba(205, 127, 50, 0.3) 0%, rgba(160, 82, 45, 0.3) 100%);
+    border-color: rgba(205, 127, 50, 0.4);
   }
 
-  .rank-badge--small .rank-icon {
-    width: 20px;
-    height: 20px;
-  }
-
-  .rank-badge--medium .rank-icon {
-    width: 32px;
-    height: 32px;
-  }
-
-  .rank-badge--large .rank-icon {
-    width: 48px;
-    height: 48px;
+  .rank-icon-container {
+    position: relative;
+    z-index: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
   }
 
   .rank-icon {
+    width: 32px;
+    height: 32px;
     object-fit: contain;
     filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.3));
   }
 
-  .rank-info {
+  .rank-text-container {
+    position: relative;
+    z-index: 1;
     display: flex;
     flex-direction: column;
     gap: 2px;
   }
 
   .rank-tier {
-    font-weight: bold;
+    font-weight: 700;
     font-size: 0.875rem;
-    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.5);
+    color: white;
+    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.8);
   }
 
   .rank-level {
+    font-weight: 600;
     font-size: 0.75rem;
-    opacity: 0.9;
+    color: rgba(255, 255, 255, 0.9);
+    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.6);
   }
 
   .rank-rp {
+    font-weight: 500;
     font-size: 0.75rem;
     color: rgba(255, 255, 255, 0.8);
-  }
-
-  /* Nightmare special styling */
-  .rank-badge[data-tier="Nightmare"] {
-    animation: nightmareGlow 2s ease-in-out infinite alternate;
+    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.6);
   }
 
   @keyframes nightmareGlow {
     from {
-      box-shadow: 0 0 20px rgba(156, 39, 176, 0.4);
+      box-shadow: 0 0 20px rgba(156, 39, 176, 0.3);
     }
     to {
-      box-shadow: 0 0 30px rgba(156, 39, 176, 0.6), 0 0 40px rgba(156, 39, 176, 0.3);
+      box-shadow: 0 0 30px rgba(156, 39, 176, 0.5), 0 0 40px rgba(156, 39, 176, 0.2);
     }
   }
 }

@@ -1,5 +1,10 @@
 import { RobloxUser, RobloxThumbnail } from '../types/leaderboard';
 
+// Helper to clean @ from username
+function cleanUsername(username: string): string {
+  return username.startsWith('@') ? username.slice(1) : username;
+}
+
 class RobloxApiService {
   private cache = new Map<string, { user: RobloxUser; timestamp: number }>();
   private thumbnailCache = new Map<number, { thumbnail: RobloxThumbnail; timestamp: number }>();
@@ -9,27 +14,21 @@ class RobloxApiService {
    * Get Roblox user ID from username
    */
   async getRobloxUserId(username: string): Promise<number | null> {
-    // Remove @ symbol if present
-    const cleanUsername = username.replace('@', '');
-    
+    const cleanName = cleanUsername(username);
     try {
-      console.log('Fetching Roblox user ID for:', cleanUsername);
-      
+      console.log('Fetching Roblox user ID for:', cleanName);
       const response = await fetch(`https://users.roblox.com/v1/usernames/users`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ usernames: [cleanUsername] })
+        body: JSON.stringify({ usernames: [cleanName] })
       });
-      
       if (!response.ok) {
-        console.warn(`Failed to get Roblox user ID for ${cleanUsername}:`, response.status);
+        console.warn(`Failed to get Roblox user ID for ${cleanName}:`, response.status);
         return null;
       }
-      
       const data = await response.json();
       const userId = data.data?.[0]?.id || null;
-      
-      console.log(`Roblox user ID for ${cleanUsername}:`, userId);
+      console.log(`Roblox user ID for ${cleanName}:`, userId);
       return userId;
     } catch (error) {
       console.error('Failed to get Roblox user ID:', error);
@@ -66,29 +65,25 @@ class RobloxApiService {
    * Search for a Roblox user by username
    */
   async searchUser(username: string): Promise<RobloxUser | null> {
+    const cleanName = cleanUsername(username);
     try {
-      console.log('Searching for Roblox user:', username);
-      
-      const userId = await this.getRobloxUserId(username);
+      console.log('Searching for Roblox user:', cleanName);
+      const userId = await this.getRobloxUserId(cleanName);
       if (!userId) {
-        console.log('No user ID found for:', username);
+        console.log('No user ID found for:', cleanName);
         return null;
       }
-
       const response = await fetch(`https://users.roblox.com/v1/users/${userId}`);
-      
       if (!response.ok) {
         console.warn(`Failed to get user data for ${userId}:`, response.status);
         return null;
       }
-      
       const userData = await response.json();
       const user: RobloxUser = {
         id: userId,
         name: userData.name,
         displayName: userData.displayName
       };
-      
       console.log('Found Roblox user:', user);
       return user;
     } catch (error) {
@@ -101,12 +96,12 @@ class RobloxApiService {
    * Get profile picture for a user by username
    */
   async getProfilePictureByUsername(username: string): Promise<string> {
+    const cleanName = cleanUsername(username);
     try {
-      const userId = await this.getRobloxUserId(username);
+      const userId = await this.getRobloxUserId(cleanName);
       if (!userId) {
         return '/default-avatar.png';
       }
-      
       return await this.getRobloxProfilePicture(userId);
     } catch (error) {
       console.error('Failed to get profile picture by username:', error);
@@ -123,7 +118,6 @@ class RobloxApiService {
       if (entry.user_id && entry.profile_picture) {
         return entry;
       }
-
       const user = await this.searchUser(entry.username);
       if (user) {
         const profilePicture = await this.getRobloxProfilePicture(user.id);
@@ -133,7 +127,6 @@ class RobloxApiService {
           profile_picture: profilePicture
         };
       }
-
       return entry;
     } catch (error) {
       console.error('Failed to enrich leaderboard entry:', error);

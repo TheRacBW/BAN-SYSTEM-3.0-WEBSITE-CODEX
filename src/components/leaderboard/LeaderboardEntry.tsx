@@ -61,6 +61,42 @@ const LeaderboardEntryComponent: React.FC<LeaderboardEntryProps> = ({
     else if (entry.position_change < 0) animationClass = 'entry-position-declined';
   }
 
+  // Add RP bar color utility
+  const getRPBarColors = (rankTitle: string) => {
+    const tier = (rankTitle.startsWith('@') ? rankTitle.slice(1) : rankTitle).split(' ')[0];
+    const colorMappings = {
+      'Nightmare': {
+        gradient: 'linear-gradient(90deg, #9C27B0 0%, #E91E63 100%)',
+        glow: '0 0 10px rgba(156, 39, 176, 0.5)'
+      },
+      'Emerald': {
+        gradient: 'linear-gradient(90deg, #4CAF50 0%, #8BC34A 100%)',
+        glow: '0 0 10px rgba(76, 175, 80, 0.5)'
+      },
+      'Diamond': {
+        gradient: 'linear-gradient(90deg, #2196F3 0%, #03DAC6 100%)',
+        glow: '0 0 10px rgba(33, 150, 243, 0.5)'
+      },
+      'Platinum': {
+        gradient: 'linear-gradient(90deg, #00BCD4 0%, #4DD0E1 100%)',
+        glow: '0 0 10px rgba(0, 188, 212, 0.5)'
+      },
+      'Gold': {
+        gradient: 'linear-gradient(90deg, #FFD700 0%, #FFA500 100%)',
+        glow: '0 0 10px rgba(255, 215, 0, 0.5)'
+      },
+      'Silver': {
+        gradient: 'linear-gradient(90deg, #C0C0C0 0%, #E8E8E8 100%)',
+        glow: '0 0 10px rgba(192, 192, 192, 0.5)'
+      },
+      'Bronze': {
+        gradient: 'linear-gradient(90deg, #CD7F32 0%, #FF6B35 100%)',
+        glow: '0 0 10px rgba(205, 127, 50, 0.5)'
+      }
+    };
+    return colorMappings[tier as keyof typeof colorMappings] || colorMappings['Bronze'];
+  };
+
   return (
     <div className={`leaderboard-entry relative flex items-center justify-between p-4 bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-750 transition-all duration-300 ease-in-out ${animationClass}`}>
       {/* Position */}
@@ -110,8 +146,12 @@ const LeaderboardEntryComponent: React.FC<LeaderboardEntryProps> = ({
           </div>
           <div className="w-full bg-gray-200 dark:bg-gray-600 rounded-full h-2">
             <div
-              className={`h-2 rounded-full transition-all duration-300 ${rankInfo ? `bg-gradient-to-r ${rankInfo.gradient}` : 'bg-blue-500'}`}
-              style={{ width: `${progressPercent}%` }}
+              className="h-2 rounded-full transition-all duration-300"
+              style={{
+                width: `${progressPercent}%`,
+                background: getRPBarColors(entry.rank_title).gradient,
+                boxShadow: getRPBarColors(entry.rank_title).glow
+              }}
             />
           </div>
         </div>
