@@ -5,6 +5,7 @@ import { LeaderboardEntryWithChanges } from '../../types/leaderboard';
 import { robloxApi } from '../../services/robloxApi';
 import { calculateRankFromRPCached, getRankDisplayName, isTierPromotion, isTierDemotion, getRankTierInfo } from '../../utils/rankingSystem';
 import RankBadge from './RankBadge';
+import { Tooltip } from 'react-tooltip';
 
 interface LeaderboardEntryProps {
   entry: LeaderboardEntryWithChanges;
@@ -98,53 +99,63 @@ const LeaderboardEntryComponent: React.FC<LeaderboardEntryProps> = ({
   };
 
   return (
-    <div className={`leaderboard-entry relative flex items-center justify-between p-4 bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-750 transition-all duration-300 ease-in-out ${animationClass}`}>
+    <div className={`leaderboard-entry relative flex items-center justify-between p-4 bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-750 transition-all duration-300 ease-in-out rounded-xl shadow-sm hover:shadow-lg fade-in-row ${animationClass}`}
+      style={{ minHeight: 72 }}>
       {/* Position */}
       <div className="flex items-center space-x-4">
-        <div className="flex items-center justify-center w-8 h-8 rounded-full font-bold text-sm bg-gray-200 dark:bg-gray-600 text-gray-700 dark:text-gray-300">{entry.rank_position}</div>
+        <div className="flex items-center justify-center w-8 h-8 rounded-full font-bold text-base bg-gray-200 dark:bg-gray-600 text-gray-700 dark:text-gray-300 shadow-sm">{entry.rank_position}</div>
         {/* Profile Picture */}
-        <div className="relative">
+        <div className="relative group" tabIndex={0} aria-label={`Roblox profile for ${entry.username}`}
+          data-tooltip-id={`profile-tooltip-${entry.username}`}
+          data-tooltip-content={`@${entry.username} \n View Roblox Profile`}>
           {isLoadingProfile ? (
-            <div className="w-10 h-10 bg-gray-200 dark:bg-gray-600 rounded-full animate-pulse" />
+            <div className="avatar-shimmer w-12 h-12 rounded-full bg-gray-200 dark:bg-gray-700 animate-shimmer" />
           ) : (
             <img
               src={profilePicture || '/default-avatar.png'}
               alt={`${entry.username}'s profile`}
-              className="w-10 h-10 rounded-full border-2 border-gray-200 dark:border-gray-600 object-cover"
+              className="w-12 h-12 rounded-full border-2 border-gray-200 dark:border-gray-600 object-cover transition-all duration-200 group-hover:shadow-lg group-hover:border-blue-400 group-hover:ring-2 group-hover:ring-blue-200"
               onError={handleProfileError}
               loading="lazy"
+              style={{ boxShadow: entry.user_id ? '0 0 0 2px #3b82f6' : undefined }}
             />
           )}
+          {/* Roblox logo overlay for verified users */}
+          {entry.user_id && !isLoadingProfile && (
+            <img src="/roblox-logo.svg" alt="Roblox" className="absolute bottom-0 right-0 w-5 h-5 rounded-full bg-white border border-gray-300 shadow" style={{ transform: 'translate(30%, 30%)' }} />
+          )}
+          <Tooltip id={`profile-tooltip-${entry.username}`} place="top" />
         </div>
         {/* Username and Rank */}
-        <div className="flex flex-col">
+        <div className="flex flex-col min-w-0">
           <a
             href={getRobloxProfileUrl()}
             target="_blank"
             rel="noopener noreferrer"
-            className="font-semibold text-gray-900 dark:text-white hover:text-blue-600 dark:hover:text-blue-400 transition-colors"
+            className="font-semibold text-gray-900 dark:text-white hover:text-blue-600 dark:hover:text-blue-400 transition-colors truncate text-base"
+            style={{ maxWidth: 120 }}
           >
             {entry.username}
           </a>
-          <div className="flex items-center space-x-2">
+          <div className="flex items-center space-x-2 mt-0.5">
             <RankBadge rankTitle={entry.rank_title} rp={entry.rp} size="small" />
-            <span className="text-xs text-gray-500 dark:text-gray-400">{entry.rank_title}</span>
+            <span className="text-xs text-gray-500 dark:text-gray-400 truncate">{entry.rank_title}</span>
           </div>
         </div>
       </div>
       {/* RP and Progress */}
-      <div className="flex items-center space-x-4">
-        <div className="text-right">
-          <div className="font-bold text-lg text-gray-900 dark:text-white">{formatRP(entry.rp)}</div>
+      <div className="flex items-center space-x-4 min-w-0">
+        <div className="text-right min-w-[60px]">
+          <div className="font-bold text-lg text-gray-900 dark:text-white leading-tight">{formatRP(entry.rp)}</div>
           <div className="text-xs text-gray-500 dark:text-gray-400">Total RP</div>
         </div>
         {/* Progress Bar */}
-        <div className="w-24">
+        <div className="w-28">
           <div className="flex justify-between text-xs text-gray-500 dark:text-gray-400 mb-1">
             <span>{progressValue}</span>
             <span>{progressMax}</span>
           </div>
-          <div className="w-full bg-gray-200 dark:bg-gray-600 rounded-full h-2">
+          <div className="w-full bg-gray-100 dark:bg-gray-700 rounded-full h-2 border border-gray-300 dark:border-gray-600 relative overflow-hidden">
             <div
               className="h-2 rounded-full transition-all duration-300"
               style={{
@@ -158,7 +169,8 @@ const LeaderboardEntryComponent: React.FC<LeaderboardEntryProps> = ({
       </div>
       {/* RP Change Indicator */}
       {entry.rp_change !== 0 && (
-        <div className={`rp-change absolute top-2 right-2 px-2 py-1 rounded-full text-xs font-semibold ${entry.rp_change > 0 ? 'gain' : 'loss'}`}>
+        <div className={`rp-change absolute top-2 right-2 px-2 py-1 rounded-full text-xs font-semibold ${entry.rp_change > 0 ? 'gain' : 'loss'}`}
+          style={{ boxShadow: '0 2px 8px rgba(34,197,94,0.08)' }}>
           {entry.rp_change > 0 ? '+' : ''}{entry.rp_change} RP
           {entry.position_change !== 0 && (
             <span className="position-change ml-1">

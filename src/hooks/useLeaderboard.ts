@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { leaderboardService } from '../services/leaderboardService';
+import { robloxApi } from '../services/robloxApi';
 import {
   LeaderboardEntryWithChanges,
   RPChangeWithTimeRange,
@@ -32,6 +33,23 @@ export const useLeaderboard = () => {
   const [isLoadingGainers, setIsLoadingGainers] = useState(false);
   const [isLoadingLosers, setIsLoadingLosers] = useState(false);
 
+  // Progressive loading: fetch leaderboard, then enrich avatars in background
+  const [entriesWithAvatars, setEntriesWithAvatars] = useState<LeaderboardEntryWithChanges[]>([]);
+
+  // Utility to convert LeaderboardEntry to LeaderboardEntryWithChanges
+  function toWithChanges(entry: any): LeaderboardEntryWithChanges {
+    return {
+      ...entry,
+      rp_change: 0,
+      position_change: 0,
+      rank_title_change: null,
+      has_changes: false,
+      previous_position: entry.rank_position,
+      previous_rp: entry.rp,
+      previous_rank_title: entry.rank_title
+    };
+  }
+
   // Fetch main leaderboard with changes
   const fetchLeaderboard = useCallback(async () => {
     if (isInitialLoading) setIsLoading(true);
@@ -50,6 +68,30 @@ export const useLeaderboard = () => {
       setIsInitialLoading(false);
     }
   }, [entries, isInitialLoading]);
+
+  // Progressive loading: fetch leaderboard, then enrich avatars in background
+  const fetchLeaderboardProgressive = useCallback(async () => {
+    setIsLoading(true);
+    setError(null);
+    try {
+      // Step 1: Fetch core leaderboard data (fast)
+      const coreEntries = await leaderboardService.fetchLeaderboardData();
+      const coreWithChanges = coreEntries.map(toWithChanges);
+      setEntries(coreWithChanges);
+      setEntriesWithAvatars(coreWithChanges); // Show immediately
+      setIsInitialLoading(false);
+      setIsLoading(false);
+
+      // Step 2: Enrich avatars in background (batch, non-blocking)
+      robloxApi.enrichLeaderboardEntries(coreWithChanges).then((enrichedEntries) => {
+        setEntriesWithAvatars(enrichedEntries);
+      });
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to fetch leaderboard data');
+      setIsLoading(false);
+      setIsInitialLoading(false);
+    }
+  }, []);
 
   // Fetch gainers/losers for a time range
   const fetchGainers = useCallback(async (timeRange: TimeRange) => {
@@ -91,7 +133,7 @@ export const useLeaderboard = () => {
 
   // Initial fetch
   useEffect(() => {
-    fetchLeaderboard();
+    fetchLeaderboardProgressive();
     fetchGainers(gainersTimeRange);
     fetchLosers(losersTimeRange);
     startAutoRefresh();
@@ -170,7 +212,7 @@ export const useLeaderboard = () => {
   }, [refreshLeaderboard]);
 
   return {
-    entries: filteredEntries,
+    entries: entriesWithAvatars.length > 0 ? entriesWithAvatars : entries,
     previousEntries,
     isLoading,
     isInitialLoading,

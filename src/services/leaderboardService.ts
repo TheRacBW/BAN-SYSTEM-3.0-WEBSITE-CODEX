@@ -47,20 +47,7 @@ class LeaderboardService {
   async fetchLeaderboardData(): Promise<LeaderboardEntry[]> {
     try {
       console.log('🔍 Starting leaderboard data fetch...');
-      
-      // First, let's check what tables exist and their structure
-      const { data: tables, error: tablesError } = await supabase
-        .from('information_schema.tables')
-        .select('table_name')
-        .eq('table_schema', 'public');
-      
-      if (tablesError) {
-        console.warn('Could not check tables:', tablesError);
-      } else {
-        console.log('Available tables:', tables?.map(t => t.table_name));
-      }
-
-      // Try to fetch from leaderboard table
+      // Only fetch from leaderboard table (no information_schema)
       console.log('📊 Fetching from leaderboard table...');
       const { data: leaderboardData, error: leaderboardError } = await supabase
         .from('leaderboard')
@@ -93,14 +80,8 @@ class LeaderboardService {
         entry.rank_position = idx + 1;
       });
 
-      // Process and enrich the data
-      console.log('🔄 Processing leaderboard entries...');
-      const processedEntries = await this.processLeaderboardEntries(sorted);
-      
-      console.log('✅ Final processed entries count:', processedEntries.length);
-      console.log('✅ Sample processed entry:', processedEntries[0]);
-      
-      return processedEntries;
+      // Return sorted, un-enriched data for progressive loading
+      return sorted;
     } catch (error) {
       console.error('💥 Leaderboard fetch error:', error);
       throw error;

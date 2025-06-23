@@ -544,3 +544,80 @@
   0%, 100% { opacity: 0.7; }
   50% { opacity: 1; }
 }
+
+/* --- Leaderboard Entry Fade-in Animation --- */
+.fade-in-row {
+  animation: fadeInRow 0.7s cubic-bezier(0.4,0,0.2,1);
+}
+@keyframes fadeInRow {
+  from { opacity: 0; transform: translateY(16px); }
+  to { opacity: 1; transform: none; }
+}
+
+/* --- Avatar Hover Glow --- */
+.leaderboard-entry .group:hover img {
+  box-shadow: 0 0 0 4px #3b82f6, 0 4px 16px rgba(59,130,246,0.12);
+  border-color: #3b82f6;
+}
+
+/* --- Progress Bar --- */
+.leaderboard-entry .w-28 .h-2 {
+  border-radius: 9999px;
+  min-width: 8px;
+}
+.leaderboard-entry .w-28 {
+  min-width: 112px;
+}
+
+/* --- Roblox Logo Overlay --- */
+.leaderboard-entry .roblox-logo {
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: #fff;
+  border: 1px solid #e5e7eb;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.08);
+  position: absolute;
+  bottom: 0;
+  right: 0;
+  transform: translate(30%, 30%);
+}
+
+/* --- Responsive Leaderboard Entry --- */
+@media (max-width: 640px) {
+  .leaderboard-entry {
+    flex-direction: column;
+    align-items: flex-start;
+    padding: 12px 8px;
+    gap: 8px;
+  }
+  .leaderboard-entry .w-28 {
+    width: 100%;
+    min-width: 0;
+  }
+  .leaderboard-entry .flex.items-center.space-x-4 {
+    gap: 8px;
+  }
+  .leaderboard-entry .font-bold.text-lg {
+    font-size: 1rem;
+  }
+  .leaderboard-entry .w-12, .leaderboard-entry .h-12 {
+    width: 40px;
+    height: 40px;
+  }
+}
+
+/* --- Avatar Shimmer Effect --- */
+.avatar-shimmer {
+  position: relative;
+  overflow: hidden;
+  background: linear-gradient(90deg, #e5e7eb 25%, #f3f4f6 50%, #e5e7eb 75%);
+  background-size: 200% 100%;
+}
+.animate-shimmer {
+  animation: shimmerMove 1.2s infinite linear;
+}
+@keyframes shimmerMove {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}

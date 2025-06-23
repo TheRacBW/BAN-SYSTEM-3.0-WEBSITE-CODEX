@@ -8,7 +8,59 @@ function cleanUsername(username: string): string {
 class RobloxApiService {
   private cache = new Map<string, { user: RobloxUser; timestamp: number }>();
   private thumbnailCache = new Map<number, { thumbnail: RobloxThumbnail; timestamp: number }>();
+  private userIdBatchCache = new Map<string, { id: number; timestamp: number }>();
+  private profilePicBatchCache = new Map<number, { url: string; timestamp: number }>();
   private readonly CACHE_DURATION = 30 * 60 * 1000; // 30 minutes
+  private readonly BATCH_CACHE_DURATION = 5 * 60 * 1000; // 5 minutes
+
+  // Persistent cache keys
+  private static USER_ID_CACHE_KEY = 'robloxUserIdCache';
+  private static PROFILE_PIC_CACHE_KEY = 'robloxProfilePicCache';
+
+  // Load persistent cache on init
+  constructor() {
+    this.loadPersistentCache();
+  }
+
+  private loadPersistentCache() {
+    try {
+      const userIdCacheRaw = localStorage.getItem(RobloxApiService.USER_ID_CACHE_KEY);
+      if (userIdCacheRaw) {
+        const parsed = JSON.parse(userIdCacheRaw);
+        Object.entries(parsed).forEach(([name, val]: any) => {
+          this.userIdBatchCache.set(name, val);
+        });
+      }
+      const picCacheRaw = localStorage.getItem(RobloxApiService.PROFILE_PIC_CACHE_KEY);
+      if (picCacheRaw) {
+        const parsed = JSON.parse(picCacheRaw);
+        Object.entries(parsed).forEach(([id, val]: any) => {
+          this.profilePicBatchCache.set(Number(id), val);
+        });
+      }
+    } catch (e) {
+      // Ignore cache errors
+    }
+  }
+
+  private savePersistentCache() {
+    try {
+      // Only keep fresh entries
+      const now = Date.now();
+      const userIdObj: Record<string, any> = {};
+      this.userIdBatchCache.forEach((val, key) => {
+        if (now - val.timestamp < this.BATCH_CACHE_DURATION) userIdObj[key] = val;
+      });
+      localStorage.setItem(RobloxApiService.USER_ID_CACHE_KEY, JSON.stringify(userIdObj));
+      const picObj: Record<string, any> = {};
+      this.profilePicBatchCache.forEach((val, key) => {
+        if (now - val.timestamp < this.BATCH_CACHE_DURATION) picObj[key] = val;
+      });
+      localStorage.setItem(RobloxApiService.PROFILE_PIC_CACHE_KEY, JSON.stringify(picObj));
+    } catch (e) {
+      // Ignore cache errors
+    }
+  }
 
   /**
    * Get Roblox user ID from username
@@ -142,34 +194,118 @@ class RobloxApiService {
   }
 
   /**
+   * Batch get Roblox user IDs from usernames
+   */
+  async getUserIdsBatch(usernames: string[]): Promise<Map<string, number>> {
+    const now = Date.now();
+    const cleanUsernames = usernames.map(cleanUsername);
+    const userIdMap = new Map<string, number>();
+    const toFetch: string[] = [];
+    // Check cache first
+    for (const name of cleanUsernames) {
+      const cached = this.userIdBatchCache.get(name);
+      if (cached && now - cached.timestamp < this.BATCH_CACHE_DURATION) {
+        userIdMap.set(name, cached.id);
+      } else {
+        toFetch.push(name);
+      }
+    }
+    // Batch fetch only missing
+    const batches = [];
+    const batchSize = 10;
+    for (let i = 0; i < toFetch.length; i += batchSize) {
+      batches.push(toFetch.slice(i, i + batchSize));
+    }
+    for (const batch of batches) {
+      try {
+        const response = await fetch(`https://users.roblox.com/v1/usernames/users`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ usernames: batch, excludeBannedUsers: true })
+        });
+        const data = await response.json();
+        data.data?.forEach((user: any) => {
+          userIdMap.set(user.name, user.id);
+          this.userIdBatchCache.set(user.name, { id: user.id, timestamp: now });
+        });
+        await new Promise(resolve => setTimeout(resolve, 100));
+      } catch (error) {
+        console.error('Batch user ID fetch failed:', error);
+      }
+    }
+    this.savePersistentCache();
+    return userIdMap;
+  }
+
+  /**
+   * Batch get profile pictures from user IDs
+   */
+  async getProfilePicturesBatch(userIds: number[]): Promise<Map<number, string>> {
+    const now = Date.now();
+    const pictureMap = new Map<number, string>();
+    const toFetch: number[] = [];
+    // Check cache first
+    for (const id of userIds) {
+      const cached = this.profilePicBatchCache.get(id);
+      if (cached && now - cached.timestamp < this.BATCH_CACHE_DURATION) {
+        pictureMap.set(id, cached.url);
+      } else {
+        toFetch.push(id);
+      }
+    }
+    // Batch fetch only missing
+    const batches = [];
+    const batchSize = 100;
+    for (let i = 0; i < toFetch.length; i += batchSize) {
+      batches.push(toFetch.slice(i, i + batchSize));
+    }
+    for (const batch of batches) {
+      try {
+        const idsParam = batch.join(',');
+        const response = await fetch(`https://thumbnails.roblox.com/v1/users/avatar-headshot?userIds=${idsParam}&size=150x150&format=Png&isCircular=true`);
+        const data = await response.json();
+        data.data?.forEach((thumb: any) => {
+          pictureMap.set(thumb.targetId, thumb.imageUrl || '/default-avatar.png');
+          this.profilePicBatchCache.set(thumb.targetId, { url: thumb.imageUrl || '/default-avatar.png', timestamp: now });
+        });
+        await new Promise(resolve => setTimeout(resolve, 100));
+      } catch (error) {
+        console.error('Batch profile picture fetch failed:', error);
+      }
+    }
+    this.savePersistentCache();
+    return pictureMap;
+  }
+
+  /**
    * Batch enrich multiple entries (for performance)
    */
   async enrichLeaderboardEntries(entries: any[]): Promise<any[]> {
-    console.log('Enriching', entries.length, 'leaderboard entries');
-    
-    const enrichedEntries = await Promise.all(
-      entries.map(async (entry, index) => {
-        try {
-          // Add delay to avoid rate limiting
-          if (index > 0 && index % 10 === 0) {
-            await new Promise(resolve => setTimeout(resolve, 1000));
-          }
-          
-          return await this.enrichLeaderboardEntry(entry);
-        } catch (error) {
-          console.error(`Failed to enrich entry ${index}:`, error);
-          return entry;
-        }
-      })
-    );
-
-    console.log('Enrichment completed for', enrichedEntries.length, 'entries');
-    return enrichedEntries;
+    console.log('Batch enriching', entries.length, 'leaderboard entries');
+    // Step 1: Batch user ID lookup
+    const usernames = entries.map((e: any) => cleanUsername(e.username));
+    const userIdMap = await this.getUserIdsBatch(usernames);
+    // Step 2: Batch profile picture lookup
+    const userIds = Array.from(userIdMap.values()).filter(Boolean);
+    const pictureMap = await this.getProfilePicturesBatch(userIds);
+    // Step 3: Merge data
+    return entries.map((entry: any) => {
+      const cleanName = cleanUsername(entry.username);
+      const userId = userIdMap.get(cleanName);
+      const profile_picture = userId ? pictureMap.get(userId) || '/default-avatar.png' : '/default-avatar.png';
+      return {
+        ...entry,
+        user_id: userId || entry.user_id || null,
+        profile_picture: profile_picture || entry.profile_picture || '/default-avatar.png'
+      };
+    });
   }
 
   clearCache(): void {
     this.cache.clear();
     this.thumbnailCache.clear();
+    this.userIdBatchCache.clear();
+    this.profilePicBatchCache.clear();
   }
 }
 

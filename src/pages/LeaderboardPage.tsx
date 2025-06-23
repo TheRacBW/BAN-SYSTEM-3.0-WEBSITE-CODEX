@@ -5,6 +5,7 @@ import { TabType } from '../types/leaderboard';
 import LeaderboardEntryComponent from '../components/leaderboard/LeaderboardEntry';
 import StatsCard from '../components/leaderboard/StatsCard';
 import { TestLeaderboardData } from '../components/TestLeaderboardData';
+import { robloxApi } from '../services/robloxApi';
 
 const LeaderboardPage: React.FC = () => {
   const {
@@ -62,6 +63,16 @@ const LeaderboardPage: React.FC = () => {
     { id: 'gainers', label: 'Hottest Gainers', icon: <TrendingUp size={20} /> },
     { id: 'losers', label: 'Biggest Losers', icon: <TrendingDown size={20} /> }
   ];
+
+  // Debug: Clear cache
+  const handleClearCache = () => {
+    robloxApi.clearCache();
+    if (typeof localStorage !== 'undefined') {
+      localStorage.removeItem('robloxUserIdCache');
+      localStorage.removeItem('robloxProfilePicCache');
+    }
+    refresh();
+  };
 
   // Show test component first
   if (showTest) {
@@ -138,6 +149,17 @@ const LeaderboardPage: React.FC = () => {
                 Refresh
               </button>
             </div>
+
+            {/* Debug: Clear Cache Button (dev only) */}
+            {process.env.NODE_ENV !== 'production' && (
+              <button
+                onClick={handleClearCache}
+                className="ml-4 px-3 py-1.5 rounded-lg bg-red-100 text-red-700 font-semibold text-xs shadow hover:bg-red-200 transition"
+                title="Clear Roblox avatar cache (debug)"
+              >
+                Clear Avatar Cache
+              </button>
+            )}
           </div>
         </div>
       </div>
