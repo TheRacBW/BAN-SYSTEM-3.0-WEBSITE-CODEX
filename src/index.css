@@ -469,24 +469,23 @@
 
 /* --- Entry Spacing and Subtle Animation --- */
 .leaderboard-entry {
-  margin: 8px 0;
-  position: relative;
-  transition: all 0.2s cubic-bezier(0.25, 0.46, 0.45, 0.94);
-  border-radius: 12px;
-  overflow: visible;
-  cursor: pointer;
-  border: 1px solid transparent;
-  transform: translateY(0) scale(1);
-  transform-origin: center;
-  opacity: 1;
-  animation: none;
+  margin-top: 0;
+  margin-bottom: 0;
+  border-bottom: none;
+  max-width: calc(100% - 24px);
+  margin-left: auto;
+  margin-right: auto;
 }
-.leaderboard-entry.initial-load {
-  animation: fadeIn 0.4s ease-out forwards;
+.leaderboard-entry:not(:last-child) {
+  border-bottom: 1px solid #181b24; /* Match the site's dark background */
 }
-@keyframes fadeIn {
-  from { opacity: 0; }
-  to { opacity: 1; }
+
+/* --- Progress Bar --- */
+.leaderboard-entry .w-28 {
+  width: calc(100% - 24px);
+  min-width: 112px;
+  margin-left: 12px;
+  margin-right: 12px;
 }
 
 /* --- Subtle, Fast Hover Effects --- */
@@ -579,53 +578,6 @@
   border-color: #3b82f6;
 }
 
-/* --- Progress Bar --- */
-.leaderboard-entry .w-28 .h-2 {
-  border-radius: 9999px;
-  min-width: 8px;
-}
-.leaderboard-entry .w-28 {
-  min-width: 112px;
-}
-
-/* --- Roblox Logo Overlay --- */
-.leaderboard-entry .roblox-logo {
-  width: 20px;
-  height: 20px;
-  border-radius: 50%;
-  background: #fff;
-  border: 1px solid #e5e7eb;
-  box-shadow: 0 1px 4px rgba(0,0,0,0.08);
-  position: absolute;
-  bottom: 0;
-  right: 0;
-  transform: translate(30%, 30%);
-}
-
-/* --- Responsive Leaderboard Entry --- */
-@media (max-width: 640px) {
-  .leaderboard-entry {
-    flex-direction: column;
-    align-items: flex-start;
-    padding: 12px 8px;
-    gap: 8px;
-  }
-  .leaderboard-entry .w-28 {
-    width: 100%;
-    min-width: 0;
-  }
-  .leaderboard-entry .flex.items-center.space-x-4 {
-    gap: 8px;
-  }
-  .leaderboard-entry .font-bold.text-lg {
-    font-size: 1rem;
-  }
-  .leaderboard-entry .w-12, .leaderboard-entry .h-12 {
-    width: 40px;
-    height: 40px;
-  }
-}
-
 /* --- Avatar Shimmer Effect --- */
 .avatar-shimmer {
   position: relative;
@@ -639,4 +591,17 @@
 @keyframes shimmerMove {
   0% { background-position: -200% 0; }
   100% { background-position: 200% 0; }
+}
+
+@media (max-width: 640px) {
+  .leaderboard-entry {
+    max-width: 100%;
+    margin-left: 0;
+    margin-right: 0;
+  }
+  .leaderboard-entry .w-28 {
+    width: 100%;
+    margin-left: 0;
+    margin-right: 0;
+  }
 }
