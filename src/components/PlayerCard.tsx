@@ -23,7 +23,9 @@ import {
   Image,
   Star,
   RefreshCw,
-  Pin
+  Pin,
+  Crown,
+  Check
 } from 'lucide-react';
 
 const BEDWARS_ICON_URL =
@@ -136,6 +138,14 @@ function PlayerCard({ player, onDelete, isAdmin, isPinned, onPinToggle, showPinI
     fetchAvailableTeammates();
     fetchCurrentTeammatesWithStatus();
   }, []);
+
+  // Prevent body scroll when modals are open
+  useEffect(() => {
+    if (showAddAccountModal || showAddStrategyModal || showTeammateModal || showRankClaimModal || showEditModal) {
+      document.body.classList.add('modal-open');
+      return () => document.body.classList.remove('modal-open');
+    }
+  }, [showAddAccountModal, showAddStrategyModal, showTeammateModal, showRankClaimModal, showEditModal]);
 
   // Update playerData when player prop changes
   useEffect(() => {
@@ -643,6 +653,86 @@ function PlayerCard({ player, onDelete, isAdmin, isPinned, onPinToggle, showPinI
     return fallbackUrl || rank.image_url;
   };
 
+  // Enhanced Star Icon Component with better visibility
+  const EnhancedStarIcon = ({ isStarred, onClick }: { isStarred: boolean; onClick: (e: React.MouseEvent) => void }) => {
+    return (
+      <button
+        onClick={onClick}
+        className={`absolute top-1 right-1 p-1 rounded-full transition-all duration-200 star-icon ${
+          isStarred ? 'starred' : ''
+        }`}
+        title={isStarred ? 'Unstar kit' : 'Star this kit to indicate it is used by the player'}
+      >
+        {isStarred ? (
+          // Option 1: Enhanced filled star with glow
+          <div className="relative">
+            <Star 
+              size={20} 
+              className="text-yellow-400 fill-yellow-400"
+            />
+            {/* Sparkle effect */}
+            <div className="absolute inset-0 animate-pulse">
+              <Star 
+                size={20} 
+                className="text-yellow-200 fill-yellow-200 opacity-50"
+              />
+            </div>
+          </div>
+        ) : (
+          // Unstarred state with subtle hover effect
+          <Star 
+            size={20} 
+            className="text-gray-400 hover:text-yellow-400 transition-colors duration-200"
+          />
+        )}
+      </button>
+    );
+  };
+
+  // Alternative Crown Icon Component
+  const CrownIcon = ({ isStarred, onClick }: { isStarred: boolean; onClick: (e: React.MouseEvent) => void }) => {
+    return (
+      <button
+        onClick={onClick}
+        className="absolute top-1 right-1 p-1 rounded-full transition-all duration-200"
+        title={isStarred ? 'Unstar kit' : 'Star this kit to indicate it is used by the player'}
+      >
+        {isStarred ? (
+          <Crown 
+            size={20} 
+            className="text-yellow-400 fill-yellow-400 drop-shadow-lg animate-pulse"
+          />
+        ) : (
+          <Crown 
+            size={20} 
+            className="text-gray-400 hover:text-yellow-400 transition-colors"
+          />
+        )}
+      </button>
+    );
+  };
+
+  // Alternative Badge/Checkmark Component
+  const StarredBadge = ({ isStarred, onClick }: { isStarred: boolean; onClick: (e: React.MouseEvent) => void }) => {
+    return (
+      <button
+        onClick={onClick}
+        className="absolute top-1 right-1 transition-all duration-200"
+        title={isStarred ? 'Unstar kit' : 'Star this kit to indicate it is used by the player'}
+      >
+        {isStarred ? (
+          <div className="bg-yellow-400 text-black rounded-full p-1 shadow-lg animate-pulse">
+            <Check size={12} className="font-bold" />
+          </div>
+        ) : (
+          <div className="bg-gray-400 text-white rounded-full p-1 hover:bg-yellow-400 hover:text-black transition-all">
+            <Check size={12} />
+          </div>
+        )}
+      </button>
+    );
+  };
+
   // Rank Icon Component with proper error handling
   const RankIcon = ({ account }: { account: PlayerAccount }) => {
     const rank = getAccountRank(account);
@@ -718,10 +808,22 @@ function PlayerCard({ player, onDelete, isAdmin, isPinned, onPinToggle, showPinI
     const maxVisibleAccounts = 2;
     const showScrollbar = accountCount > maxVisibleAccounts;
 
+    const handleCardClick = () => {
+      // Don't open PlayerCard modal if any sub-modal is open
+      if (showAddAccountModal || showAddStrategyModal || showTeammateModal || showRankClaimModal || showEditModal) {
+        return; // Block card click when modals are open
+      }
+      
+      // Only open if no other modals are active
+      if (onTeammateClick) {
+        onTeammateClick(player);
+      }
+    };
+
     return (
       <div 
         className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-4 h-64 flex flex-col cursor-pointer hover:shadow-lg transition-shadow"
-        onClick={() => onTeammateClick && onTeammateClick(player)}
+        onClick={handleCardClick}
       >
         {/* Header with pin, edit, delete buttons */}
         <div className="flex items-center justify-between mb-3">
@@ -830,20 +932,30 @@ function PlayerCard({ player, onDelete, isAdmin, isPinned, onPinToggle, showPinI
         <div className="flex gap-2 mt-auto">
           <button
             onClick={(e) => {
+              e.preventDefault();
               e.stopPropagation();
+              console.log('🔘 Add Account button clicked!');
+              console.log('Current showAddAccountModal state:', showAddAccountModal);
               setShowAddAccountModal(true);
+              console.log('Set showAddAccountModal to true');
             }}
             className="btn btn-outline flex items-center gap-1 text-sm"
+            type="button"
           >
             <Plus size={14} />
             Add Account
           </button>
           <button
             onClick={(e) => {
+              e.preventDefault();
               e.stopPropagation();
+              console.log('🔘 Add Strategy button clicked!');
+              console.log('Current showAddStrategyModal state:', showAddStrategyModal);
               setShowAddStrategyModal(true);
+              console.log('Set showAddStrategyModal to true');
             }}
             className="btn btn-outline flex items-center gap-1 text-sm"
+            type="button"
           >
             <Plus size={14} />
             Add Strategy
@@ -1035,12 +1147,29 @@ function PlayerCard({ player, onDelete, isAdmin, isPinned, onPinToggle, showPinI
   );
 
   const renderAddAccountModal = () => (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-      <div className="bg-white dark:bg-gray-800 rounded-lg p-6 max-w-md w-full mx-4">
+    <div 
+      className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[9999]"
+      onClick={(e) => {
+        // Only close if clicking the overlay, not the modal content
+        if (e.target === e.currentTarget) {
+          setShowAddAccountModal(false);
+        }
+      }}
+    >
+      <div 
+        className="bg-white dark:bg-gray-800 rounded-lg p-6 max-w-md w-full mx-4 shadow-2xl"
+        onClick={(e) => {
+          // Prevent clicks inside modal from bubbling up
+          e.stopPropagation();
+        }}
+      >
         <div className="flex justify-between items-center mb-4">
           <h3 className="text-xl font-bold">Add Account</h3>
           <button
-            onClick={() => setShowAddAccountModal(false)}
+            onClick={(e) => {
+              e.stopPropagation();
+              setShowAddAccountModal(false);
+            }}
             className="text-gray-500 hover:text-gray-700"
           >
             <X size={24} />
@@ -1058,18 +1187,26 @@ function PlayerCard({ player, onDelete, isAdmin, isPinned, onPinToggle, showPinI
               onChange={(e) => setNewUserId(e.target.value)}
               className="w-full p-2 border rounded dark:bg-gray-700 dark:border-gray-600"
               placeholder="Enter Roblox User ID"
+              onClick={(e) => e.stopPropagation()}
+              onFocus={(e) => e.stopPropagation()}
             />
           </div>
 
           <div className="flex justify-end gap-3">
             <button
-              onClick={() => setShowAddAccountModal(false)}
+              onClick={(e) => {
+                e.stopPropagation();
+                setShowAddAccountModal(false);
+              }}
               className="btn btn-outline"
             >
               Cancel
             </button>
             <button
-              onClick={handleAddAccount}
+              onClick={(e) => {
+                e.stopPropagation();
+                handleAddAccount();
+              }}
               className="btn btn-primary"
             >
               Add Account
@@ -1081,12 +1218,29 @@ function PlayerCard({ player, onDelete, isAdmin, isPinned, onPinToggle, showPinI
   );
 
   const renderAddStrategyModal = () => (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-      <div className="bg-white dark:bg-gray-800 rounded-lg p-6 max-w-2xl w-full mx-4">
+    <div 
+      className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[9999]"
+      onClick={(e) => {
+        // Only close if clicking the overlay, not the modal content
+        if (e.target === e.currentTarget) {
+          setShowAddStrategyModal(false);
+        }
+      }}
+    >
+      <div 
+        className="bg-white dark:bg-gray-800 rounded-lg p-6 max-w-2xl w-full mx-4 shadow-2xl max-h-[90vh] overflow-y-auto"
+        onClick={(e) => {
+          // Prevent clicks inside modal from bubbling up
+          e.stopPropagation();
+        }}
+      >
         <div className="flex justify-between items-center mb-4">
           <h3 className="text-xl font-bold">Add Strategy</h3>
           <button
-            onClick={() => setShowAddStrategyModal(false)}
+            onClick={(e) => {
+              e.stopPropagation();
+              setShowAddStrategyModal(false);
+            }}
             className="text-gray-500 hover:text-gray-700"
           >
             <X size={24} />
@@ -1103,6 +1257,9 @@ function PlayerCard({ player, onDelete, isAdmin, isPinned, onPinToggle, showPinI
               value={imageUrl}
               onChange={(e) => setImageUrl(e.target.value)}
               className="w-full p-2 border rounded dark:bg-gray-700 dark:border-gray-600"
+              placeholder="https://example.com/strategy-image.png"
+              onClick={(e) => e.stopPropagation()}
+              onFocus={(e) => e.stopPropagation()}
             />
           </div>
 
@@ -1117,47 +1274,77 @@ function PlayerCard({ player, onDelete, isAdmin, isPinned, onPinToggle, showPinI
                 value={kitSearchQuery}
                 onChange={(e) => setKitSearchQuery(e.target.value)}
                 className="w-full p-2 pl-8 border rounded dark:bg-gray-700 dark:border-gray-600"
+                onClick={(e) => e.stopPropagation()}
+                onFocus={(e) => e.stopPropagation()}
               />
               <Search className="absolute left-2 top-2.5 text-gray-400" size={16} />
             </div>
             <div className="grid grid-cols-4 gap-2 max-h-[200px] overflow-y-auto">
               {displayKits.map(kit => {
                 if (!kit) return null;
+                const isSelected = selectedKits.includes(kit.id);
+                const isStarred = starredKitId === kit.id;
+                
                 return (
                   <div
                     key={kit.id}
-                    onClick={() => {
-                      if (selectedKits.includes(kit.id)) {
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      if (isSelected) {
                         setSelectedKits(prev => prev.filter(id => id !== kit.id));
-                        if (starredKitId === kit.id) {
+                        if (isStarred) {
                           setStarredKitId(null);
                         }
                       } else if (selectedKits.length < 5) {
                         setSelectedKits(prev => [...prev, kit.id]);
                       }
                     }}
-                    className={`relative cursor-pointer ${
-                      selectedKits.includes(kit.id) 
-                        ? 'ring-2 ring-primary-500' 
-                        : ''
-                    }`}
+                    className={`kit-card ${
+                      isSelected ? 'kit-selected' : ''
+                    } ${
+                      isSelected 
+                        ? 'bg-yellow-50 dark:bg-yellow-900/20' 
+                        : 'bg-white dark:bg-gray-800'
+                    } border ${
+                      isSelected 
+                        ? 'border-yellow-400' 
+                        : 'border-gray-200 dark:border-gray-700'
+                    } relative group p-2`}
                   >
-                    <KitCard kit={kit} size="sm" />
-                    {selectedKits.includes(kit.id) && (
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setStarredKitId(starredKitId === kit.id ? null : kit.id);
-                        }}
-                        className={`absolute top-1 right-1 p-1 rounded-full ${
-                          starredKitId === kit.id
-                            ? 'text-yellow-500'
-                            : 'text-gray-400 hover:text-yellow-500'
-                        }`}
-                        title={starredKitId === kit.id ? 'Unstar kit' : 'Star this kit to indicate it is used by the player'}
-                      >
-                        <Star size={16} />
-                      </button>
+                    {/* Kit image */}
+                    <div className="aspect-square mb-2">
+                      <img
+                        src={kit.image_url}
+                        alt={kit.name}
+                        className="w-full h-full object-cover rounded"
+                      />
+                    </div>
+                    
+                    {/* Kit name */}
+                    <div className={`text-center text-xs font-medium ${
+                      isSelected ? 'text-yellow-800 dark:text-yellow-200' : 'text-gray-900 dark:text-gray-100'
+                    }`}>
+                      {kit.name}
+                    </div>
+                    
+                    {/* Enhanced star icon */}
+                    {isSelected && (
+                      <EnhancedStarIcon isStarred={isStarred} onClick={(e) => {
+                        e.stopPropagation();
+                        setStarredKitId(isStarred ? null : kit.id);
+                      }} />
+                    )}
+                    
+                    {/* Selection indicator overlay */}
+                    {isSelected && (
+                      <div className="absolute inset-0 bg-gradient-to-r from-yellow-400/10 to-yellow-500/10 pointer-events-none rounded-lg" />
+                    )}
+                    
+                    {/* Starred kit indicator */}
+                    {isStarred && (
+                      <div className="absolute top-0 left-0 bg-yellow-400 text-black text-xs px-2 py-1 rounded-br-lg font-bold shadow-lg">
+                        MAIN
+                      </div>
                     )}
                   </div>
                 );
@@ -1186,13 +1373,19 @@ function PlayerCard({ player, onDelete, isAdmin, isPinned, onPinToggle, showPinI
 
           <div className="flex justify-end gap-3">
             <button
-              onClick={() => setShowAddStrategyModal(false)}
+              onClick={(e) => {
+                e.stopPropagation();
+                setShowAddStrategyModal(false);
+              }}
               className="btn btn-outline"
             >
               Cancel
             </button>
             <button
-              onClick={handleAddStrategy}
+              onClick={(e) => {
+                e.stopPropagation();
+                handleAddStrategy();
+              }}
               className="btn btn-primary"
             >
               Add Strategy
@@ -1624,15 +1817,36 @@ function PlayerCard({ player, onDelete, isAdmin, isPinned, onPinToggle, showPinI
       <>
         {renderModal()}
         {showTeammateModal && renderTeammateModal()}
-        {showAddAccountModal && renderAddAccountModal()}
-        {showAddStrategyModal && renderAddStrategyModal()}
+        {showAddAccountModal && (() => {
+          console.log('🎭 Rendering Add Account Modal');
+          return renderAddAccountModal();
+        })()}
+        {showAddStrategyModal && (() => {
+          console.log('🎭 Rendering Add Strategy Modal');
+          return renderAddStrategyModal();
+        })()}
         {showRankClaimModal && renderRankClaimModal()}
         {showEditModal && renderEditModal()}
       </>
     );
   }
 
-  return renderCard();
+  return (
+    <>
+      {renderCard()}
+      {showTeammateModal && renderTeammateModal()}
+      {showAddAccountModal && (() => {
+        console.log('🎭 Rendering Add Account Modal');
+        return renderAddAccountModal();
+      })()}
+      {showAddStrategyModal && (() => {
+        console.log('🎭 Rendering Add Strategy Modal');
+        return renderAddStrategyModal();
+      })()}
+      {showRankClaimModal && renderRankClaimModal()}
+      {showEditModal && renderEditModal()}
+    </>
+  );
 }
 
 export default PlayerCard;

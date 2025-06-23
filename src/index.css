@@ -90,3 +90,111 @@
     @apply text-gray-700 dark:text-gray-300;
   }
 }
+
+/* Modal styles */
+.modal-open {
+  overflow: hidden !important;
+}
+
+.modal-overlay {
+  z-index: 9999 !important;
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+}
+
+.modal-content {
+  position: relative;
+  z-index: 10000 !important;
+  pointer-events: all;
+}
+
+/* Enhanced Kit Selection Styles */
+.kit-selected {
+  position: relative;
+  border: 3px solid #fbbf24 !important; /* Golden border */
+  border-radius: 12px !important;
+  box-shadow: 
+    0 0 0 1px #fbbf24,                    /* Inner glow - 0% transparency */
+    0 0 8px rgba(251, 191, 36, 0.6),      /* Medium glow - 40% transparency */
+    0 0 16px rgba(251, 191, 36, 0.3),     /* Outer glow - 70% transparency */
+    0 0 24px rgba(251, 191, 36, 0.1) !important;     /* Far glow - 90% transparency */
+  transform: scale(1.02);
+  transition: all 0.2s ease-in-out;
+  background: linear-gradient(135deg, rgba(251, 191, 36, 0.05), rgba(251, 191, 36, 0.1)) !important;
+}
+
+.kit-selected::before {
+  content: '';
+  position: absolute;
+  inset: -6px;
+  border-radius: 16px;
+  background: radial-gradient(
+    circle at center,
+    rgba(251, 191, 36, 0.2) 0%,     /* 0% transparency inner */
+    rgba(251, 191, 36, 0.1) 50%,    /* 50% transparency middle */
+    rgba(251, 191, 36, 0) 100%      /* 100% transparency outer */
+  );
+  z-index: -1;
+  pointer-events: none;
+}
+
+.kit-card {
+  position: relative;
+  cursor: pointer;
+  border-radius: 8px;
+  transition: all 0.2s ease-in-out;
+  overflow: hidden;
+  border: 2px solid transparent;
+}
+
+.kit-card:hover {
+  transform: scale(1.05);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+.kit-card:hover:not(.kit-selected) {
+  border-color: rgba(251, 191, 36, 0.3);
+  box-shadow: 0 0 8px rgba(251, 191, 36, 0.2);
+}
+
+/* Star icon enhancements */
+.star-icon {
+  transition: all 0.2s ease-in-out;
+}
+
+.star-icon.starred {
+  filter: drop-shadow(0 0 4px rgba(251, 191, 36, 0.6));
+  animation: starGlow 2s ease-in-out infinite alternate;
+}
+
+@keyframes starGlow {
+  0% {
+    filter: drop-shadow(0 0 4px rgba(251, 191, 36, 0.6));
+  }
+  100% {
+    filter: drop-shadow(0 0 8px rgba(251, 191, 36, 0.8));
+  }
+}
+
+/* Alternative animated selection */
+.kit-selected-animated {
+  animation: goldenGlow 2s ease-in-out infinite alternate;
+}
+
+@keyframes goldenGlow {
+  0% {
+    box-shadow: 
+      0 0 0 1px #fbbf24,
+      0 0 8px rgba(251, 191, 36, 0.5),
+      0 0 16px rgba(251, 191, 36, 0.3);
+  }
+  100% {
+    box-shadow: 
+      0 0 0 1px #fbbf24,
+      0 0 12px rgba(251, 191, 36, 0.7),
+      0 0 24px rgba(251, 191, 36, 0.4);
+  }
+}
