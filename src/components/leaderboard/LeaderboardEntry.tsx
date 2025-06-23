@@ -62,45 +62,57 @@ const LeaderboardEntryComponent: React.FC<LeaderboardEntryProps> = ({
     else if (entry.position_change < 0) animationClass = 'entry-position-declined';
   }
 
-  // Add RP bar color utility
+  // RP Bar color logic
   const getRPBarColors = (rankTitle: string) => {
-    const tier = (rankTitle.startsWith('@') ? rankTitle.slice(1) : rankTitle).split(' ')[0];
-    const colorMappings = {
-      'Nightmare': {
-        gradient: 'linear-gradient(90deg, #9C27B0 0%, #E91E63 100%)',
-        glow: '0 0 10px rgba(156, 39, 176, 0.5)'
+    const tier = rankTitle.toUpperCase().split(' ')[0];
+    const colorMappings: Record<string, { gradient: string; background: string; glow: string }> = {
+      'NIGHTMARE': {
+        gradient: 'linear-gradient(90deg, #9C27B0 0%, #E91E63 50%, #673AB7 100%)',
+        background: 'rgba(156, 39, 176, 0.1)',
+        glow: '0 0 15px rgba(156, 39, 176, 0.6)'
       },
-      'Emerald': {
-        gradient: 'linear-gradient(90deg, #4CAF50 0%, #8BC34A 100%)',
-        glow: '0 0 10px rgba(76, 175, 80, 0.5)'
+      'EMERALD': {
+        gradient: 'linear-gradient(90deg, #4CAF50 0%, #8BC34A 50%, #2E7D32 100%)',
+        background: 'rgba(76, 175, 80, 0.1)',
+        glow: '0 0 15px rgba(76, 175, 80, 0.6)'
       },
-      'Diamond': {
-        gradient: 'linear-gradient(90deg, #2196F3 0%, #03DAC6 100%)',
-        glow: '0 0 10px rgba(33, 150, 243, 0.5)'
+      'DIAMOND': {
+        gradient: 'linear-gradient(90deg, #2196F3 0%, #03DAC6 50%, #1976D2 100%)',
+        background: 'rgba(33, 150, 243, 0.1)',
+        glow: '0 0 15px rgba(33, 150, 243, 0.6)'
       },
-      'Platinum': {
-        gradient: 'linear-gradient(90deg, #00BCD4 0%, #4DD0E1 100%)',
-        glow: '0 0 10px rgba(0, 188, 212, 0.5)'
+      'PLATINUM': {
+        gradient: 'linear-gradient(90deg, #00BCD4 0%, #4DD0E1 50%, #0097A7 100%)',
+        background: 'rgba(0, 188, 212, 0.1)',
+        glow: '0 0 15px rgba(0, 188, 212, 0.6)'
       },
-      'Gold': {
-        gradient: 'linear-gradient(90deg, #FFD700 0%, #FFA500 100%)',
-        glow: '0 0 10px rgba(255, 215, 0, 0.5)'
+      'GOLD': {
+        gradient: 'linear-gradient(90deg, #FFD700 0%, #FFA500 50%, #FF8F00 100%)',
+        background: 'rgba(255, 215, 0, 0.1)',
+        glow: '0 0 15px rgba(255, 215, 0, 0.6)'
       },
-      'Silver': {
-        gradient: 'linear-gradient(90deg, #C0C0C0 0%, #E8E8E8 100%)',
-        glow: '0 0 10px rgba(192, 192, 192, 0.5)'
+      'SILVER': {
+        gradient: 'linear-gradient(90deg, #C0C0C0 0%, #E8E8E8 50%, #9E9E9E 100%)',
+        background: 'rgba(192, 192, 192, 0.1)',
+        glow: '0 0 15px rgba(192, 192, 192, 0.6)'
       },
-      'Bronze': {
-        gradient: 'linear-gradient(90deg, #CD7F32 0%, #FF6B35 100%)',
-        glow: '0 0 10px rgba(205, 127, 50, 0.5)'
+      'BRONZE': {
+        gradient: 'linear-gradient(90deg, #CD7F32 0%, #FF6B35 50%, #BF360C 100%)',
+        background: 'rgba(205, 127, 50, 0.1)',
+        glow: '0 0 15px rgba(205, 127, 50, 0.6)'
       }
     };
-    return colorMappings[tier as keyof typeof colorMappings] || colorMappings['Bronze'];
+    const colors = colorMappings[tier] || colorMappings['BRONZE'];
+    console.log(`${rankTitle}: ${colors.gradient}`);
+    return colors;
   };
+
+  const rankTier = entry.rank_title.toLowerCase().split(' ')[0];
 
   return (
     <div className={`leaderboard-entry relative flex items-center justify-between p-4 bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-750 transition-all duration-300 ease-in-out rounded-xl shadow-sm hover:shadow-lg fade-in-row ${animationClass}`}
-      style={{ minHeight: 72 }}>
+      style={{ minHeight: 72 }}
+      data-rank={rankTier}>
       {/* Position */}
       <div className="flex items-center space-x-4">
         <div className="flex items-center justify-center w-8 h-8 rounded-full font-bold text-base bg-gray-200 dark:bg-gray-600 text-gray-700 dark:text-gray-300 shadow-sm">{entry.rank_position}</div>

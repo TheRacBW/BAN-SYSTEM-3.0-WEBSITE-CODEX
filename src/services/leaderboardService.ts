@@ -7,34 +7,34 @@ import { LeaderboardEntry, RPChange, LeaderboardEntryWithChanges, RPChangeWithTi
 function getRankSortValue(rankTitle: string, rp: number): number {
   console.log('Sorting rank_title from DB:', rankTitle); // Debug log
   const rankMapping: Record<string, number> = {
-    'Nightmare': 7000,
-    'Emerald': 6000,
-    'Diamond 3': 5003,
-    'Diamond 2': 5002,
-    'Diamond 1': 5001,
-    'Platinum 4': 4004,
-    'Platinum 3': 4003,
-    'Platinum 2': 4002,
-    'Platinum 1': 4001,
-    'Gold 4': 3004,
-    'Gold 3': 3003,
-    'Gold 2': 3002,
-    'Gold 1': 3001,
-    'Silver 4': 2004,
-    'Silver 3': 2003,
-    'Silver 2': 2002,
-    'Silver 1': 2001,
-    'Bronze 4': 1004,
-    'Bronze 3': 1003,
-    'Bronze 2': 1002,
-    'Bronze 1': 1001
+    'Nightmare': 8000, 'NIGHTMARE': 8000,
+    'Emerald': 7000, 'EMERALD': 7000,
+    'Diamond 3': 6003, 'DIAMOND 3': 6003,
+    'Diamond 2': 6002, 'DIAMOND 2': 6002,
+    'Diamond 1': 6001, 'DIAMOND 1': 6001,
+    'Platinum 4': 5004, 'PLATINUM 4': 5004,
+    'Platinum 3': 5003, 'PLATINUM 3': 5003,
+    'Platinum 2': 5002, 'PLATINUM 2': 5002,
+    'Platinum 1': 5001, 'PLATINUM 1': 5001,
+    'Gold 4': 4004, 'GOLD 4': 4004,
+    'Gold 3': 4003, 'GOLD 3': 4003,
+    'Gold 2': 4002, 'GOLD 2': 4002,
+    'Gold 1': 4001, 'GOLD 1': 4001,
+    'Silver 4': 3004, 'SILVER 4': 3004,
+    'Silver 3': 3003, 'SILVER 3': 3003,
+    'Silver 2': 3002, 'SILVER 2': 3002,
+    'Silver 1': 3001, 'SILVER 1': 3001,
+    'Bronze 4': 2004, 'BRONZE 4': 2004,
+    'Bronze 3': 2003, 'BRONZE 3': 2003,
+    'Bronze 2': 2002, 'BRONZE 2': 2002,
+    'Bronze 1': 2001, 'BRONZE 1': 2001
   };
   const baseValue = rankMapping[rankTitle];
   if (!baseValue) {
-    console.error('Unknown rank_title:', rankTitle);
-    return 0; // Put unknown ranks at bottom
+    console.error('❌ UNKNOWN RANK TITLE:', rankTitle);
+    return 0;
   }
-  const rpBonus = rankTitle === 'Nightmare' ? Math.min(rp, 999) : Math.min(rp, 99);
+  const rpBonus = Math.min(rp, 999);
   return baseValue + rpBonus;
 }
 
@@ -78,6 +78,11 @@ class LeaderboardService {
       // Assign rank_position based on sorted order
       sorted.forEach((entry, idx) => {
         entry.rank_position = idx + 1;
+      });
+
+      console.log('=== SORTING DEBUG ===');
+      sorted.forEach((entry, index) => {
+        console.log(`#${index + 1}: ${entry.rank_title} - ${entry.username} - ${entry.rp} RP`);
       });
 
       // Return sorted, un-enriched data for progressive loading

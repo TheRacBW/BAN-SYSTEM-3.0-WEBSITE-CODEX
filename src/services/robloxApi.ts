@@ -1,10 +1,5 @@
 import { RobloxUser, RobloxThumbnail } from '../types/leaderboard';
 
-// Helper to clean @ from username
-function cleanUsername(username: string): string {
-  return username.startsWith('@') ? username.slice(1) : username;
-}
-
 class RobloxApiService {
   private cache = new Map<string, { user: RobloxUser; timestamp: number }>();
   private thumbnailCache = new Map<number, { thumbnail: RobloxThumbnail; timestamp: number }>();
@@ -66,21 +61,20 @@ class RobloxApiService {
    * Get Roblox user ID from username
    */
   async getRobloxUserId(username: string): Promise<number | null> {
-    const cleanName = cleanUsername(username);
     try {
-      console.log('Fetching Roblox user ID for:', cleanName);
+      console.log('Fetching Roblox user ID for:', username);
       const response = await fetch(`https://users.roblox.com/v1/usernames/users`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ usernames: [cleanName] })
+        body: JSON.stringify({ usernames: [username] })
       });
       if (!response.ok) {
-        console.warn(`Failed to get Roblox user ID for ${cleanName}:`, response.status);
+        console.warn(`Failed to get Roblox user ID for ${username}:`, response.status);
         return null;
       }
       const data = await response.json();
       const userId = data.data?.[0]?.id || null;
-      console.log(`Roblox user ID for ${cleanName}:`, userId);
+      console.log(`Roblox user ID for ${username}:`, userId);
       return userId;
     } catch (error) {
       console.error('Failed to get Roblox user ID:', error);
@@ -117,12 +111,11 @@ class RobloxApiService {
    * Search for a Roblox user by username
    */
   async searchUser(username: string): Promise<RobloxUser | null> {
-    const cleanName = cleanUsername(username);
     try {
-      console.log('Searching for Roblox user:', cleanName);
-      const userId = await this.getRobloxUserId(cleanName);
+      console.log('Searching for Roblox user:', username);
+      const userId = await this.getRobloxUserId(username);
       if (!userId) {
-        console.log('No user ID found for:', cleanName);
+        console.log('No user ID found for:', username);
         return null;
       }
       const response = await fetch(`https://users.roblox.com/v1/users/${userId}`);
@@ -148,9 +141,8 @@ class RobloxApiService {
    * Get profile picture for a user by username
    */
   async getProfilePictureByUsername(username: string): Promise<string> {
-    const cleanName = cleanUsername(username);
     try {
-      const userId = await this.getRobloxUserId(cleanName);
+      const userId = await this.getRobloxUserId(username);
       if (!userId) {
         return '/default-avatar.png';
       }
@@ -198,11 +190,10 @@ class RobloxApiService {
    */
   async getUserIdsBatch(usernames: string[]): Promise<Map<string, number>> {
     const now = Date.now();
-    const cleanUsernames = usernames.map(cleanUsername);
     const userIdMap = new Map<string, number>();
     const toFetch: string[] = [];
     // Check cache first
-    for (const name of cleanUsernames) {
+    for (const name of usernames) {
       const cached = this.userIdBatchCache.get(name);
       if (cached && now - cached.timestamp < this.BATCH_CACHE_DURATION) {
         userIdMap.set(name, cached.id);
@@ -283,14 +274,14 @@ class RobloxApiService {
   async enrichLeaderboardEntries(entries: any[]): Promise<any[]> {
     console.log('Batch enriching', entries.length, 'leaderboard entries');
     // Step 1: Batch user ID lookup
-    const usernames = entries.map((e: any) => cleanUsername(e.username));
+    const usernames = entries.map((e: any) => e.username);
     const userIdMap = await this.getUserIdsBatch(usernames);
     // Step 2: Batch profile picture lookup
     const userIds = Array.from(userIdMap.values()).filter(Boolean);
     const pictureMap = await this.getProfilePicturesBatch(userIds);
     // Step 3: Merge data
     return entries.map((entry: any) => {
-      const cleanName = cleanUsername(entry.username);
+      const cleanName = entry.username;
       const userId = userIdMap.get(cleanName);
       const profile_picture = userId ? pictureMap.get(userId) || '/default-avatar.png' : '/default-avatar.png';
       return {

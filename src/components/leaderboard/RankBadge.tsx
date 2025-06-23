@@ -53,6 +53,20 @@ interface RankBadgeProps {
   className?: string;
 }
 
+const getRankIconUrl = (rankTitle: string): string => {
+  const tier = rankTitle.toUpperCase().split(' ')[0];
+  const iconUrls: Record<string, string> = {
+    'NIGHTMARE': '/images/ranks/nightmare.png',
+    'EMERALD': '/images/ranks/emerald.png',
+    'DIAMOND': '/images/ranks/diamond.png',
+    'PLATINUM': '/images/ranks/platinum.png',
+    'GOLD': '/images/ranks/gold.png',
+    'SILVER': '/images/ranks/silver.png',
+    'BRONZE': '/images/ranks/bronze.png'
+  };
+  return iconUrls[tier] || iconUrls['BRONZE'];
+};
+
 const RankBadge: React.FC<RankBadgeProps> = ({ rankTitle, rp, size = 'medium', className = '' }) => {
   const [rankIcons, setRankIcons] = useState<Map<string, string>>(new Map());
   const [iconError, setIconError] = useState(false);
