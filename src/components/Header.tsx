@@ -1,6 +1,6 @@
 import React from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { Moon, Sun, User, LogOut, Plus, TrendingUp, Settings, Home, Users } from 'lucide-react';
+import { Moon, Sun, User, LogOut, Plus, TrendingUp, Settings, Home, Users, Trophy } from 'lucide-react';
 import { useTheme } from '../context/ThemeContext';
 import { useAuth } from '../context/AuthContext';
 
@@ -41,6 +41,14 @@ const Header: React.FC = () => {
               title="Trending Strategies"
             >
               <TrendingUp size={20} />
+            </Link>
+
+            <Link
+              to="/leaderboard"
+              className="text-gray-600 dark:text-gray-300 hover:text-primary-600 dark:hover:text-primary-400"
+              title="Leaderboard"
+            >
+              <Trophy size={20} />
             </Link>
             
             {user && (

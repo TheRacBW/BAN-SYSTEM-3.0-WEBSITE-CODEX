@@ -14,6 +14,7 @@ import AdminPage from './pages/AdminPage';
 import AuthPage from './pages/AuthPage';
 import SettingsPage from './pages/SettingsPage';
 import PlayersPage from './pages/PlayersPage';
+import LeaderboardPage from './pages/LeaderboardPage';
 
 function App() {
   return (
@@ -35,6 +36,7 @@ function App() {
                     <Route path="/auth" element={<AuthPage />} />
                     <Route path="/settings" element={<SettingsPage />} />
                     <Route path="/players" element={<PlayersPage />} />
+                    <Route path="/leaderboard" element={<LeaderboardPage />} />
                   </Routes>
                 </main>
                 
