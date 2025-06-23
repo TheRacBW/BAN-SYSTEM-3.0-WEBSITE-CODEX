@@ -91,7 +91,7 @@ const LeaderboardEntryComponent: React.FC<LeaderboardEntryProps> = ({
             {entry.username}
           </a>
           <div className="flex items-center space-x-2">
-            <RankBadge rankTier={calculatedRank.tier} rankNumber={calculatedRank.level} displayRp={calculatedRank.displayRP} totalRp={calculatedRank.totalRP} size="sm" showProgress={false} />
+            <RankBadge rankTitle={entry.rank_title} rp={entry.rp} size="small" />
             <span className="text-xs text-gray-500 dark:text-gray-400">{entry.rank_title}</span>
           </div>
         </div>

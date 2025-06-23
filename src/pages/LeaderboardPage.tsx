@@ -11,6 +11,7 @@ const LeaderboardPage: React.FC = () => {
     entries,
     previousEntries,
     isLoading,
+    isInitialLoading,
     error,
     lastUpdate,
     searchQuery,
@@ -188,7 +189,7 @@ const LeaderboardPage: React.FC = () => {
         </div>
 
         {/* Content */}
-        {isLoading ? (
+        {isInitialLoading ? (
           <div className="flex items-center justify-center py-12">
             <div className="text-center">
               <span className="animate-spin text-blue-600 dark:text-blue-400 mx-auto mb-4">🔄</span>
@@ -196,7 +197,12 @@ const LeaderboardPage: React.FC = () => {
             </div>
           </div>
         ) : (
-          <div className="space-y-6">
+          <div className="space-y-6 relative">
+            {isRefreshing && (
+              <div className="refresh-indicator">
+                <span>Updating...</span>
+              </div>
+            )}
             {activeTab === 'main' && (
               <div>
                 <div className="flex items-center justify-between mb-4">

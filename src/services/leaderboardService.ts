@@ -3,6 +3,22 @@ import { robloxApi } from './robloxApi';
 import { calculateRankFromRP, getProgressToNextTier } from '../utils/rankingSystem';
 import { LeaderboardEntry, RPChange, LeaderboardEntryWithChanges, RPChangeWithTimeRange, TimeRange } from '../types/leaderboard';
 
+// --- Rank Sorting Utility ---
+function getRankSortValue(rankTitle: string, rp: number): number {
+  const rankMapping: Record<string, number> = {
+    'Nightmare': 7000,
+    'Emerald': 6000,
+    'Diamond 3': 5003, 'Diamond 2': 5002, 'Diamond 1': 5001,
+    'Platinum 4': 4004, 'Platinum 3': 4003, 'Platinum 2': 4002, 'Platinum 1': 4001,
+    'Gold 4': 3004, 'Gold 3': 3003, 'Gold 2': 3002, 'Gold 1': 3001,
+    'Silver 4': 2004, 'Silver 3': 2003, 'Silver 2': 2002, 'Silver 1': 2001,
+    'Bronze 4': 1004, 'Bronze 3': 1003, 'Bronze 2': 1002, 'Bronze 1': 1001
+  };
+  const baseValue = rankMapping[rankTitle] || 0;
+  const rpBonus = rankTitle === 'Nightmare' ? rp : Math.min(rp, 99);
+  return baseValue + rpBonus;
+}
+
 class LeaderboardService {
   private previousSnapshot: LeaderboardEntry[] = [];
 
@@ -30,7 +46,6 @@ class LeaderboardService {
       const { data: leaderboardData, error: leaderboardError } = await supabase
         .from('leaderboard')
         .select('*')
-        .order('rp', { ascending: false })
         .limit(200);
 
       if (leaderboardError) {
@@ -46,9 +61,22 @@ class LeaderboardService {
         return [];
       }
 
+      // --- CRITICAL: Sort by correct rank hierarchy ---
+      const sorted = [...leaderboardData].sort((a, b) => {
+        const aValue = getRankSortValue(a.rank_title, a.rp);
+        const bValue = getRankSortValue(b.rank_title, b.rp);
+        if (bValue !== aValue) return bValue - aValue;
+        return a.username.localeCompare(b.username);
+      });
+
+      // Assign rank_position based on sorted order
+      sorted.forEach((entry, idx) => {
+        entry.rank_position = idx + 1;
+      });
+
       // Process and enrich the data
       console.log('🔄 Processing leaderboard entries...');
-      const processedEntries = await this.processLeaderboardEntries(leaderboardData);
+      const processedEntries = await this.processLeaderboardEntries(sorted);
       
       console.log('✅ Final processed entries count:', processedEntries.length);
       console.log('✅ Sample processed entry:', processedEntries[0]);
@@ -435,6 +463,26 @@ class LeaderboardService {
    */
   async getCurrentLeaderboard(): Promise<LeaderboardEntry[]> {
     return this.fetchLeaderboardData();
+  }
+
+  /**
+   * Fetch official rank icons from Supabase account_ranks table
+   */
+  async getRankIcons(): Promise<Map<string, string>> {
+    try {
+      const { data, error } = await supabase
+        .from('account_ranks')
+        .select('name, image_url');
+      if (error) throw error;
+      const rankMap = new Map<string, string>();
+      data?.forEach(rank => {
+        rankMap.set(rank.name, rank.image_url);
+      });
+      return rankMap;
+    } catch (error) {
+      console.error('Failed to fetch rank icons:', error);
+      return new Map();
+    }
   }
 }
 

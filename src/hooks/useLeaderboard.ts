@@ -7,6 +7,7 @@ import {
   TabType,
   TimeRange
 } from '../types/leaderboard';
+import { supabase } from '../lib/supabase';
 
 const DEFAULT_TIME_RANGE: TimeRange = '12h';
 
@@ -15,6 +16,7 @@ export const useLeaderboard = () => {
   const [entries, setEntries] = useState<LeaderboardEntryWithChanges[]>([]);
   const [previousEntries, setPreviousEntries] = useState<LeaderboardEntryWithChanges[]>([]);
   const [isLoading, setIsLoading] = useState(false);
+  const [isInitialLoading, setIsInitialLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [lastUpdate, setLastUpdate] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
@@ -32,7 +34,7 @@ export const useLeaderboard = () => {
 
   // Fetch main leaderboard with changes
   const fetchLeaderboard = useCallback(async () => {
-    setIsLoading(true);
+    if (isInitialLoading) setIsLoading(true);
     setError(null);
     try {
       const newEntries = await leaderboardService.getCurrentLeaderboardWithChanges();
@@ -45,8 +47,9 @@ export const useLeaderboard = () => {
       setError(err instanceof Error ? err.message : 'Failed to fetch leaderboard data');
     } finally {
       setIsLoading(false);
+      setIsInitialLoading(false);
     }
-  }, [entries]);
+  }, [entries, isInitialLoading]);
 
   // Fetch gainers/losers for a time range
   const fetchGainers = useCallback(async (timeRange: TimeRange) => {
@@ -78,7 +81,7 @@ export const useLeaderboard = () => {
     const interval = setInterval(() => {
       setIsRefreshing(true);
       fetchLeaderboard().finally(() => setIsRefreshing(false));
-    }, 30000);
+    }, 300000); // 5 minutes
     setRefreshInterval(interval);
   }, [fetchLeaderboard, refreshInterval]);
   const stopAutoRefresh = useCallback(() => {
@@ -127,10 +130,50 @@ export const useLeaderboard = () => {
     fetchLosers(losersTimeRange);
   }, [fetchLeaderboard, fetchGainers, fetchLosers, gainersTimeRange, losersTimeRange]);
 
+  // Smart refresh with cache
+  const refreshLeaderboard = useCallback(async (silent = false) => {
+    try {
+      if (!silent) setIsRefreshing(true);
+      // Keep showing current data while fetching new data
+      const newEntries = await leaderboardService.getCurrentLeaderboardWithChanges();
+      // Only update if data actually changed
+      const hasChanges = JSON.stringify(entries) !== JSON.stringify(newEntries);
+      if (hasChanges) {
+        setPreviousEntries(entries);
+        setEntries(newEntries);
+        // Optionally: trigger animations for changes
+      }
+    } catch (error) {
+      console.error('Refresh failed:', error);
+    } finally {
+      setIsRefreshing(false);
+      setIsInitialLoading(false);
+    }
+  }, [entries]);
+
+  // Supabase trigger subscription for Lua script coordination
+  useEffect(() => {
+    const subscription = supabase
+      .channel('leaderboard_refresh')
+      .on('postgres_changes', {
+        event: 'INSERT',
+        schema: 'public',
+        table: 'leaderboard_refresh_trigger'
+      }, (payload) => {
+        console.log('Lua script completed, refreshing leaderboard...');
+        refreshLeaderboard(true); // Silent refresh
+      })
+      .subscribe();
+    return () => {
+      subscription.unsubscribe();
+    };
+  }, [refreshLeaderboard]);
+
   return {
     entries: filteredEntries,
     previousEntries,
     isLoading,
+    isInitialLoading,
     error,
     lastUpdate,
     searchQuery,

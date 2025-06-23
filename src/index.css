@@ -112,6 +112,84 @@
     @apply hover:bg-gray-100 dark:hover:bg-gray-700;
     @apply text-gray-700 dark:text-gray-300;
   }
+
+  /* --- Official Rank Badge Styles --- */
+  .rank-badge {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 12px;
+    border-radius: 12px;
+    border: 2px solid rgba(255, 255, 255, 0.2);
+    backdrop-filter: blur(4px);
+    transition: all 0.3s ease;
+  }
+
+  .rank-badge:hover {
+    transform: scale(1.05);
+    filter: brightness(1.1);
+  }
+
+  .rank-badge--small {
+    padding: 4px 8px;
+    gap: 4px;
+  }
+
+  .rank-badge--small .rank-icon {
+    width: 20px;
+    height: 20px;
+  }
+
+  .rank-badge--medium .rank-icon {
+    width: 32px;
+    height: 32px;
+  }
+
+  .rank-badge--large .rank-icon {
+    width: 48px;
+    height: 48px;
+  }
+
+  .rank-icon {
+    object-fit: contain;
+    filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.3));
+  }
+
+  .rank-info {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+  }
+
+  .rank-tier {
+    font-weight: bold;
+    font-size: 0.875rem;
+    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.5);
+  }
+
+  .rank-level {
+    font-size: 0.75rem;
+    opacity: 0.9;
+  }
+
+  .rank-rp {
+    font-size: 0.75rem;
+    color: rgba(255, 255, 255, 0.8);
+  }
+
+  /* Nightmare special styling */
+  .rank-badge[data-tier="Nightmare"] {
+    animation: nightmareGlow 2s ease-in-out infinite alternate;
+  }
+
+  @keyframes nightmareGlow {
+    from {
+      box-shadow: 0 0 20px rgba(156, 39, 176, 0.4);
+    }
+    to {
+      box-shadow: 0 0 30px rgba(156, 39, 176, 0.6), 0 0 40px rgba(156, 39, 176, 0.3);
+    }
+  }
 }
 
 /* Modal styles */
@@ -419,4 +497,22 @@
 .leaderboard-entry:hover {
   background: linear-gradient(90deg, #f1f5f9 0%, #f8fafc 100%);
   box-shadow: 0 2px 12px rgba(59, 130, 246, 0.06);
+}
+
+.refresh-indicator {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  background: rgba(59, 130, 246, 0.1);
+  color: #3b82f6;
+  padding: 8px 16px;
+  border-radius: 20px;
+  font-size: 0.875rem;
+  z-index: 10;
+  animation: pulse 2s infinite;
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 0.7; }
+  50% { opacity: 1; }
 }
