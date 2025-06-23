@@ -4,11 +4,11 @@ import { useLeaderboard } from '../hooks/useLeaderboard';
 import { TabType } from '../types/leaderboard';
 import LeaderboardEntryComponent from '../components/leaderboard/LeaderboardEntry';
 import StatsCard from '../components/leaderboard/StatsCard';
+import TestLeaderboardData from '../components/TestLeaderboardData';
 
 const LeaderboardPage: React.FC = () => {
   const {
-    entries,
-    filteredEntries,
+    entries: filteredEntries,
     hottestGainers,
     biggestLosers,
     lastUpdate,
@@ -22,17 +22,18 @@ const LeaderboardPage: React.FC = () => {
     refreshData
   } = useLeaderboard();
 
-  const [previousEntries, setPreviousEntries] = useState(entries);
+  const [previousEntries, setPreviousEntries] = useState(filteredEntries);
   const [isAnimating, setIsAnimating] = useState(false);
+  const [showTest, setShowTest] = useState(true); // Temporarily show test
 
   // Handle animations when data updates
   useEffect(() => {
-    if (entries.length > 0 && previousEntries.length > 0 && entries !== previousEntries) {
+    if (filteredEntries.length > 0 && previousEntries.length > 0 && filteredEntries !== previousEntries) {
       setIsAnimating(true);
       setTimeout(() => setIsAnimating(false), 3000);
     }
-    setPreviousEntries(entries);
-  }, [entries, previousEntries]);
+    setPreviousEntries(filteredEntries);
+  }, [filteredEntries, previousEntries]);
 
   const formatLastUpdate = (timestamp: string) => {
     const date = new Date(timestamp);
@@ -54,6 +55,26 @@ const LeaderboardPage: React.FC = () => {
     { id: 'gainers', label: 'Hottest Gainers', icon: <TrendingUp size={20} /> },
     { id: 'losers', label: 'Biggest Losers', icon: <TrendingDown size={20} /> }
   ];
+
+  // Show test component first
+  if (showTest) {
+    return (
+      <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
+        <div className="container mx-auto px-4 py-6">
+          <div className="flex justify-between items-center mb-4">
+            <h1 className="text-2xl font-bold">Leaderboard Data Test</h1>
+            <button
+              onClick={() => setShowTest(false)}
+              className="btn btn-primary"
+            >
+              Show Real Leaderboard
+            </button>
+          </div>
+          <TestLeaderboardData />
+        </div>
+      </div>
+    );
+  }
 
   if (error) {
     return (

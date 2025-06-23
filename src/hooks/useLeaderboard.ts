@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { LeaderboardState, TabType, LeaderboardEntry, LeaderboardStats } from '../types/leaderboard';
 import { leaderboardService } from '../services/leaderboardService';
-import { calculateRankFromRPCached, isValidRP } from '../utils/rankingSystem';
+import { calculateRankFromRPCached, isValidRP, CalculatedRank } from '../utils/rankingSystem';
 
 const REFRESH_INTERVAL = 10 * 60 * 1000; // 10 minutes
 
@@ -19,14 +19,50 @@ export const useLeaderboard = () => {
 
   const fetchData = useCallback(async () => {
     try {
+      console.log('Starting data fetch...');
       setState(prev => ({ ...prev, isLoading: true, error: null }));
 
-      const [entries, gainers, losers, lastUpdate] = await Promise.all([
-        leaderboardService.getCurrentLeaderboard(),
-        leaderboardService.getHottestGainers(),
-        leaderboardService.getBiggestLosers(),
-        leaderboardService.getLastUpdateTime()
-      ]);
+      // Fetch data with individual error handling
+      let entries: LeaderboardEntry[] = [];
+      let gainers: LeaderboardStats[] = [];
+      let losers: LeaderboardStats[] = [];
+      let lastUpdate = '';
+
+      try {
+        console.log('Fetching leaderboard entries...');
+        entries = await leaderboardService.getCurrentLeaderboard();
+        console.log('Leaderboard entries fetched:', entries.length);
+      } catch (error) {
+        console.error('Failed to fetch leaderboard entries:', error);
+        entries = [];
+      }
+
+      try {
+        console.log('Fetching hottest gainers...');
+        gainers = await leaderboardService.getHottestGainers();
+        console.log('Hottest gainers fetched:', gainers.length);
+      } catch (error) {
+        console.error('Failed to fetch hottest gainers:', error);
+        gainers = [];
+      }
+
+      try {
+        console.log('Fetching biggest losers...');
+        losers = await leaderboardService.getBiggestLosers();
+        console.log('Biggest losers fetched:', losers.length);
+      } catch (error) {
+        console.error('Failed to fetch biggest losers:', error);
+        losers = [];
+      }
+
+      try {
+        console.log('Fetching last update time...');
+        lastUpdate = await leaderboardService.getLastUpdateTime();
+        console.log('Last update time fetched:', lastUpdate);
+      } catch (error) {
+        console.error('Failed to fetch last update time:', error);
+        lastUpdate = new Date().toISOString();
+      }
 
       setState(prev => ({
         ...prev,
@@ -36,6 +72,8 @@ export const useLeaderboard = () => {
         lastUpdate,
         isLoading: false
       }));
+
+      console.log('Data fetch completed successfully');
     } catch (error) {
       console.error('Error fetching leaderboard data:', error);
       setState(prev => ({
@@ -77,28 +115,38 @@ export const useLeaderboard = () => {
 
     const query = state.searchQuery.toLowerCase();
     return state.entries.filter(entry => {
-      // Search by username
-      if (entry.username.toLowerCase().includes(query)) {
-        return true;
-      }
-
-      // Search by calculated rank
-      const calculatedRank = entry.calculatedRank || 
-        (entry.rp !== undefined ? calculateRankFromRPCached(entry.rp) : null);
-      
-      if (calculatedRank) {
-        const rankName = `${calculatedRank.tier} ${calculatedRank.level}`.toLowerCase();
-        if (rankName.includes(query)) {
+      try {
+        // Search by username
+        if (entry.username && entry.username.toLowerCase().includes(query)) {
           return true;
         }
-      }
 
-      // Search by raw rank title (legacy)
-      if (entry.rank_title.toLowerCase().includes(query)) {
-        return true;
-      }
+        // Search by calculated rank
+        let calculatedRank: CalculatedRank | null = null;
+        try {
+          calculatedRank = entry.calculatedRank || 
+            (entry.rp !== undefined ? calculateRankFromRPCached(entry.rp) : null);
+        } catch (error) {
+          console.warn(`Failed to calculate rank for search for ${entry.username}:`, error);
+        }
+        
+        if (calculatedRank) {
+          const rankName = `${calculatedRank.tier} ${calculatedRank.level}`.toLowerCase();
+          if (rankName.includes(query)) {
+            return true;
+          }
+        }
 
-      return false;
+        // Search by raw rank title (legacy)
+        if (entry.rank_title && entry.rank_title.toLowerCase().includes(query)) {
+          return true;
+        }
+
+        return false;
+      } catch (error) {
+        console.error('Error in search filter for entry:', entry, error);
+        return false;
+      }
     });
   }, [state.entries, state.searchQuery]);
 
@@ -110,19 +158,29 @@ export const useLeaderboard = () => {
 
     const query = state.searchQuery.toLowerCase();
     return state.hottestGainers.filter(gainer => {
-      if (gainer.username.toLowerCase().includes(query)) {
-        return true;
-      }
+      try {
+        if (gainer.username && gainer.username.toLowerCase().includes(query)) {
+          return true;
+        }
 
-      const calculatedRank = gainer.calculatedRank || 
-        (gainer.total_rp !== undefined ? calculateRankFromRPCached(gainer.total_rp) : null);
-      
-      if (calculatedRank) {
-        const rankName = `${calculatedRank.tier} ${calculatedRank.level}`.toLowerCase();
-        return rankName.includes(query);
-      }
+        let calculatedRank: CalculatedRank | null = null;
+        try {
+          calculatedRank = gainer.calculatedRank || 
+            (gainer.total_rp !== undefined ? calculateRankFromRPCached(gainer.total_rp) : null);
+        } catch (error) {
+          console.warn(`Failed to calculate rank for gainer search for ${gainer.username}:`, error);
+        }
+        
+        if (calculatedRank) {
+          const rankName = `${calculatedRank.tier} ${calculatedRank.level}`.toLowerCase();
+          return rankName.includes(query);
+        }
 
-      return false;
+        return false;
+      } catch (error) {
+        console.error('Error in gainer search filter for entry:', gainer, error);
+        return false;
+      }
     });
   }, [state.hottestGainers, state.searchQuery]);
 
@@ -133,19 +191,29 @@ export const useLeaderboard = () => {
 
     const query = state.searchQuery.toLowerCase();
     return state.biggestLosers.filter(loser => {
-      if (loser.username.toLowerCase().includes(query)) {
-        return true;
-      }
+      try {
+        if (loser.username && loser.username.toLowerCase().includes(query)) {
+          return true;
+        }
 
-      const calculatedRank = loser.calculatedRank || 
-        (loser.total_rp !== undefined ? calculateRankFromRPCached(loser.total_rp) : null);
-      
-      if (calculatedRank) {
-        const rankName = `${calculatedRank.tier} ${calculatedRank.level}`.toLowerCase();
-        return rankName.includes(query);
-      }
+        let calculatedRank: CalculatedRank | null = null;
+        try {
+          calculatedRank = loser.calculatedRank || 
+            (loser.total_rp !== undefined ? calculateRankFromRPCached(loser.total_rp) : null);
+        } catch (error) {
+          console.warn(`Failed to calculate rank for loser search for ${loser.username}:`, error);
+        }
+        
+        if (calculatedRank) {
+          const rankName = `${calculatedRank.tier} ${calculatedRank.level}`.toLowerCase();
+          return rankName.includes(query);
+        }
 
-      return false;
+        return false;
+      } catch (error) {
+        console.error('Error in loser search filter for entry:', loser, error);
+        return false;
+      }
     });
   }, [state.biggestLosers, state.searchQuery]);
 

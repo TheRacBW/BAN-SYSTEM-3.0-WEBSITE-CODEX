@@ -49,61 +49,87 @@ export const RANK_TIER_INDEX: Record<RankTier, number> = {
  * @returns Calculated rank information
  */
 export function calculateRankFromRP(totalRP: number): CalculatedRank {
-  // Handle negative RP
-  if (totalRP < 0) {
-    totalRP = 0;
-  }
-
-  // Find the appropriate tier
-  for (const [tierName, tierConfig] of Object.entries(RANK_TIERS)) {
-    const tier = tierName as RankTier;
-    
-    if (totalRP >= tierConfig.minRp && totalRP <= tierConfig.maxRp) {
-      let level = 0;
-      let displayRP = totalRP - tierConfig.minRp;
-      
-      // Calculate level and display RP
-      if (tier === 'Emerald' || tier === 'Nightmare') {
-        // Special tiers with no sub-levels
-        level = 0;
-        displayRP = totalRP - tierConfig.minRp;
-      } else {
-        // Regular tiers with sub-levels
-        level = Math.floor(displayRP / 100) + 1;
-        if (level > tierConfig.levels) {
-          level = tierConfig.levels;
-        }
-        displayRP = displayRP - ((level - 1) * 100);
-      }
-      
-      // Ensure display RP is within bounds
-      if (displayRP > 99) {
-        displayRP = 99;
-      }
-      
-      const calculatedRank = getRankDisplayName(tier, level);
-      const tierIndex = getRankTierIndex(tier, level);
-      
-      return {
-        tier,
-        level,
-        displayRP,
-        totalRP,
-        calculatedRank,
-        tierIndex
-      };
+  try {
+    // Handle invalid input
+    if (typeof totalRP !== 'number' || isNaN(totalRP)) {
+      console.warn('Invalid RP value provided:', totalRP);
+      totalRP = 0;
     }
+
+    // Handle negative RP
+    if (totalRP < 0) {
+      console.warn('Negative RP value provided:', totalRP);
+      totalRP = 0;
+    }
+
+    // Find the appropriate tier
+    for (const [tierName, tierConfig] of Object.entries(RANK_TIERS)) {
+      const tier = tierName as RankTier;
+      
+      if (totalRP >= tierConfig.minRp && totalRP <= tierConfig.maxRp) {
+        let level = 0;
+        let displayRP = totalRP - tierConfig.minRp;
+        
+        // Calculate level and display RP
+        if (tier === 'Emerald' || tier === 'Nightmare') {
+          // Special tiers with no sub-levels
+          level = 0;
+          displayRP = totalRP - tierConfig.minRp;
+        } else {
+          // Regular tiers with sub-levels
+          level = Math.floor(displayRP / 100) + 1;
+          if (level > tierConfig.levels) {
+            level = tierConfig.levels;
+          }
+          displayRP = displayRP - ((level - 1) * 100);
+        }
+        
+        // Ensure display RP is within bounds
+        if (displayRP > 99) {
+          displayRP = 99;
+        }
+        
+        // Ensure display RP is not negative
+        if (displayRP < 0) {
+          displayRP = 0;
+        }
+        
+        const calculatedRank = getRankDisplayName(tier, level);
+        const tierIndex = getRankTierIndex(tier, level);
+        
+        return {
+          tier,
+          level,
+          displayRP,
+          totalRP,
+          calculatedRank,
+          tierIndex
+        };
+      }
+    }
+    
+    // Fallback to Bronze 1 (should never reach here)
+    console.warn('No tier found for RP:', totalRP, '- falling back to Bronze 1');
+    return {
+      tier: 'Bronze',
+      level: 1,
+      displayRP: Math.min(totalRP, 99),
+      totalRP,
+      calculatedRank: 'Bronze 1',
+      tierIndex: getRankTierIndex('Bronze', 1)
+    };
+  } catch (error) {
+    console.error('Error in calculateRankFromRP:', error, 'for RP:', totalRP);
+    // Emergency fallback
+    return {
+      tier: 'Bronze',
+      level: 1,
+      displayRP: 0,
+      totalRP: 0,
+      calculatedRank: 'Bronze 1',
+      tierIndex: 1001
+    };
   }
-  
-  // Fallback to Bronze 1 (should never reach here)
-  return {
-    tier: 'Bronze',
-    level: 1,
-    displayRP: Math.min(totalRP, 99),
-    totalRP,
-    calculatedRank: 'Bronze 1',
-    tierIndex: getRankTierIndex('Bronze', 1)
-  };
 }
 
 /**
@@ -305,7 +331,38 @@ export function sortRanksByTier(ranks: CalculatedRank[]): CalculatedRank[] {
  * @returns True if valid
  */
 export function isValidRP(rp: number): boolean {
-  return typeof rp === 'number' && !isNaN(rp) && rp >= 0 && rp <= 10000; // Reasonable upper limit
+  try {
+    // Check if it's a number
+    if (typeof rp !== 'number') {
+      return false;
+    }
+    
+    // Check if it's NaN
+    if (isNaN(rp)) {
+      return false;
+    }
+    
+    // Check if it's finite
+    if (!isFinite(rp)) {
+      return false;
+    }
+    
+    // Check if it's within reasonable bounds
+    if (rp < 0) {
+      return false;
+    }
+    
+    // Set a reasonable upper limit (adjust as needed)
+    if (rp > 10000) {
+      console.warn('RP value exceeds reasonable limit:', rp);
+      return false;
+    }
+    
+    return true;
+  } catch (error) {
+    console.error('Error validating RP:', error, 'for value:', rp);
+    return false;
+  }
 }
 
 /**
@@ -347,24 +404,43 @@ const rankCache = new Map<number, CalculatedRank>();
  * @returns Cached or calculated rank
  */
 export function calculateRankFromRPCached(totalRP: number): CalculatedRank {
-  const cacheKey = Math.floor(totalRP);
-  
-  if (rankCache.has(cacheKey)) {
-    return rankCache.get(cacheKey)!;
-  }
-  
-  const calculatedRank = calculateRankFromRP(totalRP);
-  rankCache.set(cacheKey, calculatedRank);
-  
-  // Limit cache size to prevent memory issues
-  if (rankCache.size > 1000) {
-    const firstKey = rankCache.keys().next().value;
-    if (firstKey !== undefined) {
-      rankCache.delete(firstKey);
+  try {
+    // Validate input
+    if (!isValidRP(totalRP)) {
+      console.warn('Invalid RP for cached calculation:', totalRP);
+      totalRP = 0;
     }
+
+    const cacheKey = Math.floor(totalRP);
+    
+    if (rankCache.has(cacheKey)) {
+      return rankCache.get(cacheKey)!;
+    }
+    
+    const calculatedRank = calculateRankFromRP(totalRP);
+    rankCache.set(cacheKey, calculatedRank);
+    
+    // Limit cache size to prevent memory issues
+    if (rankCache.size > 1000) {
+      const firstKey = rankCache.keys().next().value;
+      if (firstKey !== undefined) {
+        rankCache.delete(firstKey);
+      }
+    }
+    
+    return calculatedRank;
+  } catch (error) {
+    console.error('Error in calculateRankFromRPCached:', error, 'for RP:', totalRP);
+    // Emergency fallback
+    return {
+      tier: 'Bronze',
+      level: 1,
+      displayRP: 0,
+      totalRP: 0,
+      calculatedRank: 'Bronze 1',
+      tierIndex: 1001
+    };
   }
-  
-  return calculatedRank;
 }
 
 /**
