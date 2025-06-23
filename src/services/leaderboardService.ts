@@ -389,60 +389,46 @@ class LeaderboardService {
   }
 
   /**
-   * Get RP gainers/losers for a time range
+   * Get RP gainers/losers for a time range using rp_changes table
    */
   async getRPChangesWithTimeRange(timeRange: TimeRange, type: 'gainers' | 'losers'): Promise<RPChangeWithTimeRange[]> {
-    // 1. Get current leaderboard
-    const current = await this.fetchLeaderboardData();
-    const currentMap = new Map(current.map(e => [e.username, e]));
-    // 2. Get historical data
-    const hours = timeRange === '12h' ? 12 : timeRange === '1d' ? 24 : 48;
-    const since = new Date(Date.now() - hours * 60 * 60 * 1000).toISOString();
-    const { data: historicalData, error } = await supabase
-      .from('leaderboard_history')
-      .select('username, rp, rank_title, inserted_at, profile_picture, user_id')
-      .gte('inserted_at', since)
-      .order('inserted_at', { ascending: false });
-    if (error || !historicalData) return [];
-    // Use the oldest entry for each user in the time window
-    const historicalMap = new Map<string, { rp: number; rank_title: string; profile_picture?: string; user_id?: number }>();
-    for (const entry of historicalData) {
-      if (!historicalMap.has(entry.username)) {
-        historicalMap.set(entry.username, entry);
-      }
+    // Map timeRange to SQL interval
+    const intervalMap: Record<TimeRange, string> = {
+      '6h': '6 hours',
+      '12h': '12 hours',
+      '1d': '1 day',
+      '2d': '2 days',
+    };
+    const interval = intervalMap[timeRange] || '12 hours';
+    // Build query
+    let query = supabase
+      .from('rp_changes')
+      .select('username, previous_rp, new_rp, rp_change, previous_rank, new_rank, rank_change, change_timestamp, previous_calculated_rank, new_calculated_rank, rank_tier_change, profile_picture, user_id')
+      .gte('change_timestamp', new Date(Date.now() - (
+        timeRange === '6h' ? 6 : timeRange === '12h' ? 12 : timeRange === '1d' ? 24 : 48
+      ) * 60 * 60 * 1000).toISOString());
+    if (type === 'gainers') {
+      query = query.gt('rp_change', 0).order('rp_change', { ascending: false }).limit(4);
+    } else {
+      query = query.lt('rp_change', 0).order('rp_change', { ascending: true }).limit(4);
     }
-    // 3. Calculate changes
-    const changes: RPChangeWithTimeRange[] = [];
-    for (const [username, currentEntry] of currentMap.entries()) {
-      const prev = historicalMap.get(username);
-      if (!prev) continue;
-      const rp_change = currentEntry.rp - prev.rp;
-      if ((type === 'gainers' && rp_change <= 0) || (type === 'losers' && rp_change >= 0)) continue;
-      const percentage_change = prev.rp !== 0 ? (rp_change / prev.rp) * 100 : 0;
-      let rank_change_direction: 'up' | 'down' | 'same' = 'same';
-      if (currentEntry.rank_title !== prev.rank_title) {
-        // Simple string comparison, could be improved with tier order
-        rank_change_direction = currentEntry.rp > prev.rp ? 'up' : 'down';
-      }
-      changes.push({
-        username,
-        current_rp: currentEntry.rp,
-        current_rank_title: currentEntry.rank_title,
-        previous_rp: prev.rp,
-        previous_rank_title: prev.rank_title,
-        rp_change,
-        rank_change_direction,
-        time_period: timeRange,
-        percentage_change,
-        profile_picture: currentEntry.profile_picture || prev.profile_picture || null,
-        user_id: currentEntry.user_id || prev.user_id || null,
-        inserted_at: prev.inserted_at
-      });
-    }
-    // Sort and return top 10
-    return changes
-      .sort((a, b) => type === 'gainers' ? b.rp_change - a.rp_change : a.rp_change - b.rp_change)
-      .slice(0, 10);
+    const { data, error } = await query;
+    if (error || !data) return [];
+    // Map to RPChangeWithTimeRange
+    return data.map((entry: any) => ({
+      username: entry.username,
+      current_rp: entry.new_rp,
+      current_rank_title: entry.new_calculated_rank,
+      previous_rp: entry.previous_rp,
+      previous_rank_title: entry.previous_calculated_rank,
+      rp_change: entry.rp_change,
+      rank_change_direction: entry.rank_tier_change > 0 ? 'up' : entry.rank_tier_change < 0 ? 'down' : 'same',
+      time_period: timeRange,
+      percentage_change: entry.previous_rp ? ((entry.rp_change / entry.previous_rp) * 100) : 0,
+      profile_picture: entry.profile_picture || null,
+      user_id: entry.user_id || null,
+      inserted_at: entry.change_timestamp,
+    }));
   }
 
   async getRPGainers(timeRange: TimeRange): Promise<RPChangeWithTimeRange[]> {

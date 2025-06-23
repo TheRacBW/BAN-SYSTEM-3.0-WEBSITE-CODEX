@@ -261,19 +261,15 @@ const LeaderboardPage: React.FC = () => {
                     {activeTab === 'gainers' ? 'Top RP Gainers' : 'Top RP Losers'}
                   </h2>
                   {/* Modern Segmented Control for Time Filter */}
-                  <div className="flex gap-2">
+                  <div className="time-filter-buttons">
                     {['6h', '12h', '1d', '2d'].map(opt => (
                       <button
                         key={opt}
                         type="button"
-                        className={`px-3 py-1.5 rounded-full text-sm font-medium transition-all border border-transparent focus:outline-none
-                          ${((activeTab === 'gainers' ? gainersTimeRange : losersTimeRange) === opt)
-                            ? 'bg-blue-600 text-white shadow dark:bg-blue-500 dark:text-white'
-                            : 'bg-gray-100 text-gray-700 hover:bg-blue-100 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-blue-900/30'}
-                        `}
+                        className={`filter-button${((activeTab === 'gainers' ? gainersTimeRange : losersTimeRange) === opt) ? ' active' : ''}`}
                         onClick={() => activeTab === 'gainers' ? setGainersTimeRange(opt as any) : setLosersTimeRange(opt as any)}
                       >
-                        {opt === '6h' ? '6h' : opt === '12h' ? '12h' : opt === '1d' ? '1d' : '2d'}
+                        {opt}
                       </button>
                     ))}
                   </div>
@@ -285,7 +281,9 @@ const LeaderboardPage: React.FC = () => {
                     (() => {
                       const data = activeTab === 'gainers' ? gainers : losers;
                       if (!data || data.length === 0) {
-                        return <div className="text-center py-8 text-gray-500 dark:text-gray-400">No RP changes found in the selected period.</div>;
+                        const requested = (activeTab === 'gainers' ? gainersTimeRange : losersTimeRange);
+                        const requestedHours = requested === '6h' ? 6 : requested === '12h' ? 12 : requested === '1d' ? 24 : 48;
+                        return <div className="text-center py-8 text-gray-500 dark:text-gray-400">No RP changes found in the last {requestedHours} hours. Try a longer timeframe.</div>;
                       }
                       // Find the oldest inserted_at timestamp in the data
                       const timestamps = data.map(e => e.inserted_at ? new Date(e.inserted_at) : null).filter(Boolean) as Date[];
@@ -323,7 +321,7 @@ const LeaderboardPage: React.FC = () => {
                               </div>
                             </div>
                             <div className="text-right">
-                              <div className={`font-bold text-lg ${activeTab === 'gainers' ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>
+                              <div className={`font-bold text-lg ${entry.rp_change > 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>
                                 {entry.rp_change > 0 ? '+' : ''}{entry.rp_change} RP ({entry.percentage_change.toFixed(1)}%)
                               </div>
                             </div>

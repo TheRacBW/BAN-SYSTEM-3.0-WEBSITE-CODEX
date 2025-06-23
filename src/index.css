@@ -661,3 +661,48 @@
 .leaderboard-entry:not(:last-child) {
   border-bottom: none !important;
 }
+
+/* Segmented control styling for RP Gainers/Losers time filter */
+.time-filter-buttons {
+  display: flex;
+  background: rgba(51, 65, 85, 0.8);
+  border-radius: 8px;
+  padding: 4px;
+  gap: 4px;
+}
+
+.filter-button {
+  padding: 8px 16px;
+  border-radius: 6px;
+  background: transparent;
+  color: #94a3b8;
+  font-weight: 500;
+  font-size: 1rem;
+  border: none;
+  outline: none;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.filter-button.active {
+  background: linear-gradient(135deg, #8b5cf6, #7c3aed);
+  color: white;
+  box-shadow: 0 2px 8px rgba(139, 92, 246, 0.3);
+}
+
+.filter-button:hover:not(.active) {
+  background: rgba(139, 92, 246, 0.08);
+  color: #a78bfa;
+}
+
+@media (max-width: 640px) {
+  .time-filter-buttons {
+    flex-direction: column;
+    gap: 6px;
+    padding: 4px 0;
+  }
+  .filter-button {
+    width: 100%;
+    text-align: center;
+  }
+}
