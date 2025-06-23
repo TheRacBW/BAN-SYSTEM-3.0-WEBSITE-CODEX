@@ -1023,19 +1023,30 @@ function PlayerCard({ player, onDelete, isAdmin, isPinned, onPinToggle, showPinI
                       <select
                         value={getAccountRank(account)?.id || ''}
                         onChange={(e) => handleUpdateRank(account.id, e.target.value)}
-                        className="rounded border-gray-300 dark:border-gray-600"
+                        className="w-full p-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600 dark:text-gray-100 bg-white border-gray-300 text-gray-900 focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400"
                         disabled={isUpdatingRank}
+                        onClick={(e) => e.stopPropagation()}
+                        onFocus={(e) => e.stopPropagation()}
                       >
-                        <option value="">Set Rank</option>
+                        <option value="" className="dark:bg-gray-700 dark:text-gray-100">
+                          Set Rank
+                        </option>
                         {ranks.map(rank => (
-                          <option key={rank.id} value={rank.id}>
+                          <option 
+                            key={rank.id} 
+                            value={rank.id}
+                            className="dark:bg-gray-700 dark:text-gray-100"
+                          >
                             {rank.name}
                           </option>
                         ))}
                       </select>
                       <button
-                        onClick={() => handleDeleteAccount(account.id)}
-                        className="text-red-600 hover:text-red-700"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleDeleteAccount(account.id);
+                        }}
+                        className="text-red-600 hover:text-red-700 p-2 rounded-lg hover:bg-red-50 dark:hover:bg-red-900/20"
                         disabled={isUpdatingRank}
                       >
                         <Trash2 size={18} />
@@ -1169,13 +1180,13 @@ function PlayerCard({ player, onDelete, isAdmin, isPinned, onPinToggle, showPinI
         }}
       >
         <div className="flex justify-between items-center mb-4">
-          <h3 className="text-xl font-bold">Add Account</h3>
+          <h3 className="text-xl font-bold text-gray-900 dark:text-gray-100">Add Account</h3>
           <button
             onClick={(e) => {
               e.stopPropagation();
               setShowAddAccountModal(false);
             }}
-            className="text-gray-500 hover:text-gray-700"
+            className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
           >
             <X size={24} />
           </button>
@@ -1183,27 +1194,27 @@ function PlayerCard({ player, onDelete, isAdmin, isPinned, onPinToggle, showPinI
 
         <div className="space-y-4">
           <div>
-            <label className="block text-sm font-medium mb-1">
+            <label className="block text-sm font-medium mb-2 text-gray-700 dark:text-gray-300">
               Roblox User ID
             </label>
             <input
               type="number"
               value={newUserId}
               onChange={(e) => setNewUserId(e.target.value)}
-              className="w-full p-2 border rounded dark:bg-gray-700 dark:border-gray-600"
+              className="w-full p-3 border rounded-lg dark:bg-gray-700 dark:border-gray-600 dark:text-gray-100 bg-white border-gray-300 text-gray-900 focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400"
               placeholder="Enter Roblox User ID"
               onClick={(e) => e.stopPropagation()}
               onFocus={(e) => e.stopPropagation()}
             />
           </div>
 
-          <div className="flex justify-end gap-3">
+          <div className="flex gap-3 pt-4 border-t">
             <button
               onClick={(e) => {
                 e.stopPropagation();
                 setShowAddAccountModal(false);
               }}
-              className="btn btn-outline"
+              className="btn btn-outline flex-1"
             >
               Cancel
             </button>
@@ -1212,7 +1223,7 @@ function PlayerCard({ player, onDelete, isAdmin, isPinned, onPinToggle, showPinI
                 e.stopPropagation();
                 handleAddAccount();
               }}
-              className="btn btn-primary"
+              className="btn btn-primary flex-1"
             >
               Add Account
             </button>
@@ -1421,41 +1432,79 @@ function PlayerCard({ player, onDelete, isAdmin, isPinned, onPinToggle, showPinI
   );
 
   const renderRankClaimModal = () => (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-      <div className="bg-white dark:bg-gray-800 rounded-lg p-6 max-w-md w-full mx-4">
-        <h3 className="text-xl font-bold mb-4">Submit Rank Update</h3>
+    <div 
+      className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[9999]"
+      onClick={(e) => {
+        if (e.target === e.currentTarget) {
+          setShowRankClaimModal(false);
+        }
+      }}
+    >
+      <div 
+        className="bg-white dark:bg-gray-800 rounded-lg p-6 max-w-md w-full mx-4 shadow-2xl"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="flex justify-between items-center mb-4">
+          <h3 className="text-xl font-bold text-gray-900 dark:text-gray-100">Submit Rank Update</h3>
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              setShowRankClaimModal(false);
+            }}
+            className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
+          >
+            <X size={24} />
+          </button>
+        </div>
         
         <div className="space-y-4">
           <div>
-            <label className="block text-sm font-medium mb-1">
+            <label className="block text-sm font-medium mb-2 text-gray-700 dark:text-gray-300">
               Account
             </label>
             <select
               value={selectedAccountId}
               onChange={(e) => setSelectedAccountId(e.target.value)}
-              className="w-full p-2 border rounded dark:bg-gray-700 dark:border-gray-600"
+              className="w-full p-3 border rounded-lg dark:bg-gray-700 dark:border-gray-600 dark:text-gray-100 bg-white border-gray-300 text-gray-900 focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400"
+              onClick={(e) => e.stopPropagation()}
+              onFocus={(e) => e.stopPropagation()}
             >
-              <option value="">Select account...</option>
+              <option value="" className="dark:bg-gray-700 dark:text-gray-100">
+                Select account...
+              </option>
               {playerData.accounts?.map(account => (
-                <option key={account.id} value={account.id}>
-                  {account.status?.username}
+                <option 
+                  key={account.id} 
+                  value={account.id}
+                  className="dark:bg-gray-700 dark:text-gray-100"
+                >
+                  {account.status?.username || `User ${account.user_id}`}
                 </option>
               ))}
             </select>
           </div>
 
           <div>
-            <label className="block text-sm font-medium mb-1">
+            <label className="block text-sm font-medium mb-2 text-gray-700 dark:text-gray-300">
               New Rank
             </label>
             <select
               value={selectedRankId}
               onChange={(e) => setSelectedRankId(e.target.value)}
-              className="w-full p-2 border rounded dark:bg-gray-700 dark:border-gray-600"
+              className="w-full p-3 border rounded-lg dark:bg-gray-700 dark:border-gray-600 dark:text-gray-100 bg-white border-gray-300 text-gray-900 focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400"
+              onClick={(e) => e.stopPropagation()}
+              onFocus={(e) => e.stopPropagation()}
+              disabled={!selectedAccountId}
             >
-              <option value="">Select rank...</option>
+              <option value="" className="dark:bg-gray-700 dark:text-gray-100">
+                Select rank...
+              </option>
               {ranks.map(rank => (
-                <option key={rank.id} value={rank.id}>
+                <option 
+                  key={rank.id} 
+                  value={rank.id}
+                  className="dark:bg-gray-700 dark:text-gray-100"
+                >
                   {rank.name}
                 </option>
               ))}
@@ -1463,27 +1512,36 @@ function PlayerCard({ player, onDelete, isAdmin, isPinned, onPinToggle, showPinI
           </div>
 
           <div>
-            <label className="block text-sm font-medium mb-1">
+            <label className="block text-sm font-medium mb-2 text-gray-700 dark:text-gray-300">
               Proof URL (Screenshot/Video)
             </label>
             <input
               type="url"
               value={proofUrl}
               onChange={(e) => setProofUrl(e.target.value)}
-              className="w-full p-2 border rounded dark:bg-gray-700 dark:border-gray-600"
+              className="w-full p-3 border rounded-lg dark:bg-gray-700 dark:border-gray-600 dark:text-gray-100 bg-white border-gray-300 text-gray-900 focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400"
+              placeholder="https://example.com/proof.png"
+              onClick={(e) => e.stopPropagation()}
+              onFocus={(e) => e.stopPropagation()}
             />
           </div>
 
-          <div className="flex justify-end gap-3">
+          <div className="flex gap-3 pt-4 border-t">
             <button
-              onClick={() => setShowRankClaimModal(false)}
-              className="btn btn-outline"
+              onClick={(e) => {
+                e.stopPropagation();
+                setShowRankClaimModal(false);
+              }}
+              className="btn btn-outline flex-1"
             >
               Cancel
             </button>
             <button
-              onClick={handleSubmitRankClaim}
-              className="btn btn-primary flex items-center gap-2"
+              onClick={(e) => {
+                e.stopPropagation();
+                handleSubmitRankClaim();
+              }}
+              className="btn btn-primary flex-1 flex items-center gap-2"
             >
               <Upload size={18} />
               Submit Claim
@@ -1522,9 +1580,30 @@ function PlayerCard({ player, onDelete, isAdmin, isPinned, onPinToggle, showPinI
     });
 
     return (
-      <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-        <div className="bg-white dark:bg-gray-800 rounded-lg p-6 max-w-2xl w-full mx-4 max-h-[90vh] overflow-y-auto">
-          <h3 className="text-xl font-bold mb-4">Manage Teammates</h3>
+      <div 
+        className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[9999]"
+        onClick={(e) => {
+          if (e.target === e.currentTarget) {
+            setShowTeammateModal(false);
+          }
+        }}
+      >
+        <div 
+          className="bg-white dark:bg-gray-800 rounded-lg p-6 max-w-2xl w-full mx-4 max-h-[90vh] overflow-y-auto shadow-2xl"
+          onClick={(e) => e.stopPropagation()}
+        >
+          <div className="flex justify-between items-center mb-4">
+            <h3 className="text-xl font-bold text-gray-900 dark:text-gray-100">Manage Teammates</h3>
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                setShowTeammateModal(false);
+              }}
+              className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
+            >
+              <X size={24} />
+            </button>
+          </div>
           
           <div className="space-y-4">
             <div className="relative">
@@ -1533,9 +1612,11 @@ function PlayerCard({ player, onDelete, isAdmin, isPinned, onPinToggle, showPinI
                 placeholder="Search players by alias or Roblox username..."
                 value={teammateSearchQuery}
                 onChange={(e) => setTeammateSearchQuery(e.target.value)}
-                className="w-full p-2 pl-10 border rounded dark:bg-gray-700 dark:border-gray-600"
+                className="w-full p-3 pl-10 border rounded-lg dark:bg-gray-700 dark:border-gray-600 dark:text-gray-100 bg-white border-gray-300 text-gray-900 focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400"
+                onClick={(e) => e.stopPropagation()}
+                onFocus={(e) => e.stopPropagation()}
               />
-              <Search size={18} className="absolute left-3 top-2.5 text-gray-400" />
+              <Search size={18} className="absolute left-3 top-3.5 text-gray-400" />
             </div>
 
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -1787,45 +1868,86 @@ function PlayerCard({ player, onDelete, isAdmin, isPinned, onPinToggle, showPinI
   );
 
   const renderEditModal = () => (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-      <div className="bg-white dark:bg-gray-800 rounded-lg p-6 max-w-md w-full mx-4">
-        <h3 className="text-xl font-bold mb-4">Edit Player</h3>
+    <div 
+      className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[9999]"
+      onClick={(e) => {
+        // Only close if clicking the overlay, not the modal content
+        if (e.target === e.currentTarget) {
+          setShowEditModal(false);
+        }
+      }}
+    >
+      <div 
+        className="bg-white dark:bg-gray-800 rounded-lg p-6 max-w-md w-full mx-4 shadow-2xl"
+        onClick={(e) => {
+          // Prevent clicks inside modal from bubbling up
+          e.stopPropagation();
+        }}
+      >
+        <div className="flex justify-between items-center mb-4">
+          <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100">
+            Edit Player
+          </h3>
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              setShowEditModal(false);
+            }}
+            className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
+          >
+            <X size={24} />
+          </button>
+        </div>
         
         <div className="space-y-4">
           <div>
-            <label className="block text-sm font-medium mb-1">
+            <label className="block text-sm font-medium mb-2 text-gray-700 dark:text-gray-300">
               Player Alias
             </label>
-          <input
-            type="text"
-            value={editingAlias}
-            onChange={(e) => setEditingAlias(e.target.value)}
-            className="w-full p-2 border rounded dark:bg-gray-700 dark:border-gray-600"
-          />
-        </div>
+            <input
+              type="text"
+              value={editingAlias}
+              onChange={(e) => setEditingAlias(e.target.value)}
+              className="w-full p-3 border rounded-lg dark:bg-gray-700 dark:border-gray-600 dark:text-gray-100 bg-white border-gray-300 text-gray-900 focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400"
+              placeholder="Enter player alias"
+              onClick={(e) => e.stopPropagation()}
+              onFocus={(e) => e.stopPropagation()}
+              autoComplete="off"
+            />
+          </div>
 
-        <div>
-          <label className="block text-sm font-medium mb-1">
-            YouTube Channel (Optional)
-          </label>
-          <input
-            type="text"
-            value={editingYoutubeChannel}
-            onChange={(e) => setEditingYoutubeChannel(e.target.value)}
-            className="w-full p-2 border rounded dark:bg-gray-700 dark:border-gray-600"
-          />
-        </div>
+          <div>
+            <label className="block text-sm font-medium mb-2 text-gray-700 dark:text-gray-300">
+              YouTube Channel URL
+            </label>
+            <input
+              type="url"
+              value={editingYoutubeChannel}
+              onChange={(e) => setEditingYoutubeChannel(e.target.value)}
+              className="w-full p-3 border rounded-lg dark:bg-gray-700 dark:border-gray-600 dark:text-gray-100 bg-white border-gray-300 text-gray-900 focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400"
+              placeholder="https://youtube.com/@channel"
+              onClick={(e) => e.stopPropagation()}
+              onFocus={(e) => e.stopPropagation()}
+              autoComplete="off"
+            />
+          </div>
 
-          <div className="flex justify-end gap-3">
+          <div className="flex gap-3 pt-4 border-t">
             <button
-              onClick={() => setShowEditModal(false)}
-              className="btn btn-outline"
+              onClick={(e) => {
+                e.stopPropagation();
+                setShowEditModal(false);
+              }}
+              className="btn btn-outline flex-1"
             >
               Cancel
             </button>
             <button
-              onClick={handleEditPlayer}
-              className="btn btn-primary flex items-center gap-2"
+              onClick={(e) => {
+                e.stopPropagation();
+                handleEditPlayer();
+              }}
+              className="btn btn-primary flex-1 flex items-center gap-2"
             >
               <Save size={18} />
               Save Changes
