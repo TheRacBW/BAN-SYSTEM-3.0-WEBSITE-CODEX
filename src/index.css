@@ -452,19 +452,47 @@
   background-size: 200px 100%;
 }
 
-/* --- Glow Breathing Room --- */
+/* --- Leaderboard Container: True Dark, Centered, Floating --- */
 .leaderboard-container {
-  padding: 20px 10px;
-  overflow: visible;
+  background-color: #030712;
+  border-radius: 18px;
+  box-shadow: 0 2px 24px 0 rgba(0,0,0,0.18);
+  padding: 32px 0;
+  width: 100%;
+  max-width: 900px;
+  margin: 0 auto;
 }
+
+/* --- Leaderboard List: Vertical Spacing, Centered --- */
 .leaderboard-list {
-  padding: 0 15px;
-  margin: 10px 0;
-  overflow: visible;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 0 24px;
+  margin: 0;
+  background: none;
+  width: 100%;
 }
-.leaderboard-wrapper,
-.top-players-section {
-  overflow: visible !important;
+
+/* --- Center and Space Bars, Remove Borders --- */
+.leaderboard-entry {
+  margin: 0 auto;
+  border-bottom: none !important;
+  max-width: 100%;
+}
+.leaderboard-entry:not(:last-child) {
+  border-bottom: none !important;
+}
+
+@media (max-width: 900px) {
+  .leaderboard-container {
+    max-width: 100%;
+    padding: 20px 0;
+  }
+  .leaderboard-list {
+    padding: 0 8px;
+    gap: 8px;
+  }
 }
 
 /* --- Entry Spacing and Subtle Animation --- */
@@ -604,4 +632,32 @@
     margin-left: 0;
     margin-right: 0;
   }
+}
+
+/* --- Leaderboard Container Background: True Dark --- */
+.leaderboard-container, .leaderboard-list {
+  background-color: #fff;
+}
+.dark .leaderboard-container, .dark .leaderboard-list {
+  background-color: #030712;
+}
+
+/* --- Leaderboard List: Vertical Spacing Between Entries --- */
+.leaderboard-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 0 15px;
+  margin: 10px 0;
+  overflow: visible;
+  background-color: inherit;
+}
+
+/* Remove border between entries, so only gap is visible */
+.leaderboard-entry {
+  margin: 0;
+  border-bottom: none !important;
+}
+.leaderboard-entry:not(:last-child) {
+  border-bottom: none !important;
 }

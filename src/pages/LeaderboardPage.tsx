@@ -242,14 +242,16 @@ const LeaderboardPage: React.FC = () => {
                     </p>
                   </div>
                 ) : (
-                  <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm overflow-hidden">
-                    {entries.map((entry, index) => (
-                      <LeaderboardEntryComponent
-                        key={entry.username}
-                        entry={entry}
-                        index={index}
-                      />
-                    ))}
+                  <div className="leaderboard-container rounded-lg shadow-sm overflow-hidden">
+                    <div className="leaderboard-list">
+                      {entries.map((entry, index) => (
+                        <LeaderboardEntryComponent
+                          key={entry.username}
+                          entry={entry}
+                          index={index}
+                        />
+                      ))}
+                    </div>
                   </div>
                 )}
               </div>
