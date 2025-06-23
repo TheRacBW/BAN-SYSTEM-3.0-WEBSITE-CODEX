@@ -68,22 +68,10 @@ class LeaderboardService {
       }
 
       // --- CRITICAL: Sort by correct rank hierarchy ---
-      const sorted = [...leaderboardData].sort((a, b) => {
-        const aValue = getRankSortValue(a.rank_title, a.rp);
-        const bValue = getRankSortValue(b.rank_title, b.rp);
-        if (bValue !== aValue) return bValue - aValue;
-        return a.username.localeCompare(b.username);
-      });
+      // FIX: Use rank_position from DB, do not sort by calculated rank or RP
+      const sorted = [...leaderboardData].sort((a, b) => a.rank_position - b.rank_position);
 
-      // Assign rank_position based on sorted order
-      sorted.forEach((entry, idx) => {
-        entry.rank_position = idx + 1;
-      });
-
-      console.log('=== SORTING DEBUG ===');
-      sorted.forEach((entry, index) => {
-        console.log(`#${index + 1}: ${entry.rank_title} - ${entry.username} - ${entry.rp} RP`);
-      });
+      // Do NOT assign rank_position in the frontend; trust the DB
 
       // Return sorted, un-enriched data for progressive loading
       return sorted;
