@@ -389,53 +389,73 @@ class LeaderboardService {
   }
 
   /**
-   * Get RP gainers/losers for a time range using rp_changes table
+   * Get RP gainers for a time range using Supabase RPC
    */
-  async getRPChangesWithTimeRange(timeRange: TimeRange, type: 'gainers' | 'losers'): Promise<RPChangeWithTimeRange[]> {
-    // Map timeRange to SQL interval
-    const intervalMap: Record<TimeRange, string> = {
-      '6h': '6 hours',
-      '12h': '12 hours',
-      '1d': '1 day',
-      '2d': '2 days',
-    };
-    const interval = intervalMap[timeRange] || '12 hours';
-    // Build query
-    let query = supabase
-      .from('rp_changes')
-      .select('username, previous_rp, new_rp, rp_change, previous_rank, new_rank, rank_change, change_timestamp, previous_calculated_rank, new_calculated_rank, rank_tier_change, profile_picture, user_id')
-      .gte('change_timestamp', new Date(Date.now() - (
-        timeRange === '6h' ? 6 : timeRange === '12h' ? 12 : timeRange === '1d' ? 24 : 48
-      ) * 60 * 60 * 1000).toISOString());
-    if (type === 'gainers') {
-      query = query.gt('rp_change', 0).order('rp_change', { ascending: false }).limit(4);
-    } else {
-      query = query.lt('rp_change', 0).order('rp_change', { ascending: true }).limit(4);
+  async getRPGainers(timeRange: TimeRange): Promise<RPChangeWithTimeRange[]> {
+    const timeframeHours = {
+      '6h': 6,
+      '12h': 12,
+      '1d': 24,
+      '2d': 48
+    }[timeRange] || 12;
+    console.log('[RPC] Calling get_hottest_gainers with', timeframeHours, 'hours');
+    const { data, error } = await supabase.rpc('get_hottest_gainers', { timeframe_hours: timeframeHours });
+    if (error) {
+      console.error('[RPC] get_hottest_gainers error:', error);
+      return [];
     }
-    const { data, error } = await query;
-    if (error || !data) return [];
+    console.log('[RPC] get_hottest_gainers data:', data);
+    if (!data || data.length === 0) return [];
     // Map to RPChangeWithTimeRange
     return data.map((entry: any) => ({
       username: entry.username,
-      current_rp: entry.new_rp,
-      current_rank_title: entry.new_calculated_rank,
-      previous_rp: entry.previous_rp,
-      previous_rank_title: entry.previous_calculated_rank,
-      rp_change: entry.rp_change,
-      rank_change_direction: entry.rank_tier_change > 0 ? 'up' : entry.rank_tier_change < 0 ? 'down' : 'same',
+      current_rp: entry.current_rp,
+      current_rank_title: entry.current_rank_title,
+      previous_rp: entry.current_rp - entry.total_rp_gained, // Estimate previous RP
+      previous_rank_title: '', // Not available from RPC
+      rp_change: entry.total_rp_gained,
+      rank_change_direction: entry.rank_change_text?.includes('↑') ? 'up' : entry.rank_change_text?.includes('↓') ? 'down' : 'same',
       time_period: timeRange,
-      percentage_change: entry.previous_rp ? ((entry.rp_change / entry.previous_rp) * 100) : 0,
+      percentage_change: entry.current_rp ? (entry.total_rp_gained / (entry.current_rp - entry.total_rp_gained)) * 100 : 0,
       profile_picture: entry.profile_picture || null,
       user_id: entry.user_id || null,
-      inserted_at: entry.change_timestamp,
+      inserted_at: entry.latest_change,
     }));
   }
 
-  async getRPGainers(timeRange: TimeRange): Promise<RPChangeWithTimeRange[]> {
-    return this.getRPChangesWithTimeRange(timeRange, 'gainers');
-  }
+  /**
+   * Get RP losers for a time range using Supabase RPC
+   */
   async getRPLosers(timeRange: TimeRange): Promise<RPChangeWithTimeRange[]> {
-    return this.getRPChangesWithTimeRange(timeRange, 'losers');
+    const timeframeHours = {
+      '6h': 6,
+      '12h': 12,
+      '1d': 24,
+      '2d': 48
+    }[timeRange] || 12;
+    console.log('[RPC] Calling get_biggest_losers with', timeframeHours, 'hours');
+    const { data, error } = await supabase.rpc('get_biggest_losers', { timeframe_hours: timeframeHours });
+    if (error) {
+      console.error('[RPC] get_biggest_losers error:', error);
+      return [];
+    }
+    console.log('[RPC] get_biggest_losers data:', data);
+    if (!data || data.length === 0) return [];
+    // Map to RPChangeWithTimeRange
+    return data.map((entry: any) => ({
+      username: entry.username,
+      current_rp: entry.current_rp,
+      current_rank_title: entry.current_rank_title,
+      previous_rp: entry.current_rp - entry.total_rp_lost, // Estimate previous RP
+      previous_rank_title: '', // Not available from RPC
+      rp_change: entry.total_rp_lost, // This is negative
+      rank_change_direction: entry.rank_change_text?.includes('↑') ? 'up' : entry.rank_change_text?.includes('↓') ? 'down' : 'same',
+      time_period: timeRange,
+      percentage_change: entry.current_rp ? (entry.total_rp_lost / (entry.current_rp - entry.total_rp_lost)) * 100 : 0,
+      profile_picture: entry.profile_picture || null,
+      user_id: entry.user_id || null,
+      inserted_at: entry.latest_change,
+    }));
   }
 
   /**

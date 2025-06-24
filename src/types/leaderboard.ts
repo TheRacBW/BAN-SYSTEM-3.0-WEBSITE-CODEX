@@ -156,4 +156,7 @@ export interface RPChangeWithTimeRange {
   profile_picture?: string | null;
   user_id?: number | null;
   inserted_at?: string;
+  rank_change_text?: string;
+  change_count?: number;
+  latest_change?: string;
 } 
