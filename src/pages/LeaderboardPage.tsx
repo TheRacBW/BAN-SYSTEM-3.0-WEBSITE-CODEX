@@ -616,36 +616,8 @@ const LeaderboardPage: React.FC = () => {
                         )}
                         
                         {activeTab === 'gainers' ? (
-                          // Use modern gainers bars with sections
+                          // Use modern gainers bars with sections (Established above, New below)
                           <div className="space-y-6 stagger-animation">
-                            {/* New Players Section */}
-                            {(() => {
-                              const newPlayers = top10Data.filter(player => player.previous_rp === 0 || player.previous_rp === null);
-                              return newPlayers.length > 0 ? (
-                                <div>
-                                  <div className="flex items-center space-x-3 mb-4">
-                                    <div className="w-1 h-6 bg-gradient-to-b from-emerald-400 to-cyan-500 rounded-full"></div>
-                                    <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
-                                      🆕 New to Leaderboard
-                                    </h3>
-                                    <div className="bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-400 px-2 py-1 rounded-full text-xs font-medium">
-                                      {newPlayers.length} fresh
-                                    </div>
-                                  </div>
-                                  <div className="space-y-3">
-                                    {newPlayers.map((player, index) => (
-                                      <ModernGainerBar 
-                                        key={player.username} 
-                                        player={player} 
-                                        rank={index + 1} 
-                                        isNewPlayer={true}
-                                      />
-                                    ))}
-                                  </div>
-                                </div>
-                              ) : null;
-                            })()}
-
                             {/* Established Players Section */}
                             {(() => {
                               const newPlayers = top10Data.filter(player => player.previous_rp === 0 || player.previous_rp === null);
@@ -666,8 +638,36 @@ const LeaderboardPage: React.FC = () => {
                                       <ModernGainerBar 
                                         key={player.username} 
                                         player={player} 
-                                        rank={newPlayers.length + index + 1} 
+                                        rank={index + 1} 
                                         isNewPlayer={false}
+                                      />
+                                    ))}
+                                  </div>
+                                </div>
+                              ) : null;
+                            })()}
+                            {/* New Players Section */}
+                            {(() => {
+                              const newPlayers = top10Data.filter(player => player.previous_rp === 0 || player.previous_rp === null);
+                              const establishedPlayers = top10Data.filter(player => player.previous_rp > 0);
+                              return newPlayers.length > 0 ? (
+                                <div>
+                                  <div className="flex items-center space-x-3 mb-4">
+                                    <div className="w-1 h-6 bg-gradient-to-b from-emerald-400 to-cyan-500 rounded-full"></div>
+                                    <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
+                                      🆕 New to Leaderboard
+                                    </h3>
+                                    <div className="bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-400 px-2 py-1 rounded-full text-xs font-medium">
+                                      {newPlayers.length} fresh
+                                    </div>
+                                  </div>
+                                  <div className="space-y-3">
+                                    {newPlayers.map((player, index) => (
+                                      <ModernGainerBar 
+                                        key={player.username} 
+                                        player={player} 
+                                        rank={establishedPlayers.length + index + 1} 
+                                        isNewPlayer={true}
                                       />
                                     ))}
                                   </div>
@@ -676,7 +676,7 @@ const LeaderboardPage: React.FC = () => {
                             })()}
                           </div>
                         ) : (
-                          // Use modern losers bars with sections
+                          // Use modern losers bars with sections (RP Losers above, Dropped below)
                           <div className="space-y-6 stagger-animation">
                             {/* RP Losers Section */}
                             {(() => {
@@ -709,7 +709,6 @@ const LeaderboardPage: React.FC = () => {
                                 </div>
                               ) : null;
                             })()}
-
                             {/* Dropped from Top 200 Section */}
                             {(() => {
                               const rpLosers = top10Data.filter(player => 
