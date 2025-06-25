@@ -103,7 +103,7 @@ const LeaderboardEntryComponent: React.FC<LeaderboardEntryProps> = ({
       }
     };
     const colors = colorMappings[tier] || colorMappings['BRONZE'];
-    console.log(`${rankTitle}: ${colors.gradient}`);
+    // console.log(`${rankTitle}: ${colors.gradient}`);
     return colors;
   };
 
