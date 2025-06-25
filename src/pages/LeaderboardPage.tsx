@@ -124,7 +124,7 @@ const LeaderboardPage: React.FC = () => {
     console.log(`🔍 Calculating percentage for ${player.username}:`, {
       previous_rp: previousRP,
       rp_change: rpChange,
-      new_rp: player.new_rp
+      current_rp: player.current_rp
     });
     if (previousRP === 0 || previousRP === null || previousRP === undefined) {
       return "New Player joins LB";
@@ -132,23 +132,6 @@ const LeaderboardPage: React.FC = () => {
     const percentage = (rpChange / previousRP) * 100;
     const roundedPercentage = Math.round(percentage * 10) / 10;
     return `${roundedPercentage > 0 ? '+' : ''}${roundedPercentage}%`;
-  };
-
-  const getFullRankTransition = (player: any) => {
-    const prevRank = player.previous_calculated_rank;
-    const currRank = player.new_calculated_rank;
-    const prevRP = player.previous_rp;
-    const currRP = player.new_rp;
-    console.log(`🎯 Rank transition for ${player.username}:`, {
-      prevRank, currRank, prevRP, currRP
-    });
-    if (prevRP === 0 || prevRP === null) {
-      return `→ ${currRank} (${currRP} RP)`;
-    }
-    if (currRank === '[Not in Top 200]' || currRP === 0) {
-      return `${prevRank} (${prevRP} RP) → Dropped from leaderboard`;
-    }
-    return `${prevRank} (${prevRP} RP) → ${currRank} (${currRP} RP)`;
   };
 
   const processGainersData = (allGainers: any[]) => {
@@ -166,14 +149,22 @@ const LeaderboardPage: React.FC = () => {
     return { existingGainers, newPlayers };
   };
 
-  const processLosersData = (allLosers: any[]) => {
-    const validLosers = allLosers.filter(player => player.rp_change < 0 && player.previous_rp > 0);
-    console.log('📊 Filtered losers:', {
-      total: allLosers.length,
-      validLosers: validLosers.length,
-      validLosersList: validLosers.map(p => `${p.username}: ${p.rp_change}`)
+  const getFullRankTransition = (player: any) => {
+    // Try to use calculated rank fields if available, else fallback to rank_title
+    const prevRank = player.previous_calculated_rank || player.previous_rank_title || 'Unknown';
+    const currRank = player.new_calculated_rank || player.current_rank_title || 'Unknown';
+    const prevRP = player.previous_rp;
+    const currRP = player.new_rp || player.current_rp;
+    console.log(`🎯 Rank transition for ${player.username}:`, {
+      prevRank, currRank, prevRP, currRP
     });
-    return validLosers;
+    if (prevRP === 0 || prevRP === null) {
+      return `→ ${currRank} (${currRP} RP)`;
+    }
+    if (currRank === '[Not in Top 200]' || currRP === 0) {
+      return `${prevRank} (${prevRP} RP) → Dropped from leaderboard`;
+    }
+    return `${prevRank} (${prevRP} RP) → ${currRank} (${currRP} RP)`;
   };
 
   const ModernGainerCard = ({ player, rank, isNewPlayer }: any) => (
@@ -343,7 +334,12 @@ const LeaderboardPage: React.FC = () => {
 
   // --- Modern Losers Section ---
   const renderLosersSection = () => {
-    const validLosers = processLosersData(losers);
+    const validLosers = losers.filter((player: any) => player.rp_change < 0 && player.previous_rp > 0);
+    console.log('📊 Filtered losers:', {
+      total: losers.length,
+      validLosers: validLosers.length,
+      validLosersList: validLosers.map((p: any) => `${p.username}: ${p.rp_change}`)
+    });
     return (
       <div className="space-y-3">
         {validLosers.length > 0 ? (

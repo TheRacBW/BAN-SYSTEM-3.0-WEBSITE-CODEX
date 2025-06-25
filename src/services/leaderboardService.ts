@@ -38,6 +38,19 @@ function getRankSortValue(rankTitle: string, rp: number): number {
   return baseValue + rpBonus;
 }
 
+// Helper to ensure rank_change_direction is typed correctly
+function toRankChangeDirection(val: any): 'up' | 'down' | 'same' {
+  if (val === 'up' || val === 1) return 'up';
+  if (val === 'down' || val === -1) return 'down';
+  if (val === 'same' || val === 0) return 'same';
+  if (typeof val === 'string') {
+    if (val.toLowerCase().includes('up')) return 'up';
+    if (val.toLowerCase().includes('down')) return 'down';
+    if (val.toLowerCase().includes('same')) return 'same';
+  }
+  return 'same';
+}
+
 class LeaderboardService {
   private previousSnapshot: LeaderboardEntry[] = [];
 
@@ -402,20 +415,18 @@ class LeaderboardService {
     // --- PRIMARY: Optimized RPC ---
     console.log('[RPC] Calling get_top_gainers_optimized with', timeframeHours, 'hours, limit', limit);
     const { data: rpcData, error: rpcError } = await supabase.rpc('get_top_gainers_optimized', { hours: timeframeHours, limit });
-    if (rpcError) {
-      console.error('[RPC] get_top_gainers_optimized error:', rpcError);
-    }
+    console.log('[RPC] Raw RPC result:', { data: rpcData, error: rpcError });
     let gainers: any[] = rpcData || [];
     if (gainers.length >= 3) {
       console.log('[RPC] Using optimized gainers:', gainers);
-      return gainers.map((entry: any) => ({
+      const mapped = gainers.map((entry: any) => ({
         username: entry.username,
         current_rp: entry.latest_rp,
         current_rank_title: entry.latest_rank,
         previous_rp: entry.latest_rp - entry.total_rp_gain,
         previous_rank_title: '',
         rp_change: entry.total_rp_gain,
-        rank_change_direction: entry.rank_improvement > 0 ? 'up' : entry.rank_improvement < 0 ? 'down' : 'same',
+        rank_change_direction: toRankChangeDirection(entry.rank_improvement),
         time_period: timeRange,
         percentage_change: entry.percentage_change,
         profile_picture: entry.profile_picture || null,
@@ -425,6 +436,8 @@ class LeaderboardService {
         change_count: entry.change_count,
         latest_change: entry.latest_change,
       }));
+      console.log('[RPC] Final mapped gainers returned to UI:', mapped);
+      return mapped;
     }
     // --- FALLBACK: Direct rp_changes query ---
     console.log('[FALLBACK] Not enough gainers from optimized RPC, using rp_changes fallback');
@@ -440,6 +453,7 @@ class LeaderboardService {
       `)
       .gt('change_timestamp', new Date(Date.now() - timeframeHours * 60 * 60 * 1000).toISOString())
       .gt('rp_change', 0);
+    console.log('[FALLBACK] Raw fallback query result:', { data: fallbackData, error: fallbackError });
     if (fallbackError) {
       console.error('[FALLBACK] rp_changes fetch error:', fallbackError);
       return [];
@@ -471,14 +485,14 @@ class LeaderboardService {
       .sort((a, b) => b.total_rp_gain - a.total_rp_gain)
       .slice(0, limit);
     console.log('[FALLBACK] Aggregated fallback gainers:', fallbackAggregated);
-    return fallbackAggregated.map((entry: any) => ({
+    const mapped = fallbackAggregated.map((entry: any) => ({
       username: entry.username,
       current_rp: entry.latest_rp,
       current_rank_title: entry.latest_rank,
       previous_rp: entry.latest_rp - entry.total_rp_gain,
       previous_rank_title: '',
       rp_change: entry.total_rp_gain,
-      rank_change_direction: entry.rank_improvement > 0 ? 'up' : entry.rank_improvement < 0 ? 'down' : 'same',
+      rank_change_direction: toRankChangeDirection(entry.rank_improvement),
       time_period: timeRange,
       percentage_change: entry.percentage_change,
       profile_picture: null,
@@ -488,6 +502,8 @@ class LeaderboardService {
       change_count: entry.change_count,
       latest_change: entry.latest_change,
     }));
+    console.log('[FALLBACK] Final mapped fallback gainers returned to UI:', mapped);
+    return mapped;
   }
 
   /**
@@ -504,20 +520,18 @@ class LeaderboardService {
     // --- PRIMARY: Optimized RPC ---
     console.log('[RPC] Calling get_top_losers_optimized with', timeframeHours, 'hours, limit', limit);
     const { data: rpcData, error: rpcError } = await supabase.rpc('get_top_losers_optimized', { hours: timeframeHours, limit });
-    if (rpcError) {
-      console.error('[RPC] get_top_losers_optimized error:', rpcError);
-    }
+    console.log('[RPC] Raw RPC result:', { data: rpcData, error: rpcError });
     let losers: any[] = rpcData || [];
     if (losers.length >= 3) {
       console.log('[RPC] Using optimized losers:', losers);
-      return losers.map((entry: any) => ({
+      const mapped = losers.map((entry: any) => ({
         username: entry.username,
         current_rp: entry.latest_rp,
         current_rank_title: entry.latest_rank,
         previous_rp: entry.latest_rp - entry.total_rp_loss,
         previous_rank_title: '',
         rp_change: entry.total_rp_loss,
-        rank_change_direction: entry.rank_decline > 0 ? 'down' : entry.rank_decline < 0 ? 'up' : 'same',
+        rank_change_direction: toRankChangeDirection(entry.rank_decline),
         time_period: timeRange,
         percentage_change: entry.percentage_change,
         profile_picture: entry.profile_picture || null,
@@ -527,6 +541,8 @@ class LeaderboardService {
         change_count: entry.change_count,
         latest_change: entry.latest_change,
       }));
+      console.log('[RPC] Final mapped losers returned to UI:', mapped);
+      return mapped;
     }
     // --- FALLBACK: Direct rp_changes query ---
     console.log('[FALLBACK] Not enough losers from optimized RPC, using rp_changes fallback');
@@ -542,6 +558,7 @@ class LeaderboardService {
       `)
       .gt('change_timestamp', new Date(Date.now() - timeframeHours * 60 * 60 * 1000).toISOString())
       .lt('rp_change', 0);
+    console.log('[FALLBACK] Raw fallback query result:', { data: fallbackData, error: fallbackError });
     if (fallbackError) {
       console.error('[FALLBACK] rp_changes fetch error:', fallbackError);
       return [];
@@ -573,14 +590,14 @@ class LeaderboardService {
       .sort((a, b) => a.total_rp_loss - b.total_rp_loss)
       .slice(0, limit);
     console.log('[FALLBACK] Aggregated fallback losers:', fallbackAggregated);
-    return fallbackAggregated.map((entry: any) => ({
+    const mapped = fallbackAggregated.map((entry: any) => ({
       username: entry.username,
       current_rp: entry.latest_rp,
       current_rank_title: entry.latest_rank,
       previous_rp: entry.latest_rp - entry.total_rp_loss,
       previous_rank_title: '',
       rp_change: entry.total_rp_loss,
-      rank_change_direction: entry.rank_decline > 0 ? 'down' : entry.rank_decline < 0 ? 'up' : 'same',
+      rank_change_direction: toRankChangeDirection(entry.rank_decline),
       time_period: timeRange,
       percentage_change: entry.percentage_change,
       profile_picture: null,
@@ -590,6 +607,8 @@ class LeaderboardService {
       change_count: entry.change_count,
       latest_change: entry.latest_change,
     }));
+    console.log('[FALLBACK] Final mapped fallback losers returned to UI:', mapped);
+    return mapped;
   }
 
   /**
