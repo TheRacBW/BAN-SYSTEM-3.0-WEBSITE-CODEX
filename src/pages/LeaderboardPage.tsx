@@ -150,21 +150,21 @@ const LeaderboardPage: React.FC = () => {
   };
 
   const getFullRankTransition = (player: any) => {
-    // Try to use calculated rank fields if available, else fallback to rank_title
-    const prevRank = player.previous_calculated_rank || player.previous_rank_title || 'Unknown';
-    const currRank = player.new_calculated_rank || player.current_rank_title || 'Unknown';
+    // Prefer previous_rank_title, then previous_calculated_rank, then previous_rank, then fallback
+    const prevRank = player.previous_rank_title || player.previous_calculated_rank || player.previous_rank || '';
+    const currRank = player.new_calculated_rank || player.current_rank_title || '';
     const prevRP = player.previous_rp;
     const currRP = player.new_rp || player.current_rp;
-    console.log(`🎯 Rank transition for ${player.username}:`, {
-      prevRank, currRank, prevRP, currRP
-    });
+    // If no previous rank at all, fallback to 'Unknown'
+    const prevRankDisplay = prevRank && prevRank !== 'Unknown' ? prevRank : 'Unranked';
+    const currRankDisplay = currRank && currRank !== 'Unknown' ? currRank : 'Unranked';
     if (prevRP === 0 || prevRP === null) {
-      return `→ ${currRank} (${currRP} RP)`;
+      return `→ ${currRankDisplay} (${currRP} RP)`;
     }
     if (currRank === '[Not in Top 200]' || currRP === 0) {
-      return `${prevRank} (${prevRP} RP) → Dropped from leaderboard`;
+      return `${prevRankDisplay} (${prevRP} RP) → Dropped from leaderboard`;
     }
-    return `${prevRank} (${prevRP} RP) → ${currRank} (${currRP} RP)`;
+    return `${prevRankDisplay} (${prevRP} RP) → ${currRankDisplay} (${currRP} RP)`;
   };
 
   const ModernGainerBar = ({ player, rank, isNewPlayer }: any) => (
