@@ -389,7 +389,7 @@ class LeaderboardService {
   }
 
   /**
-   * Get RP gainers for a time range using Supabase RPC
+   * Get RP gainers for a time range using hybrid strategy (optimized RPC, fallback to rp_changes)
    */
   async getRPGainers(timeRange: TimeRange): Promise<RPChangeWithTimeRange[]> {
     const timeframeHours = {
@@ -398,33 +398,100 @@ class LeaderboardService {
       '1d': 24,
       '2d': 48
     }[timeRange] || 12;
-    console.log('[RPC] Calling get_hottest_gainers with', timeframeHours, 'hours');
-    const { data, error } = await supabase.rpc('get_hottest_gainers', { timeframe_hours: timeframeHours });
-    if (error) {
-      console.error('[RPC] get_hottest_gainers error:', error);
+    const limit = 4;
+    // --- PRIMARY: Optimized RPC ---
+    console.log('[RPC] Calling get_top_gainers_optimized with', timeframeHours, 'hours, limit', limit);
+    const { data: rpcData, error: rpcError } = await supabase.rpc('get_top_gainers_optimized', { hours: timeframeHours, limit });
+    if (rpcError) {
+      console.error('[RPC] get_top_gainers_optimized error:', rpcError);
+    }
+    let gainers: any[] = rpcData || [];
+    if (gainers.length >= 3) {
+      console.log('[RPC] Using optimized gainers:', gainers);
+      return gainers.map((entry: any) => ({
+        username: entry.username,
+        current_rp: entry.latest_rp,
+        current_rank_title: entry.latest_rank,
+        previous_rp: entry.latest_rp - entry.total_rp_gain,
+        previous_rank_title: '',
+        rp_change: entry.total_rp_gain,
+        rank_change_direction: entry.rank_improvement > 0 ? 'up' : entry.rank_improvement < 0 ? 'down' : 'same',
+        time_period: timeRange,
+        percentage_change: entry.percentage_change,
+        profile_picture: entry.profile_picture || null,
+        user_id: entry.user_id || null,
+        inserted_at: entry.latest_change,
+        rank_change_text: entry.rank_improvement ? `↑${entry.rank_improvement}` : '',
+        change_count: entry.change_count,
+        latest_change: entry.latest_change,
+      }));
+    }
+    // --- FALLBACK: Direct rp_changes query ---
+    console.log('[FALLBACK] Not enough gainers from optimized RPC, using rp_changes fallback');
+    const { data: fallbackData, error: fallbackError } = await supabase
+      .from('rp_changes')
+      .select(`
+        username,
+        rp_change,
+        previous_rp,
+        new_calculated_rank,
+        rank_change,
+        change_timestamp
+      `)
+      .gt('change_timestamp', new Date(Date.now() - timeframeHours * 60 * 60 * 1000).toISOString())
+      .gt('rp_change', 0);
+    if (fallbackError) {
+      console.error('[FALLBACK] rp_changes fetch error:', fallbackError);
       return [];
     }
-    console.log('[RPC] get_hottest_gainers data:', data);
-    if (!data || data.length === 0) return [];
-    // Map to RPChangeWithTimeRange
-    return data.map((entry: any) => ({
+    // Group and aggregate fallback results
+    const grouped: Record<string, any[]> = {};
+    (fallbackData || []).forEach((row: any) => {
+      if (!grouped[row.username]) grouped[row.username] = [];
+      grouped[row.username].push(row);
+    });
+    const fallbackAggregated = Object.entries(grouped).map(([username, rows]) => {
+      const total_rp_gain = rows.reduce((sum, r) => sum + (r.rp_change || 0), 0);
+      const rank_improvement = Math.max(...rows.map(r => r.rank_change || 0));
+      const latest = rows.reduce((a, b) => new Date(a.change_timestamp) > new Date(b.change_timestamp) ? a : b);
+      const min_prev_rp = Math.min(...rows.map(r => r.previous_rp || 0));
+      const percentage_change = min_prev_rp === 0 ? null : (total_rp_gain / min_prev_rp) * 100;
+      return {
+        username,
+        total_rp_gain,
+        rank_improvement,
+        latest_rank: latest.new_calculated_rank,
+        change_count: rows.length,
+        percentage_change,
+        latest_change: latest.change_timestamp,
+        latest_rp: latest.previous_rp + total_rp_gain,
+      };
+    })
+      .filter(e => e.total_rp_gain > 0)
+      .sort((a, b) => b.total_rp_gain - a.total_rp_gain)
+      .slice(0, limit);
+    console.log('[FALLBACK] Aggregated fallback gainers:', fallbackAggregated);
+    return fallbackAggregated.map((entry: any) => ({
       username: entry.username,
-      current_rp: entry.current_rp,
-      current_rank_title: entry.current_rank_title,
-      previous_rp: entry.current_rp - entry.total_rp_gained, // Estimate previous RP
-      previous_rank_title: '', // Not available from RPC
-      rp_change: entry.total_rp_gained,
-      rank_change_direction: entry.rank_change_text?.includes('↑') ? 'up' : entry.rank_change_text?.includes('↓') ? 'down' : 'same',
+      current_rp: entry.latest_rp,
+      current_rank_title: entry.latest_rank,
+      previous_rp: entry.latest_rp - entry.total_rp_gain,
+      previous_rank_title: '',
+      rp_change: entry.total_rp_gain,
+      rank_change_direction: entry.rank_improvement > 0 ? 'up' : entry.rank_improvement < 0 ? 'down' : 'same',
       time_period: timeRange,
-      percentage_change: entry.current_rp ? (entry.total_rp_gained / (entry.current_rp - entry.total_rp_gained)) * 100 : 0,
-      profile_picture: entry.profile_picture || null,
-      user_id: entry.user_id || null,
+      percentage_change: entry.percentage_change,
+      profile_picture: null,
+      user_id: null,
       inserted_at: entry.latest_change,
+      rank_change_text: entry.rank_improvement ? `↑${entry.rank_improvement}` : '',
+      change_count: entry.change_count,
+      latest_change: entry.latest_change,
     }));
   }
 
   /**
-   * Get RP losers for a time range using Supabase RPC
+   * Get RP losers for a time range using hybrid strategy (optimized RPC, fallback to rp_changes)
    */
   async getRPLosers(timeRange: TimeRange): Promise<RPChangeWithTimeRange[]> {
     const timeframeHours = {
@@ -433,28 +500,95 @@ class LeaderboardService {
       '1d': 24,
       '2d': 48
     }[timeRange] || 12;
-    console.log('[RPC] Calling get_biggest_losers with', timeframeHours, 'hours');
-    const { data, error } = await supabase.rpc('get_biggest_losers', { timeframe_hours: timeframeHours });
-    if (error) {
-      console.error('[RPC] get_biggest_losers error:', error);
+    const limit = 4;
+    // --- PRIMARY: Optimized RPC ---
+    console.log('[RPC] Calling get_top_losers_optimized with', timeframeHours, 'hours, limit', limit);
+    const { data: rpcData, error: rpcError } = await supabase.rpc('get_top_losers_optimized', { hours: timeframeHours, limit });
+    if (rpcError) {
+      console.error('[RPC] get_top_losers_optimized error:', rpcError);
+    }
+    let losers: any[] = rpcData || [];
+    if (losers.length >= 3) {
+      console.log('[RPC] Using optimized losers:', losers);
+      return losers.map((entry: any) => ({
+        username: entry.username,
+        current_rp: entry.latest_rp,
+        current_rank_title: entry.latest_rank,
+        previous_rp: entry.latest_rp - entry.total_rp_loss,
+        previous_rank_title: '',
+        rp_change: entry.total_rp_loss,
+        rank_change_direction: entry.rank_decline > 0 ? 'down' : entry.rank_decline < 0 ? 'up' : 'same',
+        time_period: timeRange,
+        percentage_change: entry.percentage_change,
+        profile_picture: entry.profile_picture || null,
+        user_id: entry.user_id || null,
+        inserted_at: entry.latest_change,
+        rank_change_text: entry.rank_decline ? `↓${entry.rank_decline}` : '',
+        change_count: entry.change_count,
+        latest_change: entry.latest_change,
+      }));
+    }
+    // --- FALLBACK: Direct rp_changes query ---
+    console.log('[FALLBACK] Not enough losers from optimized RPC, using rp_changes fallback');
+    const { data: fallbackData, error: fallbackError } = await supabase
+      .from('rp_changes')
+      .select(`
+        username,
+        rp_change,
+        previous_rp,
+        new_calculated_rank,
+        rank_change,
+        change_timestamp
+      `)
+      .gt('change_timestamp', new Date(Date.now() - timeframeHours * 60 * 60 * 1000).toISOString())
+      .lt('rp_change', 0);
+    if (fallbackError) {
+      console.error('[FALLBACK] rp_changes fetch error:', fallbackError);
       return [];
     }
-    console.log('[RPC] get_biggest_losers data:', data);
-    if (!data || data.length === 0) return [];
-    // Map to RPChangeWithTimeRange
-    return data.map((entry: any) => ({
+    // Group and aggregate fallback results
+    const grouped: Record<string, any[]> = {};
+    (fallbackData || []).forEach((row: any) => {
+      if (!grouped[row.username]) grouped[row.username] = [];
+      grouped[row.username].push(row);
+    });
+    const fallbackAggregated = Object.entries(grouped).map(([username, rows]) => {
+      const total_rp_loss = rows.reduce((sum, r) => sum + (r.rp_change || 0), 0);
+      const rank_decline = Math.min(...rows.map(r => r.rank_change || 0));
+      const latest = rows.reduce((a, b) => new Date(a.change_timestamp) > new Date(b.change_timestamp) ? a : b);
+      const min_prev_rp = Math.min(...rows.map(r => r.previous_rp || 0));
+      const percentage_change = min_prev_rp === 0 ? null : (total_rp_loss / min_prev_rp) * 100;
+      return {
+        username,
+        total_rp_loss,
+        rank_decline,
+        latest_rank: latest.new_calculated_rank,
+        change_count: rows.length,
+        percentage_change,
+        latest_change: latest.change_timestamp,
+        latest_rp: latest.previous_rp + total_rp_loss,
+      };
+    })
+      .filter(e => e.total_rp_loss < 0)
+      .sort((a, b) => a.total_rp_loss - b.total_rp_loss)
+      .slice(0, limit);
+    console.log('[FALLBACK] Aggregated fallback losers:', fallbackAggregated);
+    return fallbackAggregated.map((entry: any) => ({
       username: entry.username,
-      current_rp: entry.current_rp,
-      current_rank_title: entry.current_rank_title,
-      previous_rp: entry.current_rp - entry.total_rp_lost, // Estimate previous RP
-      previous_rank_title: '', // Not available from RPC
-      rp_change: entry.total_rp_lost, // This is negative
-      rank_change_direction: entry.rank_change_text?.includes('↑') ? 'up' : entry.rank_change_text?.includes('↓') ? 'down' : 'same',
+      current_rp: entry.latest_rp,
+      current_rank_title: entry.latest_rank,
+      previous_rp: entry.latest_rp - entry.total_rp_loss,
+      previous_rank_title: '',
+      rp_change: entry.total_rp_loss,
+      rank_change_direction: entry.rank_decline > 0 ? 'down' : entry.rank_decline < 0 ? 'up' : 'same',
       time_period: timeRange,
-      percentage_change: entry.current_rp ? (entry.total_rp_lost / (entry.current_rp - entry.total_rp_lost)) * 100 : 0,
-      profile_picture: entry.profile_picture || null,
-      user_id: entry.user_id || null,
+      percentage_change: entry.percentage_change,
+      profile_picture: null,
+      user_id: null,
       inserted_at: entry.latest_change,
+      rank_change_text: entry.rank_decline ? `↓${entry.rank_decline}` : '',
+      change_count: entry.change_count,
+      latest_change: entry.latest_change,
     }));
   }
 

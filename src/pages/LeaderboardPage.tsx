@@ -117,6 +117,14 @@ const LeaderboardPage: React.FC = () => {
     );
   }
 
+  // Helper for percentage display
+  const displayPercentage = (percentage: number | null | undefined) => {
+    if (percentage === null) {
+      return "New Player joins LB";
+    }
+    return typeof percentage === 'number' ? `${percentage.toFixed(1)}%` : '';
+  };
+
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
       {/* Header */}
@@ -322,7 +330,7 @@ const LeaderboardPage: React.FC = () => {
                             </div>
                             <div className="text-right">
                               <div className={`font-bold text-lg ${entry.rp_change > 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>
-                                {entry.rp_change > 0 ? '+' : ''}{entry.rp_change} RP ({entry.percentage_change.toFixed(1)}%)
+                                {entry.rp_change > 0 ? '+' : ''}{entry.rp_change} RP ({displayPercentage(entry.percentage_change)})
                               </div>
                             </div>
                           </div>
