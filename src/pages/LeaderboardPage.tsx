@@ -167,14 +167,14 @@ const LeaderboardPage: React.FC = () => {
     return `${prevRank} (${prevRP} RP) → ${currRank} (${currRP} RP)`;
   };
 
-  const ModernGainerCard = ({ player, rank, isNewPlayer }: any) => (
+  const ModernGainerBar = ({ player, rank, isNewPlayer }: any) => (
     <div className={`
-      group relative overflow-hidden rounded-xl border transition-all duration-300 cursor-pointer animate-fade-in
+      group relative overflow-hidden rounded-lg border transition-all duration-300 cursor-pointer animate-fade-in
       ${isNewPlayer 
-        ? 'bg-gradient-to-br from-emerald-500/10 via-cyan-500/5 to-blue-500/10 border-emerald-200/30 hover:border-emerald-300/60' 
-        : 'bg-gradient-to-br from-green-500/10 via-emerald-500/5 to-teal-500/10 border-green-200/30 hover:border-green-300/60'
+        ? 'bg-gradient-to-r from-emerald-500/10 via-cyan-500/5 to-blue-500/10 border-emerald-200/30 hover:border-emerald-300/60 border-l-4 border-l-emerald-500' 
+        : 'bg-gradient-to-r from-green-500/10 via-emerald-500/5 to-teal-500/10 border-green-200/30 hover:border-green-300/60 border-l-4 border-l-green-500'
       }
-      hover:shadow-xl hover:shadow-green-500/20 hover:scale-[1.02] hover:-translate-y-1
+      hover:shadow-lg hover:shadow-green-500/10 hover:scale-[1.01] hover:-translate-y-0.5
       backdrop-blur-sm
     `}>
       {/* Animated Background Pattern */}
@@ -183,35 +183,35 @@ const LeaderboardPage: React.FC = () => {
         <div className="absolute bottom-0 left-0 w-24 h-24 bg-gradient-to-tr from-cyan-400 to-blue-500 rounded-full blur-2xl"></div>
       </div>
       
-      {/* Rank Badge */}
-      <div className="absolute top-3 left-3 z-10">
-        <div className={`
-          w-10 h-10 rounded-full flex items-center justify-center text-sm font-bold shadow-lg
-          ${rank <= 3 
-            ? 'bg-gradient-to-br from-yellow-400 via-orange-500 to-red-500 text-white' 
-            : 'bg-gradient-to-br from-gray-100 to-gray-200 text-gray-700 dark:from-gray-800 dark:to-gray-700 dark:text-gray-300'
-          }
-          transition-transform group-hover:scale-110
-        `}>
-          {rank <= 3 && '🏆'.slice(0, rank)} {rank}
-        </div>
-      </div>
-      
-      {/* Main Content */}
-      <div className="pt-16 pb-5 px-5 relative z-10">
-        {/* Username */}
-        <h3 className="font-bold text-gray-900 dark:text-white text-lg mb-2 group-hover:text-green-600 dark:group-hover:text-green-400 transition-colors">
-          {player.username}
-        </h3>
-        
-        {/* Rank Transition */}
-        <div className="text-sm text-gray-600 dark:text-gray-400 mb-4 leading-relaxed">
-          {getFullRankTransition(player)}
-        </div>
-        
-        {/* RP Gain Section */}
+      <div className="relative z-10 p-4">
         <div className="flex items-center justify-between">
-          <div className="flex items-center space-x-3">
+          {/* Left Side - Rank and Username */}
+          <div className="flex items-center space-x-4">
+            {/* Rank Badge */}
+            <div className={`
+              w-12 h-12 rounded-full flex items-center justify-center text-sm font-bold shadow-lg flex-shrink-0
+              ${rank <= 3 
+                ? 'bg-gradient-to-br from-yellow-400 via-orange-500 to-red-500 text-white' 
+                : 'bg-gradient-to-br from-gray-100 to-gray-200 text-gray-700 dark:from-gray-800 dark:to-gray-700 dark:text-gray-300'
+              }
+              transition-transform group-hover:scale-110
+            `}>
+              {rank <= 3 && '🏆'.slice(0, rank)} {rank}
+            </div>
+            
+            {/* Username and Rank Transition */}
+            <div className="flex-1 min-w-0">
+              <h3 className="font-bold text-gray-900 dark:text-white text-lg mb-1 group-hover:text-green-600 dark:group-hover:text-green-400 transition-colors truncate">
+                {player.username}
+              </h3>
+              <div className="text-sm text-gray-600 dark:text-gray-400 leading-relaxed">
+                {getFullRankTransition(player)}
+              </div>
+            </div>
+          </div>
+          
+          {/* Right Side - RP Gain and Percentage */}
+          <div className="flex items-center space-x-3 flex-shrink-0">
             <div className={`
               px-4 py-2 rounded-full text-sm font-bold shadow-md
               ${isNewPlayer 
@@ -231,48 +231,48 @@ const LeaderboardPage: React.FC = () => {
             `}>
               {getDisplayPercentage(player)}
             </div>
-          </div>
-          {/* Trending Arrow */}
-          <div className="text-green-500 group-hover:scale-110 transition-transform">
-            <svg className="w-6 h-6" fill="currentColor" viewBox="0 0 20 20">
-              <path fillRule="evenodd" d="M5.293 9.707a1 1 0 010-1.414l4-4a1 1 0 011.414 0l4 4a1 1 0 01-1.414 1.414L11 7.414V15a1 1 0 11-2 0V7.414L6.707 9.707a1 1 0 01-1.414 0z" clipRule="evenodd" />
-            </svg>
+            {/* Trending Arrow */}
+            <div className="text-green-500 group-hover:scale-110 transition-transform">
+              <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
+                <path fillRule="evenodd" d="M5.293 9.707a1 1 0 010-1.414l4-4a1 1 0 011.414 0l4 4a1 1 0 01-1.414 1.414L11 7.414V15a1 1 0 11-2 0V7.414L6.707 9.707a1 1 0 01-1.414 0z" clipRule="evenodd" />
+              </svg>
+            </div>
           </div>
         </div>
       </div>
     </div>
   );
 
-  const ModernLoserCard = ({ player, rank }: any) => (
-    <div className="group relative overflow-hidden rounded-xl border transition-all duration-300 cursor-pointer animate-fade-in bg-gradient-to-br from-red-500/10 via-orange-500/5 to-pink-500/10 border-red-200/30 hover:border-red-300/60 hover:shadow-xl hover:shadow-red-500/20 hover:scale-[1.02] hover:-translate-y-1 backdrop-blur-sm">
+  const ModernLoserBar = ({ player, rank }: any) => (
+    <div className="group relative overflow-hidden rounded-lg border transition-all duration-300 cursor-pointer animate-fade-in bg-gradient-to-r from-red-500/10 via-orange-500/5 to-pink-500/10 border-red-200/30 hover:border-red-300/60 hover:shadow-lg hover:shadow-red-500/10 hover:scale-[1.01] hover:-translate-y-0.5 backdrop-blur-sm border-l-4 border-l-red-500">
       {/* Animated Background Pattern */}
       <div className="absolute inset-0 opacity-5">
         <div className="absolute top-0 right-0 w-32 h-32 bg-gradient-to-br from-red-400 to-pink-500 rounded-full blur-3xl"></div>
         <div className="absolute bottom-0 left-0 w-24 h-24 bg-gradient-to-tr from-orange-400 to-red-500 rounded-full blur-2xl"></div>
       </div>
       
-      {/* Rank Badge */}
-      <div className="absolute top-3 left-3 z-10">
-        <div className="w-10 h-10 rounded-full flex items-center justify-center text-sm font-bold shadow-lg bg-gradient-to-br from-red-100 to-red-200 text-red-700 dark:from-red-900/30 dark:to-red-800/30 dark:text-red-400 transition-transform group-hover:scale-110">
-          {rank}
-        </div>
-      </div>
-      
-      {/* Main Content */}
-      <div className="pt-16 pb-5 px-5 relative z-10">
-        {/* Username */}
-        <h3 className="font-bold text-gray-900 dark:text-white text-lg mb-2 group-hover:text-red-600 dark:group-hover:text-red-400 transition-colors">
-          {player.username}
-        </h3>
-        
-        {/* Rank Transition */}
-        <div className="text-sm text-gray-600 dark:text-gray-400 mb-4 leading-relaxed">
-          {getFullRankTransition(player)}
-        </div>
-        
-        {/* RP Loss Section */}
+      <div className="relative z-10 p-4">
         <div className="flex items-center justify-between">
-          <div className="flex items-center space-x-3">
+          {/* Left Side - Rank and Username */}
+          <div className="flex items-center space-x-4">
+            {/* Rank Badge */}
+            <div className="w-12 h-12 rounded-full flex items-center justify-center text-sm font-bold shadow-lg flex-shrink-0 bg-gradient-to-br from-red-100 to-red-200 text-red-700 dark:from-red-900/30 dark:to-red-800/30 dark:text-red-400 transition-transform group-hover:scale-110">
+              {rank}
+            </div>
+            
+            {/* Username and Rank Transition */}
+            <div className="flex-1 min-w-0">
+              <h3 className="font-bold text-gray-900 dark:text-white text-lg mb-1 group-hover:text-red-600 dark:group-hover:text-red-400 transition-colors truncate">
+                {player.username}
+              </h3>
+              <div className="text-sm text-gray-600 dark:text-gray-400 leading-relaxed">
+                {getFullRankTransition(player)}
+              </div>
+            </div>
+          </div>
+          
+          {/* Right Side - RP Loss and Percentage */}
+          <div className="flex items-center space-x-3 flex-shrink-0">
             <div className="px-4 py-2 rounded-full text-sm font-bold shadow-md bg-gradient-to-r from-red-500 to-pink-500 text-white">
               {player.rp_change.toLocaleString()} RP
             </div>
@@ -280,12 +280,12 @@ const LeaderboardPage: React.FC = () => {
             <div className="text-xs px-3 py-1.5 rounded-full font-medium bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400">
               {getDisplayPercentage(player)}
             </div>
-          </div>
-          {/* Trending Arrow */}
-          <div className="text-red-500 group-hover:scale-110 transition-transform">
-            <svg className="w-6 h-6" fill="currentColor" viewBox="0 0 20 20">
-              <path fillRule="evenodd" d="M14.707 10.293a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 111.414-1.414L9 12.586V5a1 1 0 012 0v7.586l2.293-2.293a1 1 0 011.414 0z" clipRule="evenodd" />
-            </svg>
+            {/* Trending Arrow */}
+            <div className="text-red-500 group-hover:scale-110 transition-transform">
+              <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
+                <path fillRule="evenodd" d="M14.707 10.293a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 111.414-1.414L9 12.586V5a1 1 0 012 0v7.586l2.293-2.293a1 1 0 011.414 0z" clipRule="evenodd" />
+              </svg>
+            </div>
           </div>
         </div>
       </div>
@@ -311,7 +311,7 @@ const LeaderboardPage: React.FC = () => {
             </div>
             <div className="grid gap-3">
               {existingGainers.map((player, index) => (
-                <ModernGainerCard 
+                <ModernGainerBar 
                   key={player.username} 
                   player={player} 
                   rank={index + 1} 
@@ -335,7 +335,7 @@ const LeaderboardPage: React.FC = () => {
             </div>
             <div className="grid gap-3">
               {newPlayers.map((player, index) => (
-                <ModernGainerCard 
+                <ModernGainerBar 
                   key={player.username} 
                   player={player} 
                   rank={existingGainers.length + index + 1} 
@@ -364,7 +364,7 @@ const LeaderboardPage: React.FC = () => {
       <div className="space-y-3">
         {validLosers.length > 0 ? (
           validLosers.map((player, index) => (
-            <ModernLoserCard 
+            <ModernLoserBar 
               key={player.username} 
               player={player} 
               rank={index + 1}
@@ -616,12 +616,12 @@ const LeaderboardPage: React.FC = () => {
                         )}
                         
                         {activeTab === 'gainers' ? (
-                          // Use modern gainers cards
-                          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 stagger-animation">
+                          // Use modern gainers bars
+                          <div className="space-y-3 stagger-animation">
                             {top10Data.map((player, index) => {
                               const isNewPlayer = player.previous_rp === 0 || player.previous_rp === null;
                               return (
-                                <ModernGainerCard 
+                                <ModernGainerBar 
                                   key={player.username} 
                                   player={player} 
                                   rank={index + 1} 
@@ -631,10 +631,10 @@ const LeaderboardPage: React.FC = () => {
                             })}
                           </div>
                         ) : (
-                          // Use modern losers cards
-                          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 stagger-animation">
+                          // Use modern losers bars
+                          <div className="space-y-3 stagger-animation">
                             {top10Data.map((player, index) => (
-                              <ModernLoserCard 
+                              <ModernLoserBar 
                                 key={player.username} 
                                 player={player} 
                                 rank={index + 1}
