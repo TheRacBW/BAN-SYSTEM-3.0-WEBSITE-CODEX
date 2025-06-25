@@ -354,8 +354,12 @@ const LeaderboardPage: React.FC = () => {
 
   // --- Modern Losers Section ---
   const renderLosersSection = () => {
-    console.log('DEBUG - First loser entry structure:', losers[0]);
-    console.log('DEBUG - Available fields:', Object.keys(losers[0] || {}));
+    console.log('🎨 RENDERING LOSERS SECTION');
+    console.log('📊 LOSERS RAW:', losers);
+    console.log('📊 LOSERS LENGTH:', losers?.length);
+    console.log('📊 LOSERS TYPE:', typeof losers);
+    console.log('📊 FIRST LOSER:', losers?.[0]);
+    console.log('🎨 SHOW LOSERS:', Boolean(losers?.length));
     const validLosers = losers.filter((player: any) => player.rp_change < 0 && player.previous_rp > 0);
     console.log('📊 Filtered losers:', {
       total: losers.length,

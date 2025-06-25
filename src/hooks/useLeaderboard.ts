@@ -12,6 +12,8 @@ import { supabase } from '../lib/supabase';
 
 const DEFAULT_TIME_RANGE: TimeRange = '12h';
 
+console.log('🔄 useLeaderboard HOOK LOADED');
+
 export const useLeaderboard = () => {
   // Main leaderboard
   const [entries, setEntries] = useState<LeaderboardEntryWithChanges[]>([]);
@@ -106,9 +108,12 @@ export const useLeaderboard = () => {
     }
   }, []);
   const fetchLosers = useCallback(async (timeRange: string) => {
+    console.log('🔄 FETCHING LOSERS...');
     setIsLoadingLosers(true);
     try {
       const data = await leaderboardService.getRPLosers(timeRange);
+      console.log('🔄 LOSERS QUERY RESULT:', data);
+      console.log('🔄 LOSERS COUNT:', data?.length);
       setLosers(data);
     } catch (err) {
       setLosers([]);
