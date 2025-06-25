@@ -93,11 +93,11 @@ export const useLeaderboard = () => {
     }
   }, []);
 
-  // Fetch gainers/losers for a time range
-  const fetchGainers = useCallback(async (timeRange: TimeRange) => {
+  // Fetch gainers/losers (now always fetches all, ignores time range)
+  const fetchGainers = useCallback(async () => {
     setIsLoadingGainers(true);
     try {
-      const data = await leaderboardService.getRPGainers(timeRange);
+      const data = await leaderboardService.getRPGainers();
       setGainers(data);
     } catch (err) {
       setGainers([]);
@@ -105,10 +105,10 @@ export const useLeaderboard = () => {
       setIsLoadingGainers(false);
     }
   }, []);
-  const fetchLosers = useCallback(async (timeRange: TimeRange) => {
+  const fetchLosers = useCallback(async () => {
     setIsLoadingLosers(true);
     try {
-      const data = await leaderboardService.getRPLosers(timeRange);
+      const data = await leaderboardService.getRPLosers();
       setLosers(data);
     } catch (err) {
       setLosers([]);
@@ -134,20 +134,12 @@ export const useLeaderboard = () => {
   // Initial fetch
   useEffect(() => {
     fetchLeaderboardProgressive();
-    fetchGainers(gainersTimeRange);
-    fetchLosers(losersTimeRange);
+    fetchGainers();
+    fetchLosers();
     startAutoRefresh();
     return () => stopAutoRefresh();
     // eslint-disable-next-line
   }, []);
-
-  // Refetch gainers/losers when time range changes
-  useEffect(() => {
-    fetchGainers(gainersTimeRange);
-  }, [gainersTimeRange, fetchGainers]);
-  useEffect(() => {
-    fetchLosers(losersTimeRange);
-  }, [losersTimeRange, fetchLosers]);
 
   // Search
   const filteredEntries = searchQuery
@@ -168,9 +160,9 @@ export const useLeaderboard = () => {
   // Manual refresh
   const refresh = useCallback(() => {
     fetchLeaderboard();
-    fetchGainers(gainersTimeRange);
-    fetchLosers(losersTimeRange);
-  }, [fetchLeaderboard, fetchGainers, fetchLosers, gainersTimeRange, losersTimeRange]);
+    fetchGainers();
+    fetchLosers();
+  }, [fetchLeaderboard, fetchGainers, fetchLosers]);
 
   // Smart refresh with cache
   const refreshLeaderboard = useCallback(async (silent = false) => {
