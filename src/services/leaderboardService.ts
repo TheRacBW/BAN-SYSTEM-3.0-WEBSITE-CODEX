@@ -413,6 +413,18 @@ class LeaderboardService {
       .gt('rp_change', 0)
       .gte('change_timestamp', since)
       .order('rp_change', { ascending: false });
+    console.log('🔍 QUERY DEBUG (GAINERS):', {
+      timeRange,
+      hoursBack,
+      since,
+      query: {
+        table: 'rp_changes_optimized',
+        rp_change: '> 0',
+        change_timestamp: `>= ${since}`
+      },
+      rawResult: data,
+      error
+    });
     if (error) {
       console.error('❌ Error fetching gainers from rp_changes_optimized:', error);
       return [];
@@ -432,6 +444,18 @@ class LeaderboardService {
       .lt('rp_change', 0)
       .gte('change_timestamp', since)
       .order('rp_change', { ascending: true });
+    console.log('🔍 QUERY DEBUG (LOSERS):', {
+      timeRange,
+      hoursBack,
+      since,
+      query: {
+        table: 'rp_changes_optimized',
+        rp_change: '< 0',
+        change_timestamp: `>= ${since}`
+      },
+      rawResult: data,
+      error
+    });
     if (error) {
       console.error('❌ Error fetching losers from rp_changes_optimized:', error);
       return [];

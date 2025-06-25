@@ -7,6 +7,33 @@ import StatsCard from '../components/leaderboard/StatsCard';
 import { TestLeaderboardData } from '../components/TestLeaderboardData';
 import { robloxApi } from '../services/robloxApi';
 
+// Move these helpers to the top of the file:
+const getFullRankTransition = (player: any) => {
+  // Prefer previous_rank_title, then previous_calculated_rank, then previous_rank, then fallback
+  const prevRank = player.previous_rank_title || player.previous_calculated_rank || player.previous_rank || '';
+  const currRank = player.new_calculated_rank || player.current_rank_title || '';
+  const prevRP = player.previous_rp;
+  const currRP = player.new_rp || player.current_rp;
+  // If no previous rank at all, fallback to 'Unknown'
+  const prevRankDisplay = prevRank && prevRank !== 'Unknown' ? prevRank : 'Unranked';
+  const currRankDisplay = currRank && currRank !== 'Unknown' ? currRank : 'Unranked';
+  if (player.getTransitionText) {
+    return player.getTransitionText();
+  }
+  return `${prevRankDisplay} (${prevRP} RP) → ${currRankDisplay} (${currRP} RP)`;
+};
+
+const getDisplayPercentage = (player: any) => {
+  const previousRP = player.previous_rp;
+  const rpChange = player.rp_change;
+  if (previousRP === 0 || previousRP === null || previousRP === undefined) {
+    return "New Player joins LB";
+  }
+  const percentage = (rpChange / previousRP) * 100;
+  const roundedPercentage = Math.round(percentage * 10) / 10;
+  return `${roundedPercentage > 0 ? '+' : ''}${roundedPercentage}%`;
+};
+
 const LeaderboardPage: React.FC = () => {
   const {
     entries,
@@ -117,66 +144,169 @@ const LeaderboardPage: React.FC = () => {
     );
   }
 
-  // --- Modern Gainers/Losers Helpers ---
-  const getDisplayPercentage = (player: any) => {
-    const previousRP = player.previous_rp;
-    const rpChange = player.rp_change;
-    console.log(`🔍 Calculating percentage for ${player.username}:`, {
-      previous_rp: previousRP,
-      rp_change: rpChange,
-      current_rp: player.current_rp
-    });
-    if (previousRP === 0 || previousRP === null || previousRP === undefined) {
-      return "New Player joins LB";
+  // --- Sectioning and Transition Helpers ---
+  const categorizeGainer = (player: any) => {
+    if (
+      player.previous_calculated_rank === '[Not in Top 200]' ||
+      player.previous_calculated_rank === '[New Player]' ||
+      !player.previous_calculated_rank
+    ) {
+      return 'new';
     }
-    const percentage = (rpChange / previousRP) * 100;
-    const roundedPercentage = Math.round(percentage * 10) / 10;
-    return `${roundedPercentage > 0 ? '+' : ''}${roundedPercentage}%`;
+    return 'established';
+  };
+  const categorizeLoser = (player: any) => {
+    if (
+      player.new_calculated_rank === '[Not in Top 200]' ||
+      player.new_calculated_rank === '[Dropped Off]' ||
+      !player.new_calculated_rank
+    ) {
+      return 'dropped';
+    }
+    return 'established';
+  };
+  const getTransitionText = (player: any, isGainer: boolean) => {
+    if (isGainer) {
+      if (
+        player.previous_calculated_rank === '[Not in Top 200]' ||
+        player.previous_calculated_rank === '[New Player]' ||
+        !player.previous_calculated_rank
+      ) {
+        return `[New Player] → ${player.new_calculated_rank} (${player.new_rp} RP)`;
+      } else {
+        return `${player.previous_calculated_rank} (${player.previous_rp} RP) → ${player.new_calculated_rank} (${player.new_rp} RP)`;
+      }
+    } else {
+      if (
+        player.new_calculated_rank === '[Not in Top 200]' ||
+        player.new_calculated_rank === '[Dropped Off]' ||
+        !player.new_calculated_rank
+      ) {
+        return `${player.previous_calculated_rank} (${player.previous_rp} RP) → Dropped from leaderboard`;
+      } else {
+        return `${player.previous_calculated_rank} (${player.previous_rp} RP) → ${player.new_calculated_rank} (${player.new_rp} RP)`;
+      }
+    }
   };
 
-  const processGainersData = (allGainers: any[]) => {
-    console.log('🔍 Processing gainers data:', allGainers);
-    const validGainers = allGainers.filter(player => player.rp_change > 0);
-    const newPlayers = validGainers.filter(player => player.previous_rp === 0 || player.previous_rp === null);
-    const existingGainers = validGainers.filter(player => player.previous_rp > 0);
-    console.log('📊 Filtered gainers:', {
-      total: validGainers.length,
-      existingGainers: existingGainers.length,
-      newPlayers: newPlayers.length,
-      existingGainersList: existingGainers.map(p => `${p.username}: +${p.rp_change}`),
-      newPlayersList: newPlayers.map(p => `${p.username}: +${p.rp_change}`)
-    });
-    return { existingGainers, newPlayers };
+  // --- Modern Gainers Section ---
+  const renderGainersSection = () => {
+    const newPlayers = gainers.filter(categorizeGainer).filter(p => categorizeGainer(p) === 'new');
+    const establishedPlayers = gainers.filter(categorizeGainer).filter(p => categorizeGainer(p) === 'established');
+    return (
+      <div className="space-y-6">
+        {/* Established Players */}
+        {establishedPlayers.length > 0 && (
+          <div>
+            <div className="flex items-center space-x-3 mb-4">
+              <div className="w-1 h-6 bg-gradient-to-b from-green-400 to-emerald-500 rounded-full"></div>
+              <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
+                📈 Established Players
+              </h3>
+              <div className="bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400 px-2 py-1 rounded-full text-xs font-medium">
+                {establishedPlayers.length} active
+              </div>
+            </div>
+            <div className="space-y-3">
+              {establishedPlayers.map((player, index) => (
+                <ModernGainerBar
+                  key={player.username}
+                  player={{ ...player, getTransitionText: () => getTransitionText(player, true) }}
+                  rank={index + 1}
+                  isNewPlayer={false}
+                />
+              ))}
+            </div>
+          </div>
+        )}
+        {/* New to Leaderboard */}
+        {newPlayers.length > 0 && (
+          <div>
+            <div className="flex items-center space-x-3 mb-4">
+              <div className="w-1 h-6 bg-gradient-to-b from-emerald-400 to-cyan-500 rounded-full"></div>
+              <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
+                🆕 New to Leaderboard
+              </h3>
+              <div className="bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-400 px-2 py-1 rounded-full text-xs font-medium">
+                {newPlayers.length} fresh
+              </div>
+            </div>
+            <div className="space-y-3">
+              {newPlayers.map((player, index) => (
+                <ModernGainerBar
+                  key={player.username}
+                  player={{ ...player, getTransitionText: () => getTransitionText(player, true) }}
+                  rank={establishedPlayers.length + index + 1}
+                  isNewPlayer={true}
+                />
+              ))}
+            </div>
+          </div>
+        )}
+        {establishedPlayers.length === 0 && newPlayers.length === 0 && (
+          <div className="text-center py-8 text-gray-500 dark:text-gray-400">No RP gainers found in recent activity.</div>
+        )}
+      </div>
+    );
   };
 
-  // Helper functions for correct logic
-  const isDroppedFromLeaderboard = (player: any) => {
-    return player.current_rank_title === '[Not in Top 200]' ||
-           player.current_rank_title === '[Dropped Off]' ||
-           !player.current_rank_title;
-  };
-  const isNewToLeaderboard = (player: any) => {
-    return player.previous_rank_title === '[Not in Top 200]' ||
-           player.previous_rank_title === '[Dropped Off]' ||
-           !player.previous_rank_title;
-  };
-
-  const getFullRankTransition = (player: any) => {
-    // Prefer previous_rank_title, then previous_calculated_rank, then previous_rank, then fallback
-    const prevRank = player.previous_rank_title || player.previous_calculated_rank || player.previous_rank || '';
-    const currRank = player.new_calculated_rank || player.current_rank_title || '';
-    const prevRP = player.previous_rp;
-    const currRP = player.new_rp || player.current_rp;
-    // If no previous rank at all, fallback to 'Unknown'
-    const prevRankDisplay = prevRank && prevRank !== 'Unknown' ? prevRank : 'Unranked';
-    const currRankDisplay = currRank && currRank !== 'Unknown' ? currRank : 'Unranked';
-    if (isNewToLeaderboard(player)) {
-      return `→ ${currRankDisplay} (${currRP} RP)`;
-    }
-    if (isDroppedFromLeaderboard(player)) {
-      return `${prevRankDisplay} (${prevRP} RP) → Dropped from leaderboard`;
-    }
-    return `${prevRankDisplay} (${prevRP} RP) → ${currRankDisplay} (${currRP} RP)`;
+  // --- Modern Losers Section ---
+  const renderLosersSection = () => {
+    const droppedPlayers = losers.filter(categorizeLoser).filter(p => categorizeLoser(p) === 'dropped');
+    const establishedLosers = losers.filter(categorizeLoser).filter(p => categorizeLoser(p) === 'established');
+    return (
+      <div className="space-y-6">
+        {/* Established Players */}
+        {establishedLosers.length > 0 && (
+          <div>
+            <div className="flex items-center space-x-3 mb-4">
+              <div className="w-1 h-6 bg-gradient-to-b from-red-400 to-pink-500 rounded-full"></div>
+              <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
+                📉 Established Players
+              </h3>
+              <div className="bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400 px-2 py-1 rounded-full text-xs font-medium">
+                {establishedLosers.length} active
+              </div>
+            </div>
+            <div className="space-y-3">
+              {establishedLosers.map((player, index) => (
+                <ModernLoserBar
+                  key={player.username}
+                  player={{ ...player, getTransitionText: () => getTransitionText(player, false) }}
+                  rank={index + 1}
+                />
+              ))}
+            </div>
+          </div>
+        )}
+        {/* Dropped from Top 200 */}
+        {droppedPlayers.length > 0 && (
+          <div>
+            <div className="flex items-center space-x-3 mb-4">
+              <div className="w-1 h-6 bg-gradient-to-b from-orange-400 to-red-500 rounded-full"></div>
+              <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
+                🚫 Dropped from Top 200
+              </h3>
+              <div className="bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-400 px-2 py-1 rounded-full text-xs font-medium">
+                {droppedPlayers.length} dropped
+              </div>
+            </div>
+            <div className="space-y-3">
+              {droppedPlayers.map((player, index) => (
+                <ModernLoserBar
+                  key={player.username}
+                  player={{ ...player, getTransitionText: () => getTransitionText(player, false) }}
+                  rank={establishedLosers.length + index + 1}
+                />
+              ))}
+            </div>
+          </div>
+        )}
+        {establishedLosers.length === 0 && droppedPlayers.length === 0 && (
+          <div className="text-center py-8 text-gray-500 dark:text-gray-400">No RP losses found in recent activity.</div>
+        )}
+      </div>
+    );
   };
 
   const ModernGainerBar = ({ player, rank, isNewPlayer }: any) => (
@@ -217,7 +347,7 @@ const LeaderboardPage: React.FC = () => {
                 {player.username}
               </h3>
               <div className="text-sm text-gray-600 dark:text-gray-400 leading-relaxed">
-                {getFullRankTransition(player)}
+                {player.getTransitionText ? player.getTransitionText() : getFullRankTransition(player)}
               </div>
             </div>
           </div>
@@ -278,7 +408,7 @@ const LeaderboardPage: React.FC = () => {
                 {player.username}
               </h3>
               <div className="text-sm text-gray-600 dark:text-gray-400 leading-relaxed">
-                {getFullRankTransition(player)}
+                {player.getTransitionText ? player.getTransitionText() : getFullRankTransition(player)}
               </div>
             </div>
           </div>
@@ -303,97 +433,6 @@ const LeaderboardPage: React.FC = () => {
       </div>
     </div>
   );
-
-  // --- Modern Gainers Section ---
-  const renderGainersSection = () => {
-    const { existingGainers, newPlayers } = processGainersData(gainers);
-    return (
-      <div className="space-y-6">
-        {/* Existing Gainers */}
-        {existingGainers.length > 0 && (
-          <div>
-            <div className="flex items-center space-x-3 mb-4">
-              <div className="w-1 h-6 bg-gradient-to-b from-green-400 to-emerald-500 rounded-full"></div>
-              <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
-                Top RP Gainers
-              </h3>
-              <div className="bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400 px-2 py-1 rounded-full text-xs font-medium">
-                {existingGainers.length} active
-              </div>
-            </div>
-            <div className="grid gap-3">
-              {existingGainers.map((player, index) => (
-                <ModernGainerBar 
-                  key={player.username} 
-                  player={player} 
-                  rank={index + 1} 
-                  isNewPlayer={false}
-                />
-              ))}
-            </div>
-          </div>
-        )}
-        {/* New Players */}
-        {newPlayers.length > 0 && (
-          <div>
-            <div className="flex items-center space-x-3 mb-4">
-              <div className="w-1 h-6 bg-gradient-to-b from-emerald-400 to-cyan-500 rounded-full"></div>
-              <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
-                New to Leaderboard
-              </h3>
-              <div className="bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-400 px-2 py-1 rounded-full text-xs font-medium">
-                {newPlayers.length} fresh
-              </div>
-            </div>
-            <div className="grid gap-3">
-              {newPlayers.map((player, index) => (
-                <ModernGainerBar 
-                  key={player.username} 
-                  player={player} 
-                  rank={existingGainers.length + index + 1} 
-                  isNewPlayer={true}
-                />
-              ))}
-            </div>
-          </div>
-        )}
-        {existingGainers.length === 0 && newPlayers.length === 0 && (
-          <div className="text-center py-8 text-gray-500 dark:text-gray-400">No RP gainers found in recent activity.</div>
-        )}
-      </div>
-    );
-  };
-
-  // --- Modern Losers Section ---
-  const renderLosersSection = () => {
-    console.log('🎨 RENDERING LOSERS SECTION');
-    console.log('📊 LOSERS RAW:', losers);
-    console.log('📊 LOSERS LENGTH:', losers?.length);
-    console.log('📊 LOSERS TYPE:', typeof losers);
-    console.log('📊 FIRST LOSER:', losers?.[0]);
-    console.log('🎨 SHOW LOSERS:', Boolean(losers?.length));
-    const validLosers = losers.filter((player: any) => player.rp_change < 0 && player.previous_rp > 0);
-    console.log('📊 Filtered losers:', {
-      total: losers.length,
-      validLosers: validLosers.length,
-      validLosersList: validLosers.map((p: any) => `${p.username}: ${p.rp_change}`)
-    });
-    return (
-      <div className="space-y-3">
-        {validLosers.length > 0 ? (
-          validLosers.map((player, index) => (
-            <ModernLoserBar 
-              key={player.username} 
-              player={player} 
-              rank={index + 1}
-            />
-          ))
-        ) : (
-          <div className="text-center py-8 text-gray-500 dark:text-gray-400">No RP losses found in recent activity.</div>
-        )}
-      </div>
-    );
-  };
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
@@ -636,132 +675,12 @@ const LeaderboardPage: React.FC = () => {
                         {activeTab === 'gainers' ? (
                           // Use modern gainers bars with sections (Established above, New below)
                           <div className="space-y-6 stagger-animation">
-                            {/* Established Players Section */}
-                            {(() => {
-                              const newPlayers = top10Data.filter(player => isNewToLeaderboard(player));
-                              const establishedPlayers = top10Data.filter(player => !isNewToLeaderboard(player));
-                              return establishedPlayers.length > 0 ? (
-                                <div>
-                                  <div className="flex items-center space-x-3 mb-4">
-                                    <div className="w-1 h-6 bg-gradient-to-b from-green-400 to-emerald-500 rounded-full"></div>
-                                    <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
-                                      📈 Established Players
-                                    </h3>
-                                    <div className="bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400 px-2 py-1 rounded-full text-xs font-medium">
-                                      {establishedPlayers.length} active
-                                    </div>
-                                  </div>
-                                  <div className="space-y-3">
-                                    {establishedPlayers.map((player, index) => (
-                                      <ModernGainerBar 
-                                        key={player.username} 
-                                        player={player} 
-                                        rank={index + 1} 
-                                        isNewPlayer={false}
-                                      />
-                                    ))}
-                                  </div>
-                                </div>
-                              ) : null;
-                            })()}
-                            {/* New Players Section */}
-                            {(() => {
-                              const newPlayers = top10Data.filter(player => isNewToLeaderboard(player));
-                              const establishedPlayers = top10Data.filter(player => !isNewToLeaderboard(player));
-                              return newPlayers.length > 0 ? (
-                                <div>
-                                  <div className="flex items-center space-x-3 mb-4">
-                                    <div className="w-1 h-6 bg-gradient-to-b from-emerald-400 to-cyan-500 rounded-full"></div>
-                                    <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
-                                      🆕 New to Leaderboard
-                                    </h3>
-                                    <div className="bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-400 px-2 py-1 rounded-full text-xs font-medium">
-                                      {newPlayers.length} fresh
-                                    </div>
-                                  </div>
-                                  <div className="space-y-3">
-                                    {newPlayers.map((player, index) => (
-                                      <ModernGainerBar 
-                                        key={player.username} 
-                                        player={player} 
-                                        rank={establishedPlayers.length + index + 1} 
-                                        isNewPlayer={true}
-                                      />
-                                    ))}
-                                  </div>
-                                </div>
-                              ) : null;
-                            })()}
+                            {renderGainersSection()}
                           </div>
                         ) : (
                           // Use modern losers bars with sections (RP Losers above, Dropped below)
                           <div className="space-y-6 stagger-animation">
-                            {/* RP Losers Section */}
-                            {(() => {
-                              const rpLosers = top10Data.filter(player => 
-                                player.rp_change < 0 && 
-                                player.previous_rp > 0 && 
-                                player.current_rp > 0 && 
-                                !isDroppedFromLeaderboard(player)
-                              );
-                              return rpLosers.length > 0 ? (
-                                <div>
-                                  <div className="flex items-center space-x-3 mb-4">
-                                    <div className="w-1 h-6 bg-gradient-to-b from-red-400 to-pink-500 rounded-full"></div>
-                                    <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
-                                      📉 RP Losers
-                                    </h3>
-                                    <div className="bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400 px-2 py-1 rounded-full text-xs font-medium">
-                                      {rpLosers.length} active
-                                    </div>
-                                  </div>
-                                  <div className="space-y-3">
-                                    {rpLosers.map((player, index) => (
-                                      <ModernLoserBar 
-                                        key={player.username} 
-                                        player={player} 
-                                        rank={index + 1}
-                                      />
-                                    ))}
-                                  </div>
-                                </div>
-                              ) : null;
-                            })()}
-                            {/* Dropped from Top 200 Section */}
-                            {(() => {
-                              const rpLosers = top10Data.filter(player => 
-                                player.rp_change < 0 && 
-                                player.previous_rp > 0 && 
-                                !isDroppedFromLeaderboard(player)
-                              );
-                              const droppedFromTop200 = top10Data.filter(player => 
-                                player.rp_change < 0 && 
-                                player.previous_rp > 0 && 
-                                isDroppedFromLeaderboard(player)
-                              );
-                              return droppedFromTop200.length > 0 ? (
-                                <div>
-                                  <div className="flex items-center space-x-3 mb-4">
-                                    <div className="w-1 h-6 bg-gradient-to-b from-orange-400 to-red-500 rounded-full"></div>
-                                    <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
-                                      🚫 Dropped from Top 200
-                                    </h3>
-                                    <div className="bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-400 px-2 py-1 rounded-full text-xs font-medium">
-                                      {droppedFromTop200.length} dropped
-                                    </div>
-                                  </div>
-                                  <div className="space-y-3">
-                                    {droppedFromTop200.map((player, index) => (
-                                      <ModernLoserBar 
-                                        key={player.username} 
-                                        player={player} 
-                                        rank={rpLosers.length + index + 1}
-                                      />
-                                    ))}
-                                  </div>
-                                </div>
-                              ) : null;
-                            })()}
+                            {renderLosersSection()}
                           </div>
                         )}
 
