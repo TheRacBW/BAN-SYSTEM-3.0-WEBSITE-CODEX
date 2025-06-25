@@ -24,10 +24,18 @@ const getFullRankTransition = (player: any) => {
 };
 
 const getDisplayPercentage = (player: any) => {
+  // Only show "New Player joins LB" if truly new
+  if (
+    player.previous_calculated_rank === '[Not in Top 200]' ||
+    player.previous_calculated_rank === '[New Player]' ||
+    !player.previous_calculated_rank
+  ) {
+    return "New Player joins LB";
+  }
   const previousRP = player.previous_rp;
   const rpChange = player.rp_change;
   if (previousRP === 0 || previousRP === null || previousRP === undefined) {
-    return "New Player joins LB";
+    return "0%";
   }
   const percentage = (rpChange / previousRP) * 100;
   const roundedPercentage = Math.round(percentage * 10) / 10;
