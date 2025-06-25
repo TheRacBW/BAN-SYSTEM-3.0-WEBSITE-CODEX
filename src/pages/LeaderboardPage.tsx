@@ -149,6 +149,18 @@ const LeaderboardPage: React.FC = () => {
     return { existingGainers, newPlayers };
   };
 
+  // Helper functions for correct logic
+  const isDroppedFromLeaderboard = (player: any) => {
+    return player.current_rank_title === '[Not in Top 200]' ||
+           player.current_rank_title === '[Dropped Off]' ||
+           !player.current_rank_title;
+  };
+  const isNewToLeaderboard = (player: any) => {
+    return player.previous_rank_title === '[Not in Top 200]' ||
+           player.previous_rank_title === '[Dropped Off]' ||
+           !player.previous_rank_title;
+  };
+
   const getFullRankTransition = (player: any) => {
     // Prefer previous_rank_title, then previous_calculated_rank, then previous_rank, then fallback
     const prevRank = player.previous_rank_title || player.previous_calculated_rank || player.previous_rank || '';
@@ -158,10 +170,10 @@ const LeaderboardPage: React.FC = () => {
     // If no previous rank at all, fallback to 'Unknown'
     const prevRankDisplay = prevRank && prevRank !== 'Unknown' ? prevRank : 'Unranked';
     const currRankDisplay = currRank && currRank !== 'Unknown' ? currRank : 'Unranked';
-    if (prevRP === 0 || prevRP === null) {
+    if (isNewToLeaderboard(player)) {
       return `→ ${currRankDisplay} (${currRP} RP)`;
     }
-    if (currRank === '[Not in Top 200]' || currRP === 0) {
+    if (isDroppedFromLeaderboard(player)) {
       return `${prevRankDisplay} (${prevRP} RP) → Dropped from leaderboard`;
     }
     return `${prevRankDisplay} (${prevRP} RP) → ${currRankDisplay} (${currRP} RP)`;
@@ -626,8 +638,8 @@ const LeaderboardPage: React.FC = () => {
                           <div className="space-y-6 stagger-animation">
                             {/* Established Players Section */}
                             {(() => {
-                              const newPlayers = top10Data.filter(player => player.previous_rp === 0 || player.previous_rp === null);
-                              const establishedPlayers = top10Data.filter(player => player.previous_rp > 0);
+                              const newPlayers = top10Data.filter(player => isNewToLeaderboard(player));
+                              const establishedPlayers = top10Data.filter(player => !isNewToLeaderboard(player));
                               return establishedPlayers.length > 0 ? (
                                 <div>
                                   <div className="flex items-center space-x-3 mb-4">
@@ -654,8 +666,8 @@ const LeaderboardPage: React.FC = () => {
                             })()}
                             {/* New Players Section */}
                             {(() => {
-                              const newPlayers = top10Data.filter(player => player.previous_rp === 0 || player.previous_rp === null);
-                              const establishedPlayers = top10Data.filter(player => player.previous_rp > 0);
+                              const newPlayers = top10Data.filter(player => isNewToLeaderboard(player));
+                              const establishedPlayers = top10Data.filter(player => !isNewToLeaderboard(player));
                               return newPlayers.length > 0 ? (
                                 <div>
                                   <div className="flex items-center space-x-3 mb-4">
@@ -690,7 +702,7 @@ const LeaderboardPage: React.FC = () => {
                                 player.rp_change < 0 && 
                                 player.previous_rp > 0 && 
                                 player.current_rp > 0 && 
-                                player.current_rank_title !== '[Not in Top 200]'
+                                !isDroppedFromLeaderboard(player)
                               );
                               return rpLosers.length > 0 ? (
                                 <div>
@@ -720,13 +732,12 @@ const LeaderboardPage: React.FC = () => {
                               const rpLosers = top10Data.filter(player => 
                                 player.rp_change < 0 && 
                                 player.previous_rp > 0 && 
-                                player.current_rp > 0 && 
-                                player.current_rank_title !== '[Not in Top 200]'
+                                !isDroppedFromLeaderboard(player)
                               );
                               const droppedFromTop200 = top10Data.filter(player => 
                                 player.rp_change < 0 && 
                                 player.previous_rp > 0 && 
-                                (player.current_rank_title === '[Not in Top 200]' || player.current_rp === 0)
+                                isDroppedFromLeaderboard(player)
                               );
                               return droppedFromTop200.length > 0 ? (
                                 <div>
