@@ -169,61 +169,72 @@ const LeaderboardPage: React.FC = () => {
 
   const ModernGainerCard = ({ player, rank, isNewPlayer }: any) => (
     <div className={`
-      group relative overflow-hidden rounded-xl border transition-all duration-300
+      group relative overflow-hidden rounded-xl border transition-all duration-300 cursor-pointer animate-fade-in
       ${isNewPlayer 
-        ? 'bg-gradient-to-r from-emerald-500/5 to-cyan-500/5 border-emerald-200/20 hover:border-emerald-300/40' 
-        : 'bg-gradient-to-r from-green-500/5 to-emerald-500/5 border-green-200/20 hover:border-green-300/40'
+        ? 'bg-gradient-to-br from-emerald-500/10 via-cyan-500/5 to-blue-500/10 border-emerald-200/30 hover:border-emerald-300/60' 
+        : 'bg-gradient-to-br from-green-500/10 via-emerald-500/5 to-teal-500/10 border-green-200/30 hover:border-green-300/60'
       }
-      hover:shadow-lg hover:shadow-green-500/10 hover:scale-[1.02]
+      hover:shadow-xl hover:shadow-green-500/20 hover:scale-[1.02] hover:-translate-y-1
+      backdrop-blur-sm
     `}>
+      {/* Animated Background Pattern */}
+      <div className="absolute inset-0 opacity-5">
+        <div className="absolute top-0 right-0 w-32 h-32 bg-gradient-to-br from-green-400 to-emerald-500 rounded-full blur-3xl"></div>
+        <div className="absolute bottom-0 left-0 w-24 h-24 bg-gradient-to-tr from-cyan-400 to-blue-500 rounded-full blur-2xl"></div>
+      </div>
+      
       {/* Rank Badge */}
-      <div className="absolute top-3 left-3">
+      <div className="absolute top-3 left-3 z-10">
         <div className={`
-          w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold
+          w-10 h-10 rounded-full flex items-center justify-center text-sm font-bold shadow-lg
           ${rank <= 3 
-            ? 'bg-gradient-to-br from-yellow-400 to-orange-500 text-white shadow-lg' 
-            : 'bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-300'
+            ? 'bg-gradient-to-br from-yellow-400 via-orange-500 to-red-500 text-white' 
+            : 'bg-gradient-to-br from-gray-100 to-gray-200 text-gray-700 dark:from-gray-800 dark:to-gray-700 dark:text-gray-300'
           }
+          transition-transform group-hover:scale-110
         `}>
-          {rank}
+          {rank <= 3 && '🏆'.slice(0, rank)} {rank}
         </div>
       </div>
+      
       {/* Main Content */}
-      <div className="pt-14 pb-4 px-4">
+      <div className="pt-16 pb-5 px-5 relative z-10">
         {/* Username */}
-        <h3 className="font-semibold text-gray-900 dark:text-white text-lg mb-2">
+        <h3 className="font-bold text-gray-900 dark:text-white text-lg mb-2 group-hover:text-green-600 dark:group-hover:text-green-400 transition-colors">
           {player.username}
         </h3>
+        
         {/* Rank Transition */}
-        <div className="text-sm text-gray-600 dark:text-gray-400 mb-3">
+        <div className="text-sm text-gray-600 dark:text-gray-400 mb-4 leading-relaxed">
           {getFullRankTransition(player)}
         </div>
+        
         {/* RP Gain Section */}
         <div className="flex items-center justify-between">
-          <div className="flex items-center space-x-2">
+          <div className="flex items-center space-x-3">
             <div className={`
-              px-3 py-1 rounded-full text-sm font-medium
+              px-4 py-2 rounded-full text-sm font-bold shadow-md
               ${isNewPlayer 
-                ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-400' 
-                : 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400'
+                ? 'bg-gradient-to-r from-emerald-500 to-cyan-500 text-white' 
+                : 'bg-gradient-to-r from-green-500 to-emerald-500 text-white'
               }
             `}>
-              +{player.rp_change} RP
+              +{player.rp_change.toLocaleString()} RP
             </div>
             {/* Percentage or Label */}
             <div className={`
-              text-xs px-2 py-1 rounded
+              text-xs px-3 py-1.5 rounded-full font-medium
               ${isNewPlayer 
-                ? 'bg-cyan-50 text-cyan-600 dark:bg-cyan-900/20 dark:text-cyan-400' 
-                : 'bg-green-50 text-green-600 dark:bg-green-900/20 dark:text-green-400'
+                ? 'bg-cyan-100 text-cyan-700 dark:bg-cyan-900/30 dark:text-cyan-400' 
+                : 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400'
               }
             `}>
               {getDisplayPercentage(player)}
             </div>
           </div>
           {/* Trending Arrow */}
-          <div className="text-green-500">
-            <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
+          <div className="text-green-500 group-hover:scale-110 transition-transform">
+            <svg className="w-6 h-6" fill="currentColor" viewBox="0 0 20 20">
               <path fillRule="evenodd" d="M5.293 9.707a1 1 0 010-1.414l4-4a1 1 0 011.414 0l4 4a1 1 0 01-1.414 1.414L11 7.414V15a1 1 0 11-2 0V7.414L6.707 9.707a1 1 0 01-1.414 0z" clipRule="evenodd" />
             </svg>
           </div>
@@ -233,37 +244,46 @@ const LeaderboardPage: React.FC = () => {
   );
 
   const ModernLoserCard = ({ player, rank }: any) => (
-    <div className="group relative overflow-hidden rounded-xl border transition-all duration-300 bg-gradient-to-r from-red-500/5 to-orange-500/5 border-red-200/20 hover:border-red-300/40 hover:shadow-lg hover:shadow-red-500/10 hover:scale-[1.02]">
+    <div className="group relative overflow-hidden rounded-xl border transition-all duration-300 cursor-pointer animate-fade-in bg-gradient-to-br from-red-500/10 via-orange-500/5 to-pink-500/10 border-red-200/30 hover:border-red-300/60 hover:shadow-xl hover:shadow-red-500/20 hover:scale-[1.02] hover:-translate-y-1 backdrop-blur-sm">
+      {/* Animated Background Pattern */}
+      <div className="absolute inset-0 opacity-5">
+        <div className="absolute top-0 right-0 w-32 h-32 bg-gradient-to-br from-red-400 to-pink-500 rounded-full blur-3xl"></div>
+        <div className="absolute bottom-0 left-0 w-24 h-24 bg-gradient-to-tr from-orange-400 to-red-500 rounded-full blur-2xl"></div>
+      </div>
+      
       {/* Rank Badge */}
-      <div className="absolute top-3 left-3">
-        <div className="w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold bg-red-100 text-red-600 dark:bg-red-900/30 dark:text-red-400">
+      <div className="absolute top-3 left-3 z-10">
+        <div className="w-10 h-10 rounded-full flex items-center justify-center text-sm font-bold shadow-lg bg-gradient-to-br from-red-100 to-red-200 text-red-700 dark:from-red-900/30 dark:to-red-800/30 dark:text-red-400 transition-transform group-hover:scale-110">
           {rank}
         </div>
       </div>
+      
       {/* Main Content */}
-      <div className="pt-14 pb-4 px-4">
+      <div className="pt-16 pb-5 px-5 relative z-10">
         {/* Username */}
-        <h3 className="font-semibold text-gray-900 dark:text-white text-lg mb-2">
+        <h3 className="font-bold text-gray-900 dark:text-white text-lg mb-2 group-hover:text-red-600 dark:group-hover:text-red-400 transition-colors">
           {player.username}
         </h3>
+        
         {/* Rank Transition */}
-        <div className="text-sm text-gray-600 dark:text-gray-400 mb-3">
+        <div className="text-sm text-gray-600 dark:text-gray-400 mb-4 leading-relaxed">
           {getFullRankTransition(player)}
         </div>
+        
         {/* RP Loss Section */}
         <div className="flex items-center justify-between">
-          <div className="flex items-center space-x-2">
-            <div className="px-3 py-1 rounded-full text-sm font-medium bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400">
-              {player.rp_change} RP
+          <div className="flex items-center space-x-3">
+            <div className="px-4 py-2 rounded-full text-sm font-bold shadow-md bg-gradient-to-r from-red-500 to-pink-500 text-white">
+              {player.rp_change.toLocaleString()} RP
             </div>
             {/* Percentage */}
-            <div className="text-xs px-2 py-1 rounded bg-red-50 text-red-600 dark:bg-red-900/20 dark:text-red-400">
+            <div className="text-xs px-3 py-1.5 rounded-full font-medium bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400">
               {getDisplayPercentage(player)}
             </div>
           </div>
           {/* Trending Arrow */}
-          <div className="text-red-500">
-            <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
+          <div className="text-red-500 group-hover:scale-110 transition-transform">
+            <svg className="w-6 h-6" fill="currentColor" viewBox="0 0 20 20">
               <path fillRule="evenodd" d="M14.707 10.293a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 111.414-1.414L9 12.586V5a1 1 0 012 0v7.586l2.293-2.293a1 1 0 011.414 0z" clipRule="evenodd" />
             </svg>
           </div>
@@ -496,17 +516,26 @@ const LeaderboardPage: React.FC = () => {
             )}
             {(activeTab === 'gainers' || activeTab === 'losers') && (
               <div>
-                <div className="flex items-center justify-between mb-4">
-                  <h2 className="text-xl font-semibold text-gray-900 dark:text-gray-100">
-                    {activeTab === 'gainers' ? 'Top RP Gainers' : 'Top RP Losers'}
-                  </h2>
+                <div className="flex items-center justify-between mb-6">
+                  <div>
+                    <h2 className="text-2xl font-bold text-gray-900 dark:text-gray-100 mb-2">
+                      {activeTab === 'gainers' ? '🔥 Hottest Gainers' : '📉 Biggest Losers'}
+                    </h2>
+                    <p className="text-gray-600 dark:text-gray-400">
+                      {activeTab === 'gainers' ? 'Players with the biggest RP gains' : 'Players with the biggest RP losses'}
+                    </p>
+                  </div>
                   {/* Modern Segmented Control for Time Filter */}
-                  <div className="time-filter-buttons">
+                  <div className="flex bg-gray-100 dark:bg-gray-700 p-1 rounded-lg">
                     {['6h', '12h', '1d', '2d'].map(opt => (
                       <button
                         key={opt}
                         type="button"
-                        className={`filter-button${((activeTab === 'gainers' ? gainersTimeRange : losersTimeRange) === opt) ? ' active' : ''}`}
+                        className={`px-3 py-1.5 text-sm font-medium rounded-md transition-all ${
+                          ((activeTab === 'gainers' ? gainersTimeRange : losersTimeRange) === opt) 
+                            ? 'bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 shadow-sm' 
+                            : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100'
+                        }`}
                         onClick={() => activeTab === 'gainers' ? setGainersTimeRange(opt as any) : setLosersTimeRange(opt as any)}
                       >
                         {opt}
@@ -514,63 +543,118 @@ const LeaderboardPage: React.FC = () => {
                     ))}
                   </div>
                 </div>
-                <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm overflow-hidden">
-                  {(activeTab === 'gainers' ? isLoadingGainers : isLoadingLosers) ? (
-                    <div className="text-center py-8 text-gray-500 dark:text-gray-400">Loading...</div>
-                  ) : (
-                    (() => {
-                      const data = activeTab === 'gainers' ? gainers : losers;
-                      if (!data || data.length === 0) {
-                        const requested = (activeTab === 'gainers' ? gainersTimeRange : losersTimeRange);
-                        const requestedHours = requested === '6h' ? 6 : requested === '12h' ? 12 : requested === '1d' ? 24 : 48;
-                        return <div className="text-center py-8 text-gray-500 dark:text-gray-400">No RP changes found in the last {requestedHours} hours. Try a longer timeframe.</div>;
-                      }
-                      // Find the oldest inserted_at timestamp in the data
-                      const timestamps = data.map(e => e.inserted_at ? new Date(e.inserted_at) : null).filter(Boolean) as Date[];
-                      let oldest = null;
-                      if (timestamps.length > 0) {
-                        oldest = timestamps.reduce((min, d) => d < min ? d : min, timestamps[0]);
-                      }
-                      let periodMsg = '';
-                      if (oldest) {
-                        const now = new Date();
-                        const hours = Math.round((now.getTime() - oldest.getTime()) / (1000 * 60 * 60));
-                        const requested = (activeTab === 'gainers' ? gainersTimeRange : losersTimeRange);
-                        const requestedHours = requested === '6h' ? 6 : requested === '12h' ? 12 : requested === '1d' ? 24 : 48;
-                        if (hours < requestedHours) {
-                          periodMsg = `Partial data: Only last ${hours} hours available for this period.`;
-                        } else {
-                          periodMsg = `Showing last ${requestedHours} hours of data.`;
-                        }
-                      }
-                      return <>
-                        {periodMsg && <div className="text-center py-2 text-xs text-gray-500 dark:text-gray-400">{periodMsg}</div>}
-                        {data.map((entry, idx) => (
-                          <div key={entry.username} className="flex items-center justify-between p-4 border-b border-gray-200 dark:border-gray-700 last:border-b-0">
-                            <div className="flex items-center space-x-4">
-                              <div className="w-8 h-8 bg-gray-200 dark:bg-gray-600 rounded-full flex items-center justify-center text-sm font-bold">
-                                {idx + 1}
-                              </div>
-                              <div>
-                                <div className="font-semibold text-gray-900 dark:text-white">
-                                  {entry.username}
-                                </div>
-                                <div className="text-xs text-gray-500 dark:text-gray-400">
-                                  {entry.previous_rank_title} → {entry.current_rank_title}
-                                </div>
-                              </div>
+
+                {(activeTab === 'gainers' ? isLoadingGainers : isLoadingLosers) ? (
+                  <div className="flex items-center justify-center py-16">
+                    <div className="text-center">
+                      <div className="relative mb-6">
+                        <div className="w-16 h-16 border-4 border-gray-200 dark:border-gray-700 border-t-blue-600 dark:border-t-blue-400 rounded-full animate-spin mx-auto"></div>
+                        <div className="absolute inset-0 w-16 h-16 border-4 border-transparent border-t-green-500 dark:border-t-green-400 rounded-full animate-spin mx-auto" style={{ animationDelay: '0.5s' }}></div>
+                      </div>
+                      <p className="text-gray-600 dark:text-gray-400 font-medium">
+                        Loading {activeTab === 'gainers' ? 'hottest gainers' : 'biggest losers'}...
+                      </p>
+                      <p className="text-sm text-gray-500 dark:text-gray-500 mt-1">
+                        Analyzing recent RP changes
+                      </p>
+                    </div>
+                  </div>
+                ) : (
+                  (() => {
+                    const data = activeTab === 'gainers' ? gainers : losers;
+                    if (!data || data.length === 0) {
+                      const requested = (activeTab === 'gainers' ? gainersTimeRange : losersTimeRange);
+                      const requestedHours = requested === '6h' ? 6 : requested === '12h' ? 12 : requested === '1d' ? 24 : 48;
+                      return (
+                        <div className="text-center py-16">
+                          <div className="max-w-md mx-auto">
+                            <div className="text-6xl mb-4">
+                              {activeTab === 'gainers' ? '📈' : '📉'}
                             </div>
-                            <div className="text-right">
-                              <div className={`font-bold text-lg ${entry.rp_change > 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>
-                                {entry.rp_change > 0 ? '+' : ''}{entry.rp_change} RP ({getDisplayPercentage(entry)})
-                              </div>
+                            <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-2">
+                              No {activeTab === 'gainers' ? 'RP gains' : 'RP losses'} found
+                            </h3>
+                            <p className="text-gray-600 dark:text-gray-400 mb-4">
+                              No {activeTab === 'gainers' ? 'RP gains' : 'RP losses'} found in the last {requestedHours} hours.
+                            </p>
+                            <div className="text-sm text-gray-500 dark:text-gray-500">
+                              Try a longer timeframe to see more activity.
                             </div>
                           </div>
-                        ))}
-                      </>;
-                    })()
-                  )}
-                </div>
+                        </div>
+                      );
+                    }
+
+                    // Limit to top 10 and use modern cards
+                    const top10Data = data.slice(0, 10);
+                    
+                    // Find the oldest inserted_at timestamp in the data
+                    const timestamps = data.map(e => e.inserted_at ? new Date(e.inserted_at) : null).filter(Boolean) as Date[];
+                    let oldest = null;
+                    if (timestamps.length > 0) {
+                      oldest = timestamps.reduce((min, d) => d < min ? d : min, timestamps[0]);
+                    }
+                    let periodMsg = '';
+                    if (oldest) {
+                      const now = new Date();
+                      const hours = Math.round((now.getTime() - oldest.getTime()) / (1000 * 60 * 60));
+                      const requested = (activeTab === 'gainers' ? gainersTimeRange : losersTimeRange);
+                      const requestedHours = requested === '6h' ? 6 : requested === '12h' ? 12 : requested === '1d' ? 24 : 48;
+                      if (hours < requestedHours) {
+                        periodMsg = `Partial data: Only last ${hours} hours available for this period.`;
+                      } else {
+                        periodMsg = `Showing last ${requestedHours} hours of data.`;
+                      }
+                    }
+
+                    return (
+                      <div className="space-y-4">
+                        {periodMsg && (
+                          <div className="text-center py-3 text-sm text-gray-500 dark:text-gray-400 bg-gray-50 dark:bg-gray-800 rounded-lg">
+                            {periodMsg}
+                          </div>
+                        )}
+                        
+                        {activeTab === 'gainers' ? (
+                          // Use modern gainers cards
+                          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 stagger-animation">
+                            {top10Data.map((player, index) => {
+                              const isNewPlayer = player.previous_rp === 0 || player.previous_rp === null;
+                              return (
+                                <ModernGainerCard 
+                                  key={player.username} 
+                                  player={player} 
+                                  rank={index + 1} 
+                                  isNewPlayer={isNewPlayer}
+                                />
+                              );
+                            })}
+                          </div>
+                        ) : (
+                          // Use modern losers cards
+                          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 stagger-animation">
+                            {top10Data.map((player, index) => (
+                              <ModernLoserCard 
+                                key={player.username} 
+                                player={player} 
+                                rank={index + 1}
+                              />
+                            ))}
+                          </div>
+                        )}
+
+                        {data.length > 10 && (
+                          <div className="text-center py-6">
+                            <div className="inline-flex items-center gap-2 px-4 py-2 bg-gray-100 dark:bg-gray-800 rounded-full text-sm text-gray-600 dark:text-gray-400">
+                              <span>📊</span>
+                              <span>Showing top 10 of {data.length} {activeTab === 'gainers' ? 'gainers' : 'losers'}</span>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })()
+                )}
               </div>
             )}
           </div>
