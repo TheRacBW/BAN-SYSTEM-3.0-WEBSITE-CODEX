@@ -616,30 +616,136 @@ const LeaderboardPage: React.FC = () => {
                         )}
                         
                         {activeTab === 'gainers' ? (
-                          // Use modern gainers bars
-                          <div className="space-y-3 stagger-animation">
-                            {top10Data.map((player, index) => {
-                              const isNewPlayer = player.previous_rp === 0 || player.previous_rp === null;
-                              return (
-                                <ModernGainerBar 
-                                  key={player.username} 
-                                  player={player} 
-                                  rank={index + 1} 
-                                  isNewPlayer={isNewPlayer}
-                                />
-                              );
-                            })}
+                          // Use modern gainers bars with sections
+                          <div className="space-y-6 stagger-animation">
+                            {/* New Players Section */}
+                            {(() => {
+                              const newPlayers = top10Data.filter(player => player.previous_rp === 0 || player.previous_rp === null);
+                              return newPlayers.length > 0 ? (
+                                <div>
+                                  <div className="flex items-center space-x-3 mb-4">
+                                    <div className="w-1 h-6 bg-gradient-to-b from-emerald-400 to-cyan-500 rounded-full"></div>
+                                    <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
+                                      🆕 New to Leaderboard
+                                    </h3>
+                                    <div className="bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-400 px-2 py-1 rounded-full text-xs font-medium">
+                                      {newPlayers.length} fresh
+                                    </div>
+                                  </div>
+                                  <div className="space-y-3">
+                                    {newPlayers.map((player, index) => (
+                                      <ModernGainerBar 
+                                        key={player.username} 
+                                        player={player} 
+                                        rank={index + 1} 
+                                        isNewPlayer={true}
+                                      />
+                                    ))}
+                                  </div>
+                                </div>
+                              ) : null;
+                            })()}
+
+                            {/* Established Players Section */}
+                            {(() => {
+                              const newPlayers = top10Data.filter(player => player.previous_rp === 0 || player.previous_rp === null);
+                              const establishedPlayers = top10Data.filter(player => player.previous_rp > 0);
+                              return establishedPlayers.length > 0 ? (
+                                <div>
+                                  <div className="flex items-center space-x-3 mb-4">
+                                    <div className="w-1 h-6 bg-gradient-to-b from-green-400 to-emerald-500 rounded-full"></div>
+                                    <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
+                                      📈 Established Players
+                                    </h3>
+                                    <div className="bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400 px-2 py-1 rounded-full text-xs font-medium">
+                                      {establishedPlayers.length} active
+                                    </div>
+                                  </div>
+                                  <div className="space-y-3">
+                                    {establishedPlayers.map((player, index) => (
+                                      <ModernGainerBar 
+                                        key={player.username} 
+                                        player={player} 
+                                        rank={newPlayers.length + index + 1} 
+                                        isNewPlayer={false}
+                                      />
+                                    ))}
+                                  </div>
+                                </div>
+                              ) : null;
+                            })()}
                           </div>
                         ) : (
-                          // Use modern losers bars
-                          <div className="space-y-3 stagger-animation">
-                            {top10Data.map((player, index) => (
-                              <ModernLoserBar 
-                                key={player.username} 
-                                player={player} 
-                                rank={index + 1}
-                              />
-                            ))}
+                          // Use modern losers bars with sections
+                          <div className="space-y-6 stagger-animation">
+                            {/* RP Losers Section */}
+                            {(() => {
+                              const rpLosers = top10Data.filter(player => 
+                                player.rp_change < 0 && 
+                                player.previous_rp > 0 && 
+                                player.current_rp > 0 && 
+                                player.current_rank_title !== '[Not in Top 200]'
+                              );
+                              return rpLosers.length > 0 ? (
+                                <div>
+                                  <div className="flex items-center space-x-3 mb-4">
+                                    <div className="w-1 h-6 bg-gradient-to-b from-red-400 to-pink-500 rounded-full"></div>
+                                    <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
+                                      📉 RP Losers
+                                    </h3>
+                                    <div className="bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400 px-2 py-1 rounded-full text-xs font-medium">
+                                      {rpLosers.length} active
+                                    </div>
+                                  </div>
+                                  <div className="space-y-3">
+                                    {rpLosers.map((player, index) => (
+                                      <ModernLoserBar 
+                                        key={player.username} 
+                                        player={player} 
+                                        rank={index + 1}
+                                      />
+                                    ))}
+                                  </div>
+                                </div>
+                              ) : null;
+                            })()}
+
+                            {/* Dropped from Top 200 Section */}
+                            {(() => {
+                              const rpLosers = top10Data.filter(player => 
+                                player.rp_change < 0 && 
+                                player.previous_rp > 0 && 
+                                player.current_rp > 0 && 
+                                player.current_rank_title !== '[Not in Top 200]'
+                              );
+                              const droppedFromTop200 = top10Data.filter(player => 
+                                player.rp_change < 0 && 
+                                player.previous_rp > 0 && 
+                                (player.current_rank_title === '[Not in Top 200]' || player.current_rp === 0)
+                              );
+                              return droppedFromTop200.length > 0 ? (
+                                <div>
+                                  <div className="flex items-center space-x-3 mb-4">
+                                    <div className="w-1 h-6 bg-gradient-to-b from-orange-400 to-red-500 rounded-full"></div>
+                                    <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
+                                      🚫 Dropped from Top 200
+                                    </h3>
+                                    <div className="bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-400 px-2 py-1 rounded-full text-xs font-medium">
+                                      {droppedFromTop200.length} dropped
+                                    </div>
+                                  </div>
+                                  <div className="space-y-3">
+                                    {droppedFromTop200.map((player, index) => (
+                                      <ModernLoserBar 
+                                        key={player.username} 
+                                        player={player} 
+                                        rank={rpLosers.length + index + 1}
+                                      />
+                                    ))}
+                                  </div>
+                                </div>
+                              ) : null;
+                            })()}
                           </div>
                         )}
 
