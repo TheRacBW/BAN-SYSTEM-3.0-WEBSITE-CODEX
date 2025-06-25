@@ -114,7 +114,12 @@ export const useLeaderboard = () => {
       const data = await leaderboardService.getRPLosers(timeRange);
       console.log('🔄 LOSERS QUERY RESULT:', data);
       console.log('🔄 LOSERS COUNT:', data?.length);
-      setLosers(data);
+      // Patch: calculate current_rp if missing
+      const processed = (data || []).map(loser => ({
+        ...loser,
+        current_rp: loser.current_rp !== undefined ? loser.current_rp : (loser.previous_rp ?? 0) + (loser.rp_change ?? 0)
+      }));
+      setLosers(processed);
     } catch (err) {
       setLosers([]);
     } finally {
