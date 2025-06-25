@@ -404,12 +404,14 @@ class LeaderboardService {
   /**
    * Get RP gainers for a time range using hybrid strategy (optimized RPC, fallback to rp_changes)
    */
-  async getRPGainers(): Promise<any[]> {
-    // Direct query to rp_changes_optimized for all gainers
+  async getRPGainers(timeRange: string): Promise<any[]> {
+    const hoursBack = timeRange === '6h' ? 6 : timeRange === '12h' ? 12 : timeRange === '1d' ? 24 : 48;
+    const since = new Date(Date.now() - hoursBack * 60 * 60 * 1000).toISOString();
     const { data, error } = await supabase
       .from('rp_changes_optimized')
       .select('*')
       .gt('rp_change', 0)
+      .gte('change_timestamp', since)
       .order('rp_change', { ascending: false });
     if (error) {
       console.error('❌ Error fetching gainers from rp_changes_optimized:', error);
@@ -421,13 +423,14 @@ class LeaderboardService {
   /**
    * Get RP losers for a time range using hybrid strategy (optimized RPC, fallback to rp_changes)
    */
-  async getRPLosers(): Promise<any[]> {
-    // Direct query to rp_changes_optimized for all losers
+  async getRPLosers(timeRange: string): Promise<any[]> {
+    const hoursBack = timeRange === '6h' ? 6 : timeRange === '12h' ? 12 : timeRange === '1d' ? 24 : 48;
+    const since = new Date(Date.now() - hoursBack * 60 * 60 * 1000).toISOString();
     const { data, error } = await supabase
       .from('rp_changes_optimized')
       .select('*')
       .lt('rp_change', 0)
-      .gt('previous_rp', 0)
+      .gte('change_timestamp', since)
       .order('rp_change', { ascending: true });
     if (error) {
       console.error('❌ Error fetching losers from rp_changes_optimized:', error);
