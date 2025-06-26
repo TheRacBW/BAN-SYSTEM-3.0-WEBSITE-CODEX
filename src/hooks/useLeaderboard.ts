@@ -245,6 +245,7 @@ export const useLeaderboard = () => {
     losersTimeRange,
     setLosersTimeRange,
     isLoadingGainers,
-    isLoadingLosers
+    isLoadingLosers,
+    filteredEntries
   };
 }; 

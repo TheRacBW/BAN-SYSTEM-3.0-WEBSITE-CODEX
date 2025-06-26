@@ -66,7 +66,8 @@ const LeaderboardPage: React.FC = () => {
     losersTimeRange,
     setLosersTimeRange,
     isLoadingGainers,
-    isLoadingLosers
+    isLoadingLosers,
+    filteredEntries
   } = useLeaderboard();
 
   const [showTest, setShowTest] = useState(true); // Temporarily show test
@@ -492,27 +493,16 @@ const LeaderboardPage: React.FC = () => {
       <div className="container mx-auto px-4 py-6">
         {/* Search Bar */}
         <div className="mb-6">
-          <form onSubmit={(e) => {
-            e.preventDefault();
-            const formData = new FormData(e.currentTarget);
-            const query = formData.get('search') as string;
-            if (query.trim()) {
-              setSearchQuery(query);
-            } else {
-              setSearchQuery('');
-            }
-          }}>
-            <div className="relative max-w-md">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={20} />
-              <input
-                type="text"
-                name="search"
-                placeholder="Search players..."
-                defaultValue={searchQuery}
-                className="w-full pl-10 pr-4 py-3 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-              />
-            </div>
-          </form>
+          <div className="relative max-w-md">
+            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={20} />
+            <input
+              type="text"
+              placeholder="Search players..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="w-full pl-10 pr-4 py-3 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            />
+          </div>
         </div>
 
         {/* Tabs */}
@@ -557,10 +547,10 @@ const LeaderboardPage: React.FC = () => {
                     Top 200 Players
                   </h2>
                   <span className="text-sm text-gray-600 dark:text-gray-400">
-                    {entries.length} players
+                    {filteredEntries.length} players
                   </span>
                 </div>
-                {entries.length === 0 ? (
+                {filteredEntries.length === 0 ? (
                   <div className="text-center py-12">
                     <p className="text-gray-600 dark:text-gray-400">
                       {searchQuery ? 'No players found matching your search.' : 'No players found.'}
@@ -568,7 +558,7 @@ const LeaderboardPage: React.FC = () => {
                   </div>
                 ) : (
                   <div className="flex flex-col gap-3 w-full">
-                    {entries.map((entry, index) => (
+                    {filteredEntries.map((entry: import('../types/leaderboard').LeaderboardEntryWithChanges, index: number) => (
                       <LeaderboardEntryComponent
                         key={entry.username}
                         entry={entry}
