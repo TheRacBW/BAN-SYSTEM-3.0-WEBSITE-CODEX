@@ -90,7 +90,8 @@ export const useLeaderboard = () => {
       // Step 2: Batch load user IDs using new Edge Function
       const usernames = coreWithChanges.map(entry => entry.username);
       const lookupResults = await lookupRobloxUserIds(usernames);
-      console.log('[Leaderboard] Username lookup results:', lookupResults);
+      console.log('[Leaderboard] Username lookup results (bright-function):', lookupResults);
+      // Build a mapping from username (case-insensitive) to user_id
       const userIdMap = new Map<string, number | null>();
       lookupResults.forEach(result => {
         let userId: number | null = null;
@@ -99,14 +100,20 @@ export const useLeaderboard = () => {
         } else if (typeof result.user_id === 'string' && !isNaN(Number(result.user_id))) {
           userId = Number(result.user_id);
         }
-        userIdMap.set(result.username, userId);
+        // Use lowercase for robust matching
+        userIdMap.set(result.username.toLowerCase(), userId);
       });
+      console.log('[Leaderboard] Built userIdMap:', userIdMap);
 
-      // Step 3: Update entries with user IDs immediately
-      const entriesWithUserIds = coreWithChanges.map(entry => ({
-        ...entry,
-        user_id: userIdMap.get(entry.username) ?? entry.user_id ?? null
-      }));
+      // Step 3: Update entries with user IDs immediately (case-insensitive match)
+      const entriesWithUserIds = coreWithChanges.map(entry => {
+        const mappedUserId = userIdMap.get(entry.username.toLowerCase());
+        return {
+          ...entry,
+          user_id: mappedUserId ?? entry.user_id ?? null
+        };
+      });
+      console.log('[Leaderboard] entriesWithUserIds:', entriesWithUserIds);
       setEntriesWithAvatars(entriesWithUserIds);
 
       // Step 4: Load profile pictures in background (non-blocking)

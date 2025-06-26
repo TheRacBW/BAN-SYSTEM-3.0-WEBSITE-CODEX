@@ -19,7 +19,7 @@ const getWorkingHeaders = (cookie?: string) => ({
 interface CacheRow {
   username: string;
   user_id: string | number;
-  last_checked_at: string;
+  cached_at: string;
 }
 
 interface UsernameResult {
@@ -69,7 +69,7 @@ Deno.serve(async (req) => {
     // 1. Check cache for all usernames
     const { data: cachedRows } = await supabase
       .from('roblox_user_cache')
-      .select('username, user_id, last_checked_at')
+      .select('username, user_id, cached_at')
       .in('username', usernames);
 
     const now = new Date();
@@ -78,7 +78,7 @@ Deno.serve(async (req) => {
       for (const row of cachedRows as CacheRow[]) {
         cachedMap.set(row.username, {
           user_id: row.user_id,
-          last_checked_at: row.last_checked_at,
+          cached_at: row.cached_at,
           username: row.username
         });
       }
@@ -89,8 +89,8 @@ Deno.serve(async (req) => {
     for (const username of usernames) {
       const cached = cachedMap.get(username);
       if (cached) {
-        const lastChecked = new Date(cached.last_checked_at);
-        const ageDays = (now.getTime() - lastChecked.getTime()) / (1000 * 60 * 60 * 24);
+        const cachedAt = new Date(cached.cached_at);
+        const ageDays = (now.getTime() - cachedAt.getTime()) / (1000 * 60 * 60 * 24);
         if (ageDays < CACHE_EXPIRY_DAYS) {
           results.push({
             username,
@@ -128,13 +128,19 @@ Deno.serve(async (req) => {
     }
 
     // 3. Upsert new/updated values into cache
-    const upserts: { username: string; user_id: string | number; last_checked_at: string }[] = results.filter((r) => !r.cached && r.user_id).map((r) => ({
+    const upserts: { username: string; user_id: string | number; cached_at: string }[] = results.filter((r) => !r.cached && r.user_id).map((r) => ({
       username: r.username,
       user_id: r.user_id as string | number,
-      last_checked_at: now.toISOString()
+      cached_at: now.toISOString()
     }));
     if (upserts.length > 0) {
-      await supabase.from('roblox_user_cache').upsert(upserts);
+      console.log('[bright-function] Upserting to roblox_user_cache:', upserts);
+      const { error: upsertError } = await supabase.from('roblox_user_cache').upsert(upserts);
+      if (upsertError) {
+        console.error('[bright-function] Cache upsert failed:', upsertError);
+      } else {
+        console.log('[bright-function] Cache upsert succeeded');
+      }
     }
 
     return new Response(JSON.stringify({
