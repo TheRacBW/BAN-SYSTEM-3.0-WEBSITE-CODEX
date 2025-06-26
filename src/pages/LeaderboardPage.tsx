@@ -117,60 +117,75 @@ const LeaderboardPage: React.FC = () => {
 
   useEffect(() => {
     const enrich = async (players: any[], setPlayers: (arr: any[]) => void) => {
-      // Only enrich if missing user_id or profile_picture
-      const toLookup = players.filter(p => !p.user_id || !p.profile_picture);
-      if (toLookup.length === 0) {
-        setPlayers(players);
-        return;
-      }
+      const toLookup = players.filter(p => !p.user_id);
       const usernames = toLookup.map(p => p.username);
       const lookupResults = await lookupRobloxUserIds(usernames);
-      // Build a map for fast lookup
       const lookupMap = new Map(
         lookupResults.map(r => [r.username.toLowerCase(), r])
       );
+      const userIdsToFetch: number[] = [];
       const enriched = players.map(p => {
-        if (p.user_id && p.profile_picture) return p;
         const found = lookupMap.get(p.username.toLowerCase());
-        if (found) {
-          return {
-            ...p,
-            user_id: found.user_id ?? p.user_id,
-            profile_picture: (found as any).profile_picture_url ?? p.profile_picture
-          };
+        let user_id = found?.user_id ?? p.user_id;
+        if (typeof user_id === 'string' && !isNaN(Number(user_id))) user_id = Number(user_id);
+        // Always set profile_picture from lookup result if present
+        let profile_picture = (found && (found as any).profile_picture_url) ? (found as any).profile_picture_url : p.profile_picture || null;
+        if (!profile_picture && user_id) userIdsToFetch.push(user_id);
+        return {
+          ...p,
+          user_id,
+          profile_picture
+        };
+      });
+      let pictureMap = new Map<number, string>();
+      if (userIdsToFetch.length > 0) {
+        pictureMap = await robloxApi.getProfilePicturesBatch(userIdsToFetch);
+      }
+      const fullyEnriched = enriched.map(p => {
+        if (p.profile_picture) return p;
+        if (p.user_id && pictureMap.has(p.user_id)) {
+          return { ...p, profile_picture: pictureMap.get(p.user_id) };
         }
         return p;
       });
-      setPlayers(enriched);
+      setPlayers(fullyEnriched);
     };
     enrich(gainers, setEnrichedGainers);
   }, [gainers]);
 
   useEffect(() => {
     const enrich = async (players: any[], setPlayers: (arr: any[]) => void) => {
-      const toLookup = players.filter(p => !p.user_id || !p.profile_picture);
-      if (toLookup.length === 0) {
-        setPlayers(players);
-        return;
-      }
+      const toLookup = players.filter(p => !p.user_id);
       const usernames = toLookup.map(p => p.username);
       const lookupResults = await lookupRobloxUserIds(usernames);
       const lookupMap = new Map(
         lookupResults.map(r => [r.username.toLowerCase(), r])
       );
+      const userIdsToFetch: number[] = [];
       const enriched = players.map(p => {
-        if (p.user_id && p.profile_picture) return p;
         const found = lookupMap.get(p.username.toLowerCase());
-        if (found) {
-          return {
-            ...p,
-            user_id: found.user_id ?? p.user_id,
-            profile_picture: (found as any).profile_picture_url ?? p.profile_picture
-          };
+        let user_id = found?.user_id ?? p.user_id;
+        if (typeof user_id === 'string' && !isNaN(Number(user_id))) user_id = Number(user_id);
+        let profile_picture = (found && (found as any).profile_picture_url) ? (found as any).profile_picture_url : p.profile_picture || null;
+        if (!profile_picture && user_id) userIdsToFetch.push(user_id);
+        return {
+          ...p,
+          user_id,
+          profile_picture
+        };
+      });
+      let pictureMap = new Map<number, string>();
+      if (userIdsToFetch.length > 0) {
+        pictureMap = await robloxApi.getProfilePicturesBatch(userIdsToFetch);
+      }
+      const fullyEnriched = enriched.map(p => {
+        if (p.profile_picture) return p;
+        if (p.user_id && pictureMap.has(p.user_id)) {
+          return { ...p, profile_picture: pictureMap.get(p.user_id) };
         }
         return p;
       });
-      setPlayers(enriched);
+      setPlayers(fullyEnriched);
     };
     enrich(losers, setEnrichedLosers);
   }, [losers]);
@@ -265,8 +280,9 @@ const LeaderboardPage: React.FC = () => {
 
   // --- Modern Gainers Section ---
   const renderGainersSection = () => {
-    const newPlayers = gainers.filter(categorizeGainer).filter(p => categorizeGainer(p) === 'new');
-    const establishedPlayers = gainers.filter(categorizeGainer).filter(p => categorizeGainer(p) === 'established');
+    console.log('[renderGainersSection] enrichedGainers:', enrichedGainers);
+    const newPlayers = enrichedGainers.filter(categorizeGainer).filter(p => categorizeGainer(p) === 'new');
+    const establishedPlayers = enrichedGainers.filter(categorizeGainer).filter(p => categorizeGainer(p) === 'established');
     return (
       <div className="space-y-6">
         {/* Established Players */}
@@ -326,8 +342,9 @@ const LeaderboardPage: React.FC = () => {
 
   // --- Modern Losers Section ---
   const renderLosersSection = () => {
-    const droppedPlayers = losers.filter(categorizeLoser).filter(p => categorizeLoser(p) === 'dropped');
-    const establishedLosers = losers.filter(categorizeLoser).filter(p => categorizeLoser(p) === 'established');
+    console.log('[renderLosersSection] enrichedLosers:', enrichedLosers);
+    const droppedPlayers = enrichedLosers.filter(categorizeLoser).filter(p => categorizeLoser(p) === 'dropped');
+    const establishedLosers = enrichedLosers.filter(categorizeLoser).filter(p => categorizeLoser(p) === 'established');
     return (
       <div className="space-y-6">
         {/* Established Players */}
@@ -384,152 +401,158 @@ const LeaderboardPage: React.FC = () => {
   };
 
   // --- Modern Gainer Bar ---
-  const ModernGainerBar = ({ player, rank, isNewPlayer }: any) => (
-    <div className={`
-      group relative overflow-hidden rounded-lg border transition-all duration-300 cursor-pointer animate-fade-in
-      ${isNewPlayer 
-        ? 'bg-gradient-to-r from-emerald-500/10 via-cyan-500/5 to-blue-500/10 border-emerald-200/30 hover:border-emerald-300/60 border-l-4 border-l-emerald-500' 
-        : 'bg-gradient-to-r from-green-500/10 via-emerald-500/5 to-teal-500/10 border-green-200/30 hover:border-green-300/60 border-l-4 border-l-green-500'
-      }
-      hover:shadow-lg hover:shadow-green-500/10 hover:scale-[1.01] hover:-translate-y-0.5
-      backdrop-blur-sm
-    `}>
-      {/* Animated Background Pattern */}
-      <div className="absolute inset-0 opacity-5">
-        <div className="absolute top-0 right-0 w-32 h-32 bg-gradient-to-br from-green-400 to-emerald-500 rounded-full blur-3xl"></div>
-        <div className="absolute bottom-0 left-0 w-24 h-24 bg-gradient-to-tr from-cyan-400 to-blue-500 rounded-full blur-2xl"></div>
-      </div>
-      <div className="relative z-10 p-4">
-        <div className="flex items-center justify-between">
-          {/* Left Side - Rank, Avatar, and Username */}
-          <div className="flex items-center space-x-4">
-            {/* Ranking Number (outside the circle) */}
-            <div className="flex flex-col items-center justify-center min-w-[32px]">
-              <span className="text-xl font-extrabold text-gray-700 dark:text-gray-200 drop-shadow-sm">{rank}</span>
-            </div>
-            {/* Profile Picture in colored circle */}
-            <div className="flex-shrink-0 w-12 h-12 rounded-full flex items-center justify-center bg-white border-4 border-green-400 shadow-md">
-              {player.profile_picture ? (
-                <img
-                  src={player.profile_picture}
-                  alt={`${player.username}'s profile`}
-                  className="w-10 h-10 rounded-full object-cover"
-                  onError={e => (e.currentTarget.src = '/default-avatar.svg')}
-                />
-              ) : (
-                <div className="w-10 h-10 rounded-full bg-gray-200 dark:bg-gray-600 flex items-center justify-center">
-                  <span className="text-gray-500 dark:text-gray-400 text-sm font-bold">
-                    {player.username.charAt(0).toUpperCase()}
-                  </span>
+  const ModernGainerBar = ({ player, rank, isNewPlayer }: any) => {
+    console.log('[ModernGainerBar] username:', player.username, 'profile_picture:', player.profile_picture);
+    return (
+      <div className={`
+        group relative overflow-hidden rounded-lg border transition-all duration-300 cursor-pointer animate-fade-in
+        ${isNewPlayer 
+          ? 'bg-gradient-to-r from-emerald-500/10 via-cyan-500/5 to-blue-500/10 border-emerald-200/30 hover:border-emerald-300/60 border-l-4 border-l-emerald-500' 
+          : 'bg-gradient-to-r from-green-500/10 via-emerald-500/5 to-teal-500/10 border-green-200/30 hover:border-green-300/60 border-l-4 border-l-green-500'
+        }
+        hover:shadow-lg hover:shadow-green-500/10 hover:scale-[1.01] hover:-translate-y-0.5
+        backdrop-blur-sm
+      `}>
+        {/* Animated Background Pattern */}
+        <div className="absolute inset-0 opacity-5">
+          <div className="absolute top-0 right-0 w-32 h-32 bg-gradient-to-br from-green-400 to-emerald-500 rounded-full blur-3xl"></div>
+          <div className="absolute bottom-0 left-0 w-24 h-24 bg-gradient-to-tr from-cyan-400 to-blue-500 rounded-full blur-2xl"></div>
+        </div>
+        <div className="relative z-10 p-4">
+          <div className="flex items-center justify-between">
+            {/* Left Side - Rank, Avatar, and Username */}
+            <div className="flex items-center space-x-4">
+              {/* Ranking Number (outside the circle) */}
+              <div className="flex flex-col items-center justify-center min-w-[32px]">
+                <span className="text-xl font-extrabold text-gray-700 dark:text-gray-200 drop-shadow-sm">{rank}</span>
+              </div>
+              {/* Profile Picture in colored circle */}
+              <div className="flex-shrink-0 w-12 h-12 rounded-full flex items-center justify-center bg-white border-4 border-green-400 shadow-md">
+                {player.profile_picture ? (
+                  <img
+                    src={player.profile_picture}
+                    alt={`${player.username}'s profile`}
+                    className="w-10 h-10 rounded-full object-cover"
+                    onError={e => (e.currentTarget.src = '/default-avatar.svg')}
+                  />
+                ) : (
+                  <div className="w-10 h-10 rounded-full bg-gray-200 dark:bg-gray-600 flex items-center justify-center">
+                    <span className="text-gray-500 dark:text-gray-400 text-sm font-bold">
+                      {player.username.charAt(0).toUpperCase()}
+                    </span>
+                  </div>
+                )}
+              </div>
+              {/* Username and Rank Transition */}
+              <div className="flex-1 min-w-0">
+                <h3 className="font-bold text-gray-900 dark:text-white text-lg mb-1 group-hover:text-green-600 dark:group-hover:text-green-400 transition-colors truncate">
+                  {player.username}
+                </h3>
+                <div className="text-sm text-gray-600 dark:text-gray-400 leading-relaxed">
+                  {player.getTransitionText ? player.getTransitionText() : getFullRankTransition(player)}
                 </div>
-              )}
-            </div>
-            {/* Username and Rank Transition */}
-            <div className="flex-1 min-w-0">
-              <h3 className="font-bold text-gray-900 dark:text-white text-lg mb-1 group-hover:text-green-600 dark:group-hover:text-green-400 transition-colors truncate">
-                {player.username}
-              </h3>
-              <div className="text-sm text-gray-600 dark:text-gray-400 leading-relaxed">
-                {player.getTransitionText ? player.getTransitionText() : getFullRankTransition(player)}
               </div>
             </div>
-          </div>
-          {/* Right Side - RP Gain and Percentage */}
-          <div className="flex items-center space-x-3 flex-shrink-0">
-            <div className={`
-              px-4 py-2 rounded-full text-sm font-bold shadow-md
-              ${isNewPlayer 
-                ? 'bg-gradient-to-r from-emerald-500 to-cyan-500 text-white' 
-                : 'bg-gradient-to-r from-green-500 to-emerald-500 text-white'
-              }
-            `}>
-              +{player.rp_change.toLocaleString()} RP
-            </div>
-            {/* Percentage or Label */}
-            <div className={`
-              text-xs px-3 py-1.5 rounded-full font-medium
-              ${isNewPlayer 
-                ? 'bg-cyan-100 text-cyan-700 dark:bg-cyan-900/30 dark:text-cyan-400' 
-                : 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400'
-              }
-            `}>
-              {getDisplayPercentage(player)}
-            </div>
-            {/* Trending Arrow */}
-            <div className="text-green-500 group-hover:scale-110 transition-transform">
-              <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
-                <path fillRule="evenodd" d="M5.293 9.707a1 1 0 010-1.414l4-4a1 1 0 011.414 0l4 4a1 1 0 01-1.414 1.414L11 7.414V15a1 1 0 11-2 0V7.414L6.707 9.707a1 1 0 01-1.414 0z" clipRule="evenodd" />
-              </svg>
+            {/* Right Side - RP Gain and Percentage */}
+            <div className="flex items-center space-x-3 flex-shrink-0">
+              <div className={`
+                px-4 py-2 rounded-full text-sm font-bold shadow-md
+                ${isNewPlayer 
+                  ? 'bg-gradient-to-r from-emerald-500 to-cyan-500 text-white' 
+                  : 'bg-gradient-to-r from-green-500 to-emerald-500 text-white'
+                }
+              `}>
+                +{player.rp_change.toLocaleString()} RP
+              </div>
+              {/* Percentage or Label */}
+              <div className={`
+                text-xs px-3 py-1.5 rounded-full font-medium
+                ${isNewPlayer 
+                  ? 'bg-cyan-100 text-cyan-700 dark:bg-cyan-900/30 dark:text-cyan-400' 
+                  : 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400'
+                }
+              `}>
+                {getDisplayPercentage(player)}
+              </div>
+              {/* Trending Arrow */}
+              <div className="text-green-500 group-hover:scale-110 transition-transform">
+                <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
+                  <path fillRule="evenodd" d="M5.293 9.707a1 1 0 010-1.414l4-4a1 1 0 011.414 0l4 4a1 1 0 01-1.414 1.414L11 7.414V15a1 1 0 11-2 0V7.414L6.707 9.707a1 1 0 01-1.414 0z" clipRule="evenodd" />
+                </svg>
+              </div>
             </div>
           </div>
         </div>
       </div>
-    </div>
-  );
+    );
+  };
 
   // --- Modern Loser Bar ---
-  const ModernLoserBar = ({ player, rank }: any) => (
-    <div className="group relative overflow-hidden rounded-lg border transition-all duration-300 cursor-pointer animate-fade-in bg-gradient-to-r from-red-500/10 via-orange-500/5 to-pink-500/10 border-red-200/30 hover:border-red-300/60 hover:shadow-lg hover:shadow-red-500/10 hover:scale-[1.01] hover:-translate-y-0.5 backdrop-blur-sm border-l-4 border-l-red-500">
-      {/* Animated Background Pattern */}
-      <div className="absolute inset-0 opacity-5">
-        <div className="absolute top-0 right-0 w-32 h-32 bg-gradient-to-br from-red-400 to-pink-500 rounded-full blur-3xl"></div>
-        <div className="absolute bottom-0 left-0 w-24 h-24 bg-gradient-to-tr from-orange-400 to-red-500 rounded-full blur-2xl"></div>
-      </div>
-      <div className="relative z-10 p-4">
-        <div className="flex items-center justify-between">
-          {/* Left Side - Rank, Avatar, and Username */}
-          <div className="flex items-center space-x-4">
-            {/* Ranking Number (outside the circle) */}
-            <div className="flex flex-col items-center justify-center min-w-[32px]">
-              <span className="text-xl font-extrabold text-gray-700 dark:text-gray-200 drop-shadow-sm">{rank}</span>
-            </div>
-            {/* Profile Picture in colored circle */}
-            <div className="flex-shrink-0 w-12 h-12 rounded-full flex items-center justify-center bg-white border-4 border-red-400 shadow-md">
-              {player.profile_picture ? (
-                <img
-                  src={player.profile_picture}
-                  alt={`${player.username}'s profile`}
-                  className="w-10 h-10 rounded-full object-cover"
-                  onError={e => (e.currentTarget.src = '/default-avatar.svg')}
-                />
-              ) : (
-                <div className="w-10 h-10 rounded-full bg-gray-200 dark:bg-gray-600 flex items-center justify-center">
-                  <span className="text-gray-500 dark:text-gray-400 text-sm font-bold">
-                    {player.username.charAt(0).toUpperCase()}
-                  </span>
+  const ModernLoserBar = ({ player, rank }: any) => {
+    console.log('[ModernLoserBar] username:', player.username, 'profile_picture:', player.profile_picture);
+    return (
+      <div className="group relative overflow-hidden rounded-lg border transition-all duration-300 cursor-pointer animate-fade-in bg-gradient-to-r from-red-500/10 via-orange-500/5 to-pink-500/10 border-red-200/30 hover:border-red-300/60 hover:shadow-lg hover:shadow-red-500/10 hover:scale-[1.01] hover:-translate-y-0.5 backdrop-blur-sm border-l-4 border-l-red-500">
+        {/* Animated Background Pattern */}
+        <div className="absolute inset-0 opacity-5">
+          <div className="absolute top-0 right-0 w-32 h-32 bg-gradient-to-br from-red-400 to-pink-500 rounded-full blur-3xl"></div>
+          <div className="absolute bottom-0 left-0 w-24 h-24 bg-gradient-to-tr from-orange-400 to-red-500 rounded-full blur-2xl"></div>
+        </div>
+        <div className="relative z-10 p-4">
+          <div className="flex items-center justify-between">
+            {/* Left Side - Rank, Avatar, and Username */}
+            <div className="flex items-center space-x-4">
+              {/* Ranking Number (outside the circle) */}
+              <div className="flex flex-col items-center justify-center min-w-[32px]">
+                <span className="text-xl font-extrabold text-gray-700 dark:text-gray-200 drop-shadow-sm">{rank}</span>
+              </div>
+              {/* Profile Picture in colored circle */}
+              <div className="flex-shrink-0 w-12 h-12 rounded-full flex items-center justify-center bg-white border-4 border-red-400 shadow-md">
+                {player.profile_picture ? (
+                  <img
+                    src={player.profile_picture}
+                    alt={`${player.username}'s profile`}
+                    className="w-10 h-10 rounded-full object-cover"
+                    onError={e => (e.currentTarget.src = '/default-avatar.svg')}
+                  />
+                ) : (
+                  <div className="w-10 h-10 rounded-full bg-gray-200 dark:bg-gray-600 flex items-center justify-center">
+                    <span className="text-gray-500 dark:text-gray-400 text-sm font-bold">
+                      {player.username.charAt(0).toUpperCase()}
+                    </span>
+                  </div>
+                )}
+              </div>
+              {/* Username and Rank Transition */}
+              <div className="flex-1 min-w-0">
+                <h3 className="font-bold text-gray-900 dark:text-white text-lg mb-1 group-hover:text-red-600 dark:group-hover:text-red-400 transition-colors truncate">
+                  {player.username}
+                </h3>
+                <div className="text-sm text-gray-600 dark:text-gray-400 leading-relaxed">
+                  {player.getTransitionText ? player.getTransitionText() : getFullRankTransition(player)}
                 </div>
-              )}
-            </div>
-            {/* Username and Rank Transition */}
-            <div className="flex-1 min-w-0">
-              <h3 className="font-bold text-gray-900 dark:text-white text-lg mb-1 group-hover:text-red-600 dark:group-hover:text-red-400 transition-colors truncate">
-                {player.username}
-              </h3>
-              <div className="text-sm text-gray-600 dark:text-gray-400 leading-relaxed">
-                {player.getTransitionText ? player.getTransitionText() : getFullRankTransition(player)}
               </div>
             </div>
-          </div>
-          {/* Right Side - RP Loss and Percentage */}
-          <div className="flex items-center space-x-3 flex-shrink-0">
-            <div className="px-4 py-2 rounded-full text-sm font-bold shadow-md bg-gradient-to-r from-red-500 to-orange-500 text-white">
-              {player.rp_change.toLocaleString()} RP
-            </div>
-            {/* Percentage or Label */}
-            <div className="text-xs px-3 py-1.5 rounded-full font-medium bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400">
-              {getDisplayPercentage(player)}
-            </div>
-            {/* Trending Arrow */}
-            <div className="text-red-500 group-hover:scale-110 transition-transform">
-              <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
-                <path fillRule="evenodd" d="M14.707 10.293a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 111.414-1.414L9 12.586V5a1 1 0 012 0v7.586l2.293-2.293a1 1 0 011.414 0z" clipRule="evenodd" />
-              </svg>
+            {/* Right Side - RP Loss and Percentage */}
+            <div className="flex items-center space-x-3 flex-shrink-0">
+              <div className="px-4 py-2 rounded-full text-sm font-bold shadow-md bg-gradient-to-r from-red-500 to-orange-500 text-white">
+                {player.rp_change.toLocaleString()} RP
+              </div>
+              {/* Percentage or Label */}
+              <div className="text-xs px-3 py-1.5 rounded-full font-medium bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400">
+                {getDisplayPercentage(player)}
+              </div>
+              {/* Trending Arrow */}
+              <div className="text-red-500 group-hover:scale-110 transition-transform">
+                <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
+                  <path fillRule="evenodd" d="M14.707 10.293a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 111.414-1.414L9 12.586V5a1 1 0 012 0v7.586l2.293-2.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                </svg>
+              </div>
             </div>
           </div>
         </div>
       </div>
-    </div>
-  );
+    );
+  };
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
