@@ -111,25 +111,36 @@ export const useLeaderboard = () => {
       const userIds = entriesWithUserIds.map(e => e.user_id).filter((id): id is number => typeof id === 'number' && !isNaN(id));
       if (userIds.length > 0) {
         // Use Roblox thumbnail proxy for profile pictures
-        const pictureMap = new Map<number, string>();
+        const pictureMap = new Map<number, { imageUrl: string, targetId: number }>();
         await Promise.all(userIds.map(async (userId) => {
           try {
             const response = await fetch(`${ROBLOX_THUMBNAIL_PROXY}?userIds=${userId}&size=150x150&format=Png&isCircular=true`);
             if (response.ok) {
               const data = await response.json();
               const imageUrl = data.data?.[0]?.imageUrl || '/default-avatar.svg';
-              pictureMap.set(userId, imageUrl);
+              const targetId = data.data?.[0]?.targetId || userId;
+              pictureMap.set(userId, { imageUrl, targetId });
             } else {
-              pictureMap.set(userId, '/default-avatar.svg');
+              pictureMap.set(userId, { imageUrl: '/default-avatar.svg', targetId: userId });
             }
           } catch {
-            pictureMap.set(userId, '/default-avatar.svg');
+            pictureMap.set(userId, { imageUrl: '/default-avatar.svg', targetId: userId });
           }
         }));
-        const fullyEnrichedEntries = entriesWithUserIds.map(entry => ({
-          ...entry,
-          profile_picture: (typeof entry.user_id === 'number' && pictureMap.get(entry.user_id)) || '/default-avatar.svg'
-        }));
+        const fullyEnrichedEntries = entriesWithUserIds.map(entry => {
+          if (typeof entry.user_id === 'number' && pictureMap.has(entry.user_id)) {
+            const { imageUrl, targetId } = pictureMap.get(entry.user_id)!;
+            return {
+              ...entry,
+              profile_picture: imageUrl,
+              user_id: targetId // Use the proxy's targetId for profile links
+            };
+          }
+          return {
+            ...entry,
+            profile_picture: '/default-avatar.svg'
+          };
+        });
         setEntriesWithAvatars(fullyEnrichedEntries);
       }
     } catch (err) {

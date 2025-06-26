@@ -90,7 +90,6 @@ class RobloxApiService {
       }
       const data = await response.json();
       const imageUrl = data.data?.[0]?.imageUrl || '/default-avatar.svg';
-      console.log(`Profile picture for user ${userId}:`, imageUrl);
       return imageUrl;
     } catch (error) {
       console.error('Failed to get profile picture:', error);
