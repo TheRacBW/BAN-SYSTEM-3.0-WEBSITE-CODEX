@@ -1,8 +1,7 @@
-import React, { useState, useEffect } from 'react';
+import React from 'react';
 import { Link } from 'react-router-dom';
 import { ExternalLink, TrendingUp, TrendingDown, ArrowUp, ArrowDown } from 'lucide-react';
 import { LeaderboardEntryWithChanges } from '../../types/leaderboard';
-import { robloxApi } from '../../services/robloxApi';
 import { calculateRankFromRPCached, getRankDisplayName, isTierPromotion, isTierDemotion, getRankTierInfo } from '../../utils/rankingSystem';
 import RankBadge from './RankBadge';
 import { Tooltip } from 'react-tooltip';
@@ -16,21 +15,6 @@ const LeaderboardEntryComponent: React.FC<LeaderboardEntryProps> = ({
   entry,
   index
 }) => {
-  const [profilePicture, setProfilePicture] = useState<string | null>(entry.profile_picture || null);
-  const [userId, setUserId] = useState<number | null>(entry.user_id || null);
-
-  // Update state when entry data changes (from batch loading)
-  useEffect(() => {
-    if (entry.user_id && entry.user_id !== userId) {
-      console.log('[LeaderboardEntry] Updating userId for', entry.username, ':', entry.user_id);
-      setUserId(entry.user_id);
-    }
-    if (entry.profile_picture && entry.profile_picture !== profilePicture) {
-      console.log('[LeaderboardEntry] Updating profilePicture for', entry.username, ':', entry.profile_picture);
-      setProfilePicture(entry.profile_picture);
-    }
-  }, [entry.user_id, entry.profile_picture, userId, profilePicture, entry.username]);
-
   // Use calculated rank for badge/progress/sorting only
   const calculatedRank = entry.calculatedRank || calculateRankFromRPCached(entry.rp || 0);
   const rankInfo = calculatedRank ? getRankTierInfo(calculatedRank.tier) : null;
@@ -46,8 +30,8 @@ const LeaderboardEntryComponent: React.FC<LeaderboardEntryProps> = ({
 
   // Roblox profile URL - only return valid URL if we have user ID
   const getRobloxProfileUrl = () => {
-    if (userId) {
-      return `https://www.roblox.com/users/${userId}/profile`;
+    if (entry.user_id) {
+      return `https://www.roblox.com/users/${entry.user_id}/profile`;
     }
     return null; // Return null if no user ID available
   };
@@ -56,8 +40,8 @@ const LeaderboardEntryComponent: React.FC<LeaderboardEntryProps> = ({
   const canOpenProfile = !!profileUrl;
 
   // Profile error fallback
-  const handleProfileError = () => {
-    setProfilePicture('/default-avatar.svg');
+  const handleProfileError = (e: React.SyntheticEvent<HTMLImageElement, Event>) => {
+    e.currentTarget.src = '/default-avatar.svg';
   };
 
   // Animation classes
@@ -114,7 +98,7 @@ const LeaderboardEntryComponent: React.FC<LeaderboardEntryProps> = ({
   const rankTier = entry.rank_title.toLowerCase().split(' ')[0];
 
   // Debug log for render
-  console.log('[LeaderboardEntry] Render', entry.username, 'img src:', profilePicture, 'userId:', userId);
+  console.log('[LeaderboardEntry] Render', entry.username, 'img src:', entry.profile_picture, 'userId:', entry.user_id, 'profileUrl:', profileUrl);
 
   return (
     <div className={`leaderboard-entry relative flex items-center justify-between p-4 bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-750 transition-all duration-300 ease-in-out rounded-xl shadow-sm hover:shadow-lg fade-in-row ${animationClass}`}
@@ -127,20 +111,20 @@ const LeaderboardEntryComponent: React.FC<LeaderboardEntryProps> = ({
         <div className="relative group" tabIndex={0} aria-label={`Roblox profile for ${entry.username}`}
           data-tooltip-id={`profile-tooltip-${entry.username}`}
           data-tooltip-content={`@${entry.username} \n View Roblox Profile`}>
-          {profilePicture ? (
+          {entry.profile_picture ? (
             <img
-              src={profilePicture}
+              src={entry.profile_picture}
               alt={`${entry.username}'s profile`}
               className="w-12 h-12 rounded-full border-2 border-gray-200 dark:border-gray-600 object-cover transition-all duration-200 group-hover:shadow-lg group-hover:border-blue-400 group-hover:ring-2 group-hover:ring-blue-200"
               onError={handleProfileError}
               loading="lazy"
-              style={{ boxShadow: userId ? '0 0 0 2px #3b82f6' : undefined }}
+              style={{ boxShadow: entry.user_id ? '0 0 0 2px #3b82f6' : undefined }}
             />
           ) : (
             <div className="avatar-shimmer w-12 h-12 rounded-full bg-gray-200 dark:bg-gray-700 animate-shimmer" />
           )}
           {/* Roblox logo overlay for verified users */}
-          {userId && (
+          {entry.user_id && (
             <div className="absolute bottom-0 right-0 w-5 h-5 rounded-full bg-white border border-gray-300 shadow flex items-center justify-center" style={{ transform: 'translate(30%, 30%)' }}>
               <svg className="w-3 h-3" viewBox="0 0 24 24" fill="currentColor">
                 <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/>

@@ -87,12 +87,12 @@ export const useLeaderboard = () => {
       setIsInitialLoading(false);
       setIsLoading(false);
 
-      // Step 2: Batch load user IDs using new Edge Function
+      // Step 2: Batch load user IDs and cached avatars using bright-function
       const usernames = coreWithChanges.map(entry => entry.username);
       const lookupResults = await lookupRobloxUserIds(usernames);
       console.log('[Leaderboard] Username lookup results (bright-function):', lookupResults);
-      // Build a mapping from username (case-insensitive) to user_id
-      const userIdMap = new Map<string, number | null>();
+      // Build a mapping from username (case-insensitive) to { user_id, profile_picture_url }
+      const userIdMap = new Map<string, { user_id: number | null, profile_picture_url: string | null }>();
       lookupResults.forEach(result => {
         let userId: number | null = null;
         if (typeof result.user_id === 'number') {
@@ -100,67 +100,79 @@ export const useLeaderboard = () => {
         } else if (typeof result.user_id === 'string' && !isNaN(Number(result.user_id))) {
           userId = Number(result.user_id);
         }
-        // Use lowercase for robust matching
-        userIdMap.set(result.username.toLowerCase(), userId);
+        // Accept profile_picture_url if present
+        const profile_picture_url = (result as any).profile_picture_url ?? null;
+        const key = result.username.toLowerCase();
+        console.log('[Leaderboard] Mapping username:', result.username, '→', key, 'user_id:', userId, 'profile_picture_url:', profile_picture_url);
+        userIdMap.set(key, { user_id: userId, profile_picture_url });
       });
       console.log('[Leaderboard] Built userIdMap:', userIdMap);
 
-      // Step 3: Update entries with user IDs immediately (case-insensitive match)
+      // Step 3: Update entries with user IDs and cached avatars (case-insensitive match)
       const entriesWithUserIds = coreWithChanges.map(entry => {
-        const mappedUserId = userIdMap.get(entry.username.toLowerCase());
+        const key = entry.username.toLowerCase();
+        const mapped = userIdMap.get(key);
+        if (!mapped) {
+          console.warn('[Leaderboard] No mapping found for username:', entry.username, 'key:', key);
+        }
         return {
           ...entry,
-          user_id: mappedUserId ?? entry.user_id ?? null
+          user_id: mapped?.user_id ?? entry.user_id ?? null,
+          profile_picture: mapped?.profile_picture_url ?? null
         };
       });
       console.log('[Leaderboard] entriesWithUserIds:', entriesWithUserIds);
       setEntriesWithAvatars(entriesWithUserIds);
 
-      // Step 4: Load profile pictures in background (non-blocking)
-      const userIds = entriesWithUserIds.map(e => e.user_id).filter((id): id is number => typeof id === 'number' && !isNaN(id));
-      if (userIds.length > 0) {
-        // Use Roblox thumbnail proxy for profile pictures
+      // Step 4: Load/fallback avatars for missing or failed images
+      const entriesNeedingProxy = entriesWithUserIds.filter(e => !e.profile_picture || e.profile_picture === '' || e.profile_picture === null);
+      if (entriesNeedingProxy.length > 0) {
+        console.log('[Avatar Proxy] Fetching avatars for uncached/missing:', entriesNeedingProxy.map(e => e.username));
         const pictureMap = new Map<number, { imageUrl: string, targetId: number }>();
-        await Promise.all(userIds.map(async (userId) => {
+        await Promise.all(entriesNeedingProxy.map(async (entry) => {
+          if (typeof entry.user_id !== 'number' || isNaN(entry.user_id)) return;
           try {
-            const url = `${ROBLOX_THUMBNAIL_PROXY}?userIds=${userId}&size=150x150&format=Png&isCircular=true`;
-            console.log('[Avatar Proxy] Fetching avatar for userId:', userId, 'URL:', url);
+            const url = `${ROBLOX_THUMBNAIL_PROXY}?userIds=${entry.user_id}&size=150x150&format=Png&isCircular=true`;
+            console.log('[Avatar Proxy] Fetching avatar for userId:', entry.user_id, 'URL:', url);
             const response = await fetch(url);
             const raw = await response.clone().text();
             if (response.ok) {
               const data = await response.json();
-              console.log('[Avatar Proxy] Response for userId', userId, ':', data);
+              console.log('[Avatar Proxy] Response for userId', entry.user_id, ':', data);
               const imageUrl = data.data?.[0]?.imageUrl || '/default-avatar.svg';
-              const targetId = data.data?.[0]?.targetId || userId;
+              const targetId = data.data?.[0]?.targetId || entry.user_id;
               console.log('[Avatar Proxy] Extracted imageUrl:', imageUrl, 'targetId:', targetId);
-              pictureMap.set(userId, { imageUrl, targetId });
+              pictureMap.set(entry.user_id, { imageUrl, targetId });
             } else {
-              console.warn('[Avatar Proxy] Non-OK response for userId', userId, ':', raw);
-              pictureMap.set(userId, { imageUrl: '/default-avatar.svg', targetId: userId });
+              console.warn('[Avatar Proxy] Non-OK response for userId', entry.user_id, ':', raw);
+              pictureMap.set(entry.user_id, { imageUrl: '/default-avatar.svg', targetId: entry.user_id });
             }
           } catch (err) {
-            console.error('[Avatar Proxy] Error fetching avatar for userId', userId, ':', err);
-            pictureMap.set(userId, { imageUrl: '/default-avatar.svg', targetId: userId });
+            console.error('[Avatar Proxy] Error fetching avatar for userId', entry.user_id, ':', err);
+            pictureMap.set(entry.user_id, { imageUrl: '/default-avatar.svg', targetId: entry.user_id });
           }
         }));
         const fullyEnrichedEntries = entriesWithUserIds.map(entry => {
-          if (typeof entry.user_id === 'number' && pictureMap.has(entry.user_id)) {
-            const { imageUrl, targetId } = pictureMap.get(entry.user_id)!;
-            console.log('[Avatar Proxy] Setting img src for', entry.username, ':', imageUrl, 'and user_id:', targetId);
+          if (!entry.profile_picture || entry.profile_picture === '' || entry.profile_picture === null) {
+            if (typeof entry.user_id === 'number' && pictureMap.has(entry.user_id)) {
+              const { imageUrl, targetId } = pictureMap.get(entry.user_id)!;
+              console.log('[Avatar Proxy] Setting fallback img src for', entry.username, ':', imageUrl, 'and user_id:', targetId);
+              return {
+                ...entry,
+                profile_picture: imageUrl,
+                user_id: targetId // Use the proxy's targetId for profile links
+              };
+            }
             return {
               ...entry,
-              profile_picture: imageUrl,
-              user_id: targetId // Use the proxy's targetId for profile links
+              profile_picture: '/default-avatar.svg'
             };
           }
-          return {
-            ...entry,
-            profile_picture: '/default-avatar.svg'
-          };
+          return entry;
         });
         setEntriesWithAvatars(fullyEnrichedEntries);
       } else {
-        console.warn('[Avatar Proxy] No userIds to fetch avatars for.');
+        console.log('[Avatar Proxy] All avatars loaded from cache, no proxy calls needed.');
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to fetch leaderboard data');
