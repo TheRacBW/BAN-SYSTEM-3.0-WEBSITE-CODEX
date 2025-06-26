@@ -1,5 +1,7 @@
 import { RobloxUser, RobloxThumbnail } from '../types/leaderboard';
 
+const ROBLOX_THUMBNAIL_PROXY = 'https://theracsproxy.theraccoonmolester.workers.dev/v1/users/avatar-headshot';
+
 class RobloxApiService {
   private cache = new Map<string, { user: RobloxUser; timestamp: number }>();
   private thumbnailCache = new Map<number, { thumbnail: RobloxThumbnail; timestamp: number }>();
@@ -81,17 +83,13 @@ class RobloxApiService {
   async getRobloxProfilePicture(userId: number): Promise<string> {
     try {
       console.log('Fetching profile picture for user ID:', userId);
-      
-      const response = await fetch(`https://thumbnails.roblox.com/v1/users/avatar-headshot?userIds=${userId}&size=150x150&format=Png&isCircular=true`);
-      
+      const response = await fetch(`${ROBLOX_THUMBNAIL_PROXY}?userIds=${userId}&size=150x150&format=Png&isCircular=true`);
       if (!response.ok) {
         console.warn(`Failed to get profile picture for user ${userId}:`, response.status);
         return '/default-avatar.svg';
       }
-      
       const data = await response.json();
       const imageUrl = data.data?.[0]?.imageUrl || '/default-avatar.svg';
-      
       console.log(`Profile picture for user ${userId}:`, imageUrl);
       return imageUrl;
     } catch (error) {
@@ -253,7 +251,7 @@ class RobloxApiService {
     for (const batch of batches) {
       try {
         const idsParam = batch.join(',');
-        const response = await fetch(`https://thumbnails.roblox.com/v1/users/avatar-headshot?userIds=${idsParam}&size=150x150&format=Png&isCircular=true`);
+        const response = await fetch(`${ROBLOX_THUMBNAIL_PROXY}?userIds=${idsParam}&size=150x150&format=Png&isCircular=true`);
         const data = await response.json();
         data.data?.forEach((thumb: any) => {
           pictureMap.set(thumb.targetId, thumb.imageUrl || '/default-avatar.svg');

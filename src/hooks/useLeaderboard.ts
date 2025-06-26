@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { leaderboardService } from '../services/leaderboardService';
-import { robloxApi } from '../services/robloxApi';
+// import { robloxApi } from '../services/robloxApi'; // No longer needed for user ID lookup
+import { lookupRobloxUserIds } from '../lib/robloxUserLookup';
 import {
   LeaderboardEntryWithChanges,
   RPChangeWithTimeRange,
@@ -11,6 +12,7 @@ import {
 import { supabase } from '../lib/supabase';
 
 const DEFAULT_TIME_RANGE: TimeRange = '12h';
+const ROBLOX_THUMBNAIL_PROXY = 'https://theracsproxy.theraccoonmolester.workers.dev/v1/users/avatar-headshot';
 
 console.log('🔄 useLeaderboard HOOK LOADED');
 
@@ -84,30 +86,51 @@ export const useLeaderboard = () => {
       setIsInitialLoading(false);
       setIsLoading(false);
 
-      // Step 2: Batch load user IDs first (for clickable usernames)
+      // Step 2: Batch load user IDs using new Edge Function
       const usernames = coreWithChanges.map(entry => entry.username);
-      const userIdMap = await robloxApi.getUserIdsBatch(usernames);
-      
+      const lookupResults = await lookupRobloxUserIds(usernames);
+      const userIdMap = new Map<string, number | null>();
+      lookupResults.forEach(result => {
+        let userId: number | null = null;
+        if (typeof result.user_id === 'number') {
+          userId = result.user_id;
+        } else if (typeof result.user_id === 'string' && !isNaN(Number(result.user_id))) {
+          userId = Number(result.user_id);
+        }
+        userIdMap.set(result.username, userId);
+      });
+
       // Step 3: Update entries with user IDs immediately
       const entriesWithUserIds = coreWithChanges.map(entry => ({
         ...entry,
-        user_id: userIdMap.get(entry.username) || entry.user_id || null
+        user_id: userIdMap.get(entry.username) ?? entry.user_id ?? null
       }));
       setEntriesWithAvatars(entriesWithUserIds);
 
       // Step 4: Load profile pictures in background (non-blocking)
-      const userIds = Array.from(userIdMap.values()).filter(Boolean);
+      const userIds = entriesWithUserIds.map(e => e.user_id).filter((id): id is number => typeof id === 'number' && !isNaN(id));
       if (userIds.length > 0) {
-        robloxApi.getProfilePicturesBatch(userIds).then((pictureMap) => {
-          const fullyEnrichedEntries = entriesWithUserIds.map(entry => ({
-            ...entry,
-            profile_picture: entry.user_id ? pictureMap.get(entry.user_id) || '/default-avatar.svg' : '/default-avatar.svg'
-          }));
-          setEntriesWithAvatars(fullyEnrichedEntries);
-        }).catch((error) => {
-          console.error('Failed to load profile pictures:', error);
-          // Keep showing entries with user IDs even if profile pictures fail
-        });
+        // Use Roblox thumbnail proxy for profile pictures
+        const pictureMap = new Map<number, string>();
+        await Promise.all(userIds.map(async (userId) => {
+          try {
+            const response = await fetch(`${ROBLOX_THUMBNAIL_PROXY}?userIds=${userId}&size=150x150&format=Png&isCircular=true`);
+            if (response.ok) {
+              const data = await response.json();
+              const imageUrl = data.data?.[0]?.imageUrl || '/default-avatar.svg';
+              pictureMap.set(userId, imageUrl);
+            } else {
+              pictureMap.set(userId, '/default-avatar.svg');
+            }
+          } catch {
+            pictureMap.set(userId, '/default-avatar.svg');
+          }
+        }));
+        const fullyEnrichedEntries = entriesWithUserIds.map(entry => ({
+          ...entry,
+          profile_picture: (typeof entry.user_id === 'number' && pictureMap.get(entry.user_id)) || '/default-avatar.svg'
+        }));
+        setEntriesWithAvatars(fullyEnrichedEntries);
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to fetch leaderboard data');
