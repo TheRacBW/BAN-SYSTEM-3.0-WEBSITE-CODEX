@@ -22,12 +22,14 @@ const LeaderboardEntryComponent: React.FC<LeaderboardEntryProps> = ({
   // Update state when entry data changes (from batch loading)
   useEffect(() => {
     if (entry.user_id && entry.user_id !== userId) {
+      console.log('[LeaderboardEntry] Updating userId for', entry.username, ':', entry.user_id);
       setUserId(entry.user_id);
     }
     if (entry.profile_picture && entry.profile_picture !== profilePicture) {
+      console.log('[LeaderboardEntry] Updating profilePicture for', entry.username, ':', entry.profile_picture);
       setProfilePicture(entry.profile_picture);
     }
-  }, [entry.user_id, entry.profile_picture, userId, profilePicture]);
+  }, [entry.user_id, entry.profile_picture, userId, profilePicture, entry.username]);
 
   // Use calculated rank for badge/progress/sorting only
   const calculatedRank = entry.calculatedRank || calculateRankFromRPCached(entry.rp || 0);
@@ -110,6 +112,9 @@ const LeaderboardEntryComponent: React.FC<LeaderboardEntryProps> = ({
   };
 
   const rankTier = entry.rank_title.toLowerCase().split(' ')[0];
+
+  // Debug log for render
+  console.log('[LeaderboardEntry] Render', entry.username, 'img src:', profilePicture, 'userId:', userId);
 
   return (
     <div className={`leaderboard-entry relative flex items-center justify-between p-4 bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-750 transition-all duration-300 ease-in-out rounded-xl shadow-sm hover:shadow-lg fade-in-row ${animationClass}`}

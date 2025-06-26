@@ -80,6 +80,7 @@ export const useLeaderboard = () => {
     try {
       // Step 1: Fetch core leaderboard data (fast)
       const coreEntries = await leaderboardService.fetchLeaderboardData();
+      console.log('[Leaderboard] Raw leaderboard data:', coreEntries);
       const coreWithChanges = coreEntries.map(toWithChanges);
       setEntries(coreWithChanges);
       setEntriesWithAvatars(coreWithChanges); // Show immediately
@@ -89,6 +90,7 @@ export const useLeaderboard = () => {
       // Step 2: Batch load user IDs using new Edge Function
       const usernames = coreWithChanges.map(entry => entry.username);
       const lookupResults = await lookupRobloxUserIds(usernames);
+      console.log('[Leaderboard] Username lookup results:', lookupResults);
       const userIdMap = new Map<string, number | null>();
       lookupResults.forEach(result => {
         let userId: number | null = null;
@@ -114,22 +116,30 @@ export const useLeaderboard = () => {
         const pictureMap = new Map<number, { imageUrl: string, targetId: number }>();
         await Promise.all(userIds.map(async (userId) => {
           try {
-            const response = await fetch(`${ROBLOX_THUMBNAIL_PROXY}?userIds=${userId}&size=150x150&format=Png&isCircular=true`);
+            const url = `${ROBLOX_THUMBNAIL_PROXY}?userIds=${userId}&size=150x150&format=Png&isCircular=true`;
+            console.log('[Avatar Proxy] Fetching avatar for userId:', userId, 'URL:', url);
+            const response = await fetch(url);
+            const raw = await response.clone().text();
             if (response.ok) {
               const data = await response.json();
+              console.log('[Avatar Proxy] Response for userId', userId, ':', data);
               const imageUrl = data.data?.[0]?.imageUrl || '/default-avatar.svg';
               const targetId = data.data?.[0]?.targetId || userId;
+              console.log('[Avatar Proxy] Extracted imageUrl:', imageUrl, 'targetId:', targetId);
               pictureMap.set(userId, { imageUrl, targetId });
             } else {
+              console.warn('[Avatar Proxy] Non-OK response for userId', userId, ':', raw);
               pictureMap.set(userId, { imageUrl: '/default-avatar.svg', targetId: userId });
             }
-          } catch {
+          } catch (err) {
+            console.error('[Avatar Proxy] Error fetching avatar for userId', userId, ':', err);
             pictureMap.set(userId, { imageUrl: '/default-avatar.svg', targetId: userId });
           }
         }));
         const fullyEnrichedEntries = entriesWithUserIds.map(entry => {
           if (typeof entry.user_id === 'number' && pictureMap.has(entry.user_id)) {
             const { imageUrl, targetId } = pictureMap.get(entry.user_id)!;
+            console.log('[Avatar Proxy] Setting img src for', entry.username, ':', imageUrl, 'and user_id:', targetId);
             return {
               ...entry,
               profile_picture: imageUrl,
@@ -142,6 +152,8 @@ export const useLeaderboard = () => {
           };
         });
         setEntriesWithAvatars(fullyEnrichedEntries);
+      } else {
+        console.warn('[Avatar Proxy] No userIds to fetch avatars for.');
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to fetch leaderboard data');
