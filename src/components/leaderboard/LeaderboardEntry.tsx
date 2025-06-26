@@ -123,14 +123,6 @@ const LeaderboardEntryComponent: React.FC<LeaderboardEntryProps> = ({
           ) : (
             <div className="avatar-shimmer w-12 h-12 rounded-full bg-gray-200 dark:bg-gray-700 animate-shimmer" />
           )}
-          {/* Roblox logo overlay for verified users */}
-          {entry.user_id && (
-            <div className="absolute bottom-0 right-0 w-5 h-5 rounded-full bg-white border border-gray-300 shadow flex items-center justify-center" style={{ transform: 'translate(30%, 30%)' }}>
-              <svg className="w-3 h-3" viewBox="0 0 24 24" fill="currentColor">
-                <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/>
-              </svg>
-            </div>
-          )}
           <Tooltip id={`profile-tooltip-${entry.username}`} place="top" />
         </div>
         {/* Username and Rank */}
