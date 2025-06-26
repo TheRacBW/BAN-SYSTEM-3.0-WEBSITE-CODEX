@@ -702,7 +702,10 @@ const LeaderboardPage: React.FC = () => {
                             ? 'bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 shadow-sm' 
                             : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100'
                         }`}
-                        onClick={() => activeTab === 'gainers' ? setGainersTimeRange(opt as any) : setLosersTimeRange(opt as any)}
+                        onClick={() => {
+                          console.log('🕐 TIME RANGE CHANGE:', activeTab, 'from', activeTab === 'gainers' ? gainersTimeRange : losersTimeRange, 'to', opt);
+                          activeTab === 'gainers' ? setGainersTimeRange(opt as any) : setLosersTimeRange(opt as any);
+                        }}
                       >
                         {opt}
                       </button>
@@ -728,8 +731,15 @@ const LeaderboardPage: React.FC = () => {
                 ) : (
                   (() => {
                     const data = activeTab === 'gainers' ? enrichedGainers : enrichedLosers;
+                    const currentTimeRange = activeTab === 'gainers' ? gainersTimeRange : losersTimeRange;
+                    console.log('📊 DISPLAYING DATA:', {
+                      activeTab,
+                      currentTimeRange,
+                      dataLength: data?.length || 0,
+                      data: data?.slice(0, 3) // Show first 3 items for debugging
+                    });
                     if (!data || data.length === 0) {
-                      const requested = (activeTab === 'gainers' ? gainersTimeRange : losersTimeRange);
+                      const requested = currentTimeRange;
                       const requestedHours = requested === '6h' ? 6 : requested === '12h' ? 12 : requested === '1d' ? 24 : 48;
                       return (
                         <div className="text-center py-16">
@@ -763,7 +773,7 @@ const LeaderboardPage: React.FC = () => {
                     if (oldest) {
                       const now = new Date();
                       const hours = Math.round((now.getTime() - oldest.getTime()) / (1000 * 60 * 60));
-                      const requested = (activeTab === 'gainers' ? gainersTimeRange : losersTimeRange);
+                      const requested = currentTimeRange;
                       const requestedHours = requested === '6h' ? 6 : requested === '12h' ? 12 : requested === '1d' ? 24 : 48;
                       if (hours < requestedHours) {
                         periodMsg = `Partial data: Only last ${hours} hours available for this period.`;

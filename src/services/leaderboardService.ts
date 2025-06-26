@@ -407,29 +407,60 @@ class LeaderboardService {
   async getRPGainers(timeRange: string): Promise<any[]> {
     const hoursBack = timeRange === '6h' ? 6 : timeRange === '12h' ? 12 : timeRange === '1d' ? 24 : 48;
     const since = new Date(Date.now() - hoursBack * 60 * 60 * 1000).toISOString();
-    const { data, error } = await supabase
+    
+    console.log('🔍 GAINERS QUERY PARAMS:', {
+      timeRange,
+      hoursBack,
+      since,
+      currentTime: new Date().toISOString(),
+      timeDiff: Date.now() - hoursBack * 60 * 60 * 1000
+    });
+
+    // Try rp_changes_optimized first
+    const { data: optimizedData, error: optimizedError } = await supabase
       .from('rp_changes_optimized')
       .select('*')
       .gt('rp_change', 0)
       .gte('change_timestamp', since)
       .order('rp_change', { ascending: false });
-    console.log('🔍 QUERY DEBUG (GAINERS):', {
-      timeRange,
-      hoursBack,
-      since,
-      query: {
-        table: 'rp_changes_optimized',
-        rp_change: '> 0',
-        change_timestamp: `>= ${since}`
-      },
-      rawResult: data,
-      error
+
+    console.log('🔍 OPTIMIZED TABLE RESULT:', {
+      dataCount: optimizedData?.length || 0,
+      error: optimizedError,
+      sampleData: optimizedData?.slice(0, 2)
     });
-    if (error) {
-      console.error('❌ Error fetching gainers from rp_changes_optimized:', error);
+
+    if (optimizedError) {
+      console.error('❌ Error with rp_changes_optimized:', optimizedError);
+    }
+
+    // If optimized table has data, use it
+    if (optimizedData && optimizedData.length > 0) {
+      console.log('✅ Using rp_changes_optimized data');
+      return optimizedData;
+    }
+
+    // Fallback to regular rp_changes table
+    console.log('🔄 Falling back to rp_changes table');
+    const { data: fallbackData, error: fallbackError } = await supabase
+      .from('rp_changes')
+      .select('*')
+      .gt('rp_change', 0)
+      .gte('change_timestamp', since)
+      .order('rp_change', { ascending: false });
+
+    console.log('🔍 FALLBACK TABLE RESULT:', {
+      dataCount: fallbackData?.length || 0,
+      error: fallbackError,
+      sampleData: fallbackData?.slice(0, 2)
+    });
+
+    if (fallbackError) {
+      console.error('❌ Error with fallback rp_changes:', fallbackError);
       return [];
     }
-    return data || [];
+
+    return fallbackData || [];
   }
 
   /**
@@ -438,29 +469,60 @@ class LeaderboardService {
   async getRPLosers(timeRange: string): Promise<any[]> {
     const hoursBack = timeRange === '6h' ? 6 : timeRange === '12h' ? 12 : timeRange === '1d' ? 24 : 48;
     const since = new Date(Date.now() - hoursBack * 60 * 60 * 1000).toISOString();
-    const { data, error } = await supabase
+    
+    console.log('🔍 LOSERS QUERY PARAMS:', {
+      timeRange,
+      hoursBack,
+      since,
+      currentTime: new Date().toISOString(),
+      timeDiff: Date.now() - hoursBack * 60 * 60 * 1000
+    });
+
+    // Try rp_changes_optimized first
+    const { data: optimizedData, error: optimizedError } = await supabase
       .from('rp_changes_optimized')
       .select('*')
       .lt('rp_change', 0)
       .gte('change_timestamp', since)
       .order('rp_change', { ascending: true });
-    console.log('🔍 QUERY DEBUG (LOSERS):', {
-      timeRange,
-      hoursBack,
-      since,
-      query: {
-        table: 'rp_changes_optimized',
-        rp_change: '< 0',
-        change_timestamp: `>= ${since}`
-      },
-      rawResult: data,
-      error
+
+    console.log('🔍 OPTIMIZED TABLE RESULT:', {
+      dataCount: optimizedData?.length || 0,
+      error: optimizedError,
+      sampleData: optimizedData?.slice(0, 2)
     });
-    if (error) {
-      console.error('❌ Error fetching losers from rp_changes_optimized:', error);
+
+    if (optimizedError) {
+      console.error('❌ Error with rp_changes_optimized:', optimizedError);
+    }
+
+    // If optimized table has data, use it
+    if (optimizedData && optimizedData.length > 0) {
+      console.log('✅ Using rp_changes_optimized data');
+      return optimizedData;
+    }
+
+    // Fallback to regular rp_changes table
+    console.log('🔄 Falling back to rp_changes table');
+    const { data: fallbackData, error: fallbackError } = await supabase
+      .from('rp_changes')
+      .select('*')
+      .lt('rp_change', 0)
+      .gte('change_timestamp', since)
+      .order('rp_change', { ascending: true });
+
+    console.log('🔍 FALLBACK TABLE RESULT:', {
+      dataCount: fallbackData?.length || 0,
+      error: fallbackError,
+      sampleData: fallbackData?.slice(0, 2)
+    });
+
+    if (fallbackError) {
+      console.error('❌ Error with fallback rp_changes:', fallbackError);
       return [];
     }
-    return data || [];
+
+    return fallbackData || [];
   }
 
   /**
