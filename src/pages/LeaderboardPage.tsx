@@ -427,7 +427,7 @@ const LeaderboardPage: React.FC = () => {
                 <span className="text-xl font-extrabold text-gray-700 dark:text-gray-200 drop-shadow-sm">{rank}</span>
               </div>
               {/* Profile Picture in colored circle */}
-              <div className="flex-shrink-0 w-12 h-12 rounded-full flex items-center justify-center bg-white border-4 border-green-400 shadow-md">
+              <div className="flex-shrink-0 w-12 h-12 rounded-full flex items-center justify-center bg-transparent border-4 border-green-400 shadow-md">
                 {player.profile_picture ? (
                   <img
                     src={player.profile_picture}
@@ -506,7 +506,7 @@ const LeaderboardPage: React.FC = () => {
                 <span className="text-xl font-extrabold text-gray-700 dark:text-gray-200 drop-shadow-sm">{rank}</span>
               </div>
               {/* Profile Picture in colored circle */}
-              <div className="flex-shrink-0 w-12 h-12 rounded-full flex items-center justify-center bg-white border-4 border-red-400 shadow-md">
+              <div className="flex-shrink-0 w-12 h-12 rounded-full flex items-center justify-center bg-transparent border-4 border-red-400 shadow-md">
                 {player.profile_picture ? (
                   <img
                     src={player.profile_picture}
