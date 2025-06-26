@@ -84,10 +84,31 @@ export const useLeaderboard = () => {
       setIsInitialLoading(false);
       setIsLoading(false);
 
-      // Step 2: Enrich avatars in background (batch, non-blocking)
-      robloxApi.enrichLeaderboardEntries(coreWithChanges).then((enrichedEntries) => {
-        setEntriesWithAvatars(enrichedEntries);
-      });
+      // Step 2: Batch load user IDs first (for clickable usernames)
+      const usernames = coreWithChanges.map(entry => entry.username);
+      const userIdMap = await robloxApi.getUserIdsBatch(usernames);
+      
+      // Step 3: Update entries with user IDs immediately
+      const entriesWithUserIds = coreWithChanges.map(entry => ({
+        ...entry,
+        user_id: userIdMap.get(entry.username) || entry.user_id || null
+      }));
+      setEntriesWithAvatars(entriesWithUserIds);
+
+      // Step 4: Load profile pictures in background (non-blocking)
+      const userIds = Array.from(userIdMap.values()).filter(Boolean);
+      if (userIds.length > 0) {
+        robloxApi.getProfilePicturesBatch(userIds).then((pictureMap) => {
+          const fullyEnrichedEntries = entriesWithUserIds.map(entry => ({
+            ...entry,
+            profile_picture: entry.user_id ? pictureMap.get(entry.user_id) || '/default-avatar.svg' : '/default-avatar.svg'
+          }));
+          setEntriesWithAvatars(fullyEnrichedEntries);
+        }).catch((error) => {
+          console.error('Failed to load profile pictures:', error);
+          // Keep showing entries with user IDs even if profile pictures fail
+        });
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to fetch leaderboard data');
       setIsLoading(false);

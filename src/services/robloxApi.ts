@@ -58,26 +58,19 @@ class RobloxApiService {
   }
 
   /**
-   * Get Roblox user ID from username
+   * Get Roblox user ID from username (now via Supabase Edge Function)
    */
   async getRobloxUserId(username: string): Promise<number | null> {
     try {
-      console.log('Fetching Roblox user ID for:', username);
-      const response = await fetch(`https://users.roblox.com/v1/usernames/users`, {
+      const response = await fetch('https://dhmenivfjwbywdutchdz.supabase.co/functions/v1/get-roblox-user-id', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ usernames: [username] })
+        body: JSON.stringify({ username })
       });
-      if (!response.ok) {
-        console.warn(`Failed to get Roblox user ID for ${username}:`, response.status);
-        return null;
-      }
       const data = await response.json();
-      const userId = data.data?.[0]?.id || null;
-      console.log(`Roblox user ID for ${username}:`, userId);
-      return userId;
+      return data.user_id || null;
     } catch (error) {
-      console.error('Failed to get Roblox user ID:', error);
+      console.error('Failed to get Roblox user ID from Supabase Edge Function:', error);
       return null;
     }
   }
@@ -93,17 +86,17 @@ class RobloxApiService {
       
       if (!response.ok) {
         console.warn(`Failed to get profile picture for user ${userId}:`, response.status);
-        return '/default-avatar.png';
+        return '/default-avatar.svg';
       }
       
       const data = await response.json();
-      const imageUrl = data.data?.[0]?.imageUrl || '/default-avatar.png';
+      const imageUrl = data.data?.[0]?.imageUrl || '/default-avatar.svg';
       
       console.log(`Profile picture for user ${userId}:`, imageUrl);
       return imageUrl;
     } catch (error) {
       console.error('Failed to get profile picture:', error);
-      return '/default-avatar.png';
+      return '/default-avatar.svg';
     }
   }
 
@@ -138,18 +131,18 @@ class RobloxApiService {
   }
 
   /**
-   * Get profile picture for a user by username
+   * Get profile picture for a user by username (uses Supabase Edge Function for user ID)
    */
   async getProfilePictureByUsername(username: string): Promise<string> {
     try {
       const userId = await this.getRobloxUserId(username);
       if (!userId) {
-        return '/default-avatar.png';
+        return '/default-avatar.svg';
       }
       return await this.getRobloxProfilePicture(userId);
     } catch (error) {
       console.error('Failed to get profile picture by username:', error);
-      return '/default-avatar.png';
+      return '/default-avatar.svg';
     }
   }
 
@@ -186,7 +179,7 @@ class RobloxApiService {
   }
 
   /**
-   * Batch get Roblox user IDs from usernames
+   * Batch get Roblox user IDs from usernames (via Supabase Edge Function batch endpoint)
    */
   async getUserIdsBatch(usernames: string[]): Promise<Map<string, number>> {
     const now = Date.now();
@@ -202,26 +195,33 @@ class RobloxApiService {
       }
     }
     // Batch fetch only missing
-    const batches = [];
-    const batchSize = 10;
-    for (let i = 0; i < toFetch.length; i += batchSize) {
-      batches.push(toFetch.slice(i, i + batchSize));
-    }
-    for (const batch of batches) {
+    if (toFetch.length > 0) {
       try {
-        const response = await fetch(`https://users.roblox.com/v1/usernames/users`, {
+        // Call Supabase Edge Function batch endpoint
+        const response = await fetch('https://dhmenivfjwbywdutchdz.supabase.co/functions/v1/get-roblox-user-id-batch', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ usernames: batch, excludeBannedUsers: true })
+          body: JSON.stringify({ usernames: toFetch })
         });
         const data = await response.json();
-        data.data?.forEach((user: any) => {
-          userIdMap.set(user.name, user.id);
-          this.userIdBatchCache.set(user.name, { id: user.id, timestamp: now });
-        });
-        await new Promise(resolve => setTimeout(resolve, 100));
+        if (data.results && Array.isArray(data.results)) {
+          data.results.forEach((result: { username: string, user_id: number }) => {
+            if (result.user_id) {
+              userIdMap.set(result.username, result.user_id);
+              this.userIdBatchCache.set(result.username, { id: result.user_id, timestamp: now });
+            }
+          });
+        }
       } catch (error) {
         console.error('Batch user ID fetch failed:', error);
+        // Fallback: do single lookups for each username
+        for (const name of toFetch) {
+          const userId = await this.getRobloxUserId(name);
+          if (userId) {
+            userIdMap.set(name, userId);
+            this.userIdBatchCache.set(name, { id: userId, timestamp: now });
+          }
+        }
       }
     }
     this.savePersistentCache();
@@ -256,8 +256,8 @@ class RobloxApiService {
         const response = await fetch(`https://thumbnails.roblox.com/v1/users/avatar-headshot?userIds=${idsParam}&size=150x150&format=Png&isCircular=true`);
         const data = await response.json();
         data.data?.forEach((thumb: any) => {
-          pictureMap.set(thumb.targetId, thumb.imageUrl || '/default-avatar.png');
-          this.profilePicBatchCache.set(thumb.targetId, { url: thumb.imageUrl || '/default-avatar.png', timestamp: now });
+          pictureMap.set(thumb.targetId, thumb.imageUrl || '/default-avatar.svg');
+          this.profilePicBatchCache.set(thumb.targetId, { url: thumb.imageUrl || '/default-avatar.svg', timestamp: now });
         });
         await new Promise(resolve => setTimeout(resolve, 100));
       } catch (error) {
@@ -283,11 +283,11 @@ class RobloxApiService {
     return entries.map((entry: any) => {
       const cleanName = entry.username;
       const userId = userIdMap.get(cleanName);
-      const profile_picture = userId ? pictureMap.get(userId) || '/default-avatar.png' : '/default-avatar.png';
+      const profile_picture = userId ? pictureMap.get(userId) || '/default-avatar.svg' : '/default-avatar.svg';
       return {
         ...entry,
         user_id: userId || entry.user_id || null,
-        profile_picture: profile_picture || entry.profile_picture || '/default-avatar.png'
+        profile_picture: profile_picture || entry.profile_picture || '/default-avatar.svg'
       };
     });
   }

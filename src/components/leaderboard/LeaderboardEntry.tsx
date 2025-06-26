@@ -17,24 +17,17 @@ const LeaderboardEntryComponent: React.FC<LeaderboardEntryProps> = ({
   index
 }) => {
   const [profilePicture, setProfilePicture] = useState<string | null>(entry.profile_picture || null);
-  const [isLoadingProfile, setIsLoadingProfile] = useState(false);
-  const [hasError, setHasError] = useState(false);
+  const [userId, setUserId] = useState<number | null>(entry.user_id || null);
 
+  // Update state when entry data changes (from batch loading)
   useEffect(() => {
-    const loadProfilePicture = async () => {
-      if (profilePicture || isLoadingProfile || hasError) return;
-      try {
-        setIsLoadingProfile(true);
-        const picture = await robloxApi.getProfilePictureByUsername(entry.username);
-        setProfilePicture(picture);
-      } catch {
-        setHasError(true);
-      } finally {
-        setIsLoadingProfile(false);
-      }
-    };
-    loadProfilePicture();
-  }, [entry.username, profilePicture, isLoadingProfile, hasError]);
+    if (entry.user_id && entry.user_id !== userId) {
+      setUserId(entry.user_id);
+    }
+    if (entry.profile_picture && entry.profile_picture !== profilePicture) {
+      setProfilePicture(entry.profile_picture);
+    }
+  }, [entry.user_id, entry.profile_picture, userId, profilePicture]);
 
   // Use calculated rank for badge/progress/sorting only
   const calculatedRank = entry.calculatedRank || calculateRankFromRPCached(entry.rp || 0);
@@ -49,11 +42,21 @@ const LeaderboardEntryComponent: React.FC<LeaderboardEntryProps> = ({
   // Format RP
   const formatRP = (rp: number) => rp.toLocaleString();
 
-  // Roblox profile URL
-  const getRobloxProfileUrl = () => entry.user_id ? robloxApi.getRobloxProfileUrl(entry.user_id) : `https://www.roblox.com/user/${entry.username}/profile`;
+  // Roblox profile URL - only return valid URL if we have user ID
+  const getRobloxProfileUrl = () => {
+    if (userId) {
+      return `https://www.roblox.com/users/${userId}/profile`;
+    }
+    return null; // Return null if no user ID available
+  };
+
+  const profileUrl = getRobloxProfileUrl();
+  const canOpenProfile = !!profileUrl;
 
   // Profile error fallback
-  const handleProfileError = () => setProfilePicture('/default-avatar.png');
+  const handleProfileError = () => {
+    setProfilePicture('/default-avatar.svg');
+  };
 
   // Animation classes
   let animationClass = '';
@@ -103,7 +106,6 @@ const LeaderboardEntryComponent: React.FC<LeaderboardEntryProps> = ({
       }
     };
     const colors = colorMappings[tier] || colorMappings['BRONZE'];
-    // console.log(`${rankTitle}: ${colors.gradient}`);
     return colors;
   };
 
@@ -120,35 +122,51 @@ const LeaderboardEntryComponent: React.FC<LeaderboardEntryProps> = ({
         <div className="relative group" tabIndex={0} aria-label={`Roblox profile for ${entry.username}`}
           data-tooltip-id={`profile-tooltip-${entry.username}`}
           data-tooltip-content={`@${entry.username} \n View Roblox Profile`}>
-          {isLoadingProfile ? (
-            <div className="avatar-shimmer w-12 h-12 rounded-full bg-gray-200 dark:bg-gray-700 animate-shimmer" />
-          ) : (
+          {profilePicture ? (
             <img
-              src={profilePicture || '/default-avatar.png'}
+              src={profilePicture}
               alt={`${entry.username}'s profile`}
               className="w-12 h-12 rounded-full border-2 border-gray-200 dark:border-gray-600 object-cover transition-all duration-200 group-hover:shadow-lg group-hover:border-blue-400 group-hover:ring-2 group-hover:ring-blue-200"
               onError={handleProfileError}
               loading="lazy"
-              style={{ boxShadow: entry.user_id ? '0 0 0 2px #3b82f6' : undefined }}
+              style={{ boxShadow: userId ? '0 0 0 2px #3b82f6' : undefined }}
             />
+          ) : (
+            <div className="avatar-shimmer w-12 h-12 rounded-full bg-gray-200 dark:bg-gray-700 animate-shimmer" />
           )}
           {/* Roblox logo overlay for verified users */}
-          {entry.user_id && !isLoadingProfile && (
-            <img src="/roblox-logo.svg" alt="Roblox" className="absolute bottom-0 right-0 w-5 h-5 rounded-full bg-white border border-gray-300 shadow" style={{ transform: 'translate(30%, 30%)' }} />
+          {userId && (
+            <div className="absolute bottom-0 right-0 w-5 h-5 rounded-full bg-white border border-gray-300 shadow flex items-center justify-center" style={{ transform: 'translate(30%, 30%)' }}>
+              <svg className="w-3 h-3" viewBox="0 0 24 24" fill="currentColor">
+                <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/>
+              </svg>
+            </div>
           )}
           <Tooltip id={`profile-tooltip-${entry.username}`} place="top" />
         </div>
         {/* Username and Rank */}
         <div className="flex flex-col min-w-0">
-          <a
-            href={getRobloxProfileUrl()}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="font-semibold text-gray-900 dark:text-white hover:text-blue-600 dark:hover:text-blue-400 transition-colors truncate text-base"
-            style={{ maxWidth: 120 }}
-          >
-            {entry.username}
-          </a>
+          {canOpenProfile ? (
+            <a
+              href={profileUrl!}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="font-semibold text-gray-900 dark:text-white hover:text-blue-600 dark:hover:text-blue-400 transition-colors truncate text-base flex items-center gap-1 group"
+              style={{ maxWidth: 120 }}
+              title={`View ${entry.username}'s Roblox profile`}
+            >
+              {entry.username}
+              <ExternalLink size={12} className="opacity-0 group-hover:opacity-100 transition-opacity" />
+            </a>
+          ) : (
+            <span
+              className="font-semibold text-gray-900 dark:text-white truncate text-base flex items-center gap-1"
+              style={{ maxWidth: 120 }}
+              title="Profile not available"
+            >
+              {entry.username}
+            </span>
+          )}
           <div className="flex items-center space-x-2 mt-0.5">
             <RankBadge rankTitle={entry.rank_title} rp={entry.rp} size="small" />
             <span className="text-xs text-gray-500 dark:text-gray-400 truncate">{entry.rank_title}</span>
