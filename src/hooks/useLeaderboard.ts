@@ -247,8 +247,8 @@ export const useLeaderboard = () => {
 
   // Search
   const filteredEntries = searchQuery
-    ? entries.filter(e => e.username.toLowerCase().includes(searchQuery.toLowerCase()))
-    : entries;
+    ? (entriesWithAvatars.length > 0 ? entriesWithAvatars : entries).filter(e => e.username.toLowerCase().includes(searchQuery.toLowerCase()))
+    : (entriesWithAvatars.length > 0 ? entriesWithAvatars : entries);
 
   // Live status
   const isLive = (() => {
