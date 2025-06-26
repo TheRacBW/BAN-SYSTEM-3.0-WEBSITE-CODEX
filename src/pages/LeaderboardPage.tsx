@@ -6,6 +6,7 @@ import LeaderboardEntryComponent from '../components/leaderboard/LeaderboardEntr
 import StatsCard from '../components/leaderboard/StatsCard';
 import { TestLeaderboardData } from '../components/TestLeaderboardData';
 import { robloxApi } from '../services/robloxApi';
+import { lookupRobloxUserIds } from '../lib/robloxUserLookup';
 
 // Move these helpers to the top of the file:
 const getFullRankTransition = (player: any) => {
@@ -109,6 +110,70 @@ const LeaderboardPage: React.FC = () => {
     }
     refresh();
   };
+
+  // --- Avatar enrichment for gainers/losers ---
+  const [enrichedGainers, setEnrichedGainers] = useState<any[]>(gainers);
+  const [enrichedLosers, setEnrichedLosers] = useState<any[]>(losers);
+
+  useEffect(() => {
+    const enrich = async (players: any[], setPlayers: (arr: any[]) => void) => {
+      // Only enrich if missing user_id or profile_picture
+      const toLookup = players.filter(p => !p.user_id || !p.profile_picture);
+      if (toLookup.length === 0) {
+        setPlayers(players);
+        return;
+      }
+      const usernames = toLookup.map(p => p.username);
+      const lookupResults = await lookupRobloxUserIds(usernames);
+      // Build a map for fast lookup
+      const lookupMap = new Map(
+        lookupResults.map(r => [r.username.toLowerCase(), r])
+      );
+      const enriched = players.map(p => {
+        if (p.user_id && p.profile_picture) return p;
+        const found = lookupMap.get(p.username.toLowerCase());
+        if (found) {
+          return {
+            ...p,
+            user_id: found.user_id ?? p.user_id,
+            profile_picture: (found as any).profile_picture_url ?? p.profile_picture
+          };
+        }
+        return p;
+      });
+      setPlayers(enriched);
+    };
+    enrich(gainers, setEnrichedGainers);
+  }, [gainers]);
+
+  useEffect(() => {
+    const enrich = async (players: any[], setPlayers: (arr: any[]) => void) => {
+      const toLookup = players.filter(p => !p.user_id || !p.profile_picture);
+      if (toLookup.length === 0) {
+        setPlayers(players);
+        return;
+      }
+      const usernames = toLookup.map(p => p.username);
+      const lookupResults = await lookupRobloxUserIds(usernames);
+      const lookupMap = new Map(
+        lookupResults.map(r => [r.username.toLowerCase(), r])
+      );
+      const enriched = players.map(p => {
+        if (p.user_id && p.profile_picture) return p;
+        const found = lookupMap.get(p.username.toLowerCase());
+        if (found) {
+          return {
+            ...p,
+            user_id: found.user_id ?? p.user_id,
+            profile_picture: (found as any).profile_picture_url ?? p.profile_picture
+          };
+        }
+        return p;
+      });
+      setPlayers(enriched);
+    };
+    enrich(losers, setEnrichedLosers);
+  }, [losers]);
 
   // Show test component first
   if (showTest) {
@@ -318,6 +383,7 @@ const LeaderboardPage: React.FC = () => {
     );
   };
 
+  // --- Modern Gainer Bar ---
   const ModernGainerBar = ({ player, rank, isNewPlayer }: any) => (
     <div className={`
       group relative overflow-hidden rounded-lg border transition-all duration-300 cursor-pointer animate-fade-in
@@ -333,23 +399,31 @@ const LeaderboardPage: React.FC = () => {
         <div className="absolute top-0 right-0 w-32 h-32 bg-gradient-to-br from-green-400 to-emerald-500 rounded-full blur-3xl"></div>
         <div className="absolute bottom-0 left-0 w-24 h-24 bg-gradient-to-tr from-cyan-400 to-blue-500 rounded-full blur-2xl"></div>
       </div>
-      
       <div className="relative z-10 p-4">
         <div className="flex items-center justify-between">
-          {/* Left Side - Rank and Username */}
+          {/* Left Side - Rank, Avatar, and Username */}
           <div className="flex items-center space-x-4">
-            {/* Rank Badge */}
-            <div className={`
-              w-12 h-12 rounded-full flex items-center justify-center text-sm font-bold shadow-lg flex-shrink-0
-              ${rank <= 3 
-                ? 'bg-gradient-to-br from-yellow-400 via-orange-500 to-red-500 text-white' 
-                : 'bg-gradient-to-br from-gray-100 to-gray-200 text-gray-700 dark:from-gray-800 dark:to-gray-700 dark:text-gray-300'
-              }
-              transition-transform group-hover:scale-110
-            `}>
-              {rank <= 3 && '🏆'.slice(0, rank)} {rank}
+            {/* Ranking Number (outside the circle) */}
+            <div className="flex flex-col items-center justify-center min-w-[32px]">
+              <span className="text-xl font-extrabold text-gray-700 dark:text-gray-200 drop-shadow-sm">{rank}</span>
             </div>
-            
+            {/* Profile Picture in colored circle */}
+            <div className="flex-shrink-0 w-12 h-12 rounded-full flex items-center justify-center bg-white border-4 border-green-400 shadow-md">
+              {player.profile_picture ? (
+                <img
+                  src={player.profile_picture}
+                  alt={`${player.username}'s profile`}
+                  className="w-10 h-10 rounded-full object-cover"
+                  onError={e => (e.currentTarget.src = '/default-avatar.svg')}
+                />
+              ) : (
+                <div className="w-10 h-10 rounded-full bg-gray-200 dark:bg-gray-600 flex items-center justify-center">
+                  <span className="text-gray-500 dark:text-gray-400 text-sm font-bold">
+                    {player.username.charAt(0).toUpperCase()}
+                  </span>
+                </div>
+              )}
+            </div>
             {/* Username and Rank Transition */}
             <div className="flex-1 min-w-0">
               <h3 className="font-bold text-gray-900 dark:text-white text-lg mb-1 group-hover:text-green-600 dark:group-hover:text-green-400 transition-colors truncate">
@@ -360,7 +434,6 @@ const LeaderboardPage: React.FC = () => {
               </div>
             </div>
           </div>
-          
           {/* Right Side - RP Gain and Percentage */}
           <div className="flex items-center space-x-3 flex-shrink-0">
             <div className={`
@@ -394,6 +467,7 @@ const LeaderboardPage: React.FC = () => {
     </div>
   );
 
+  // --- Modern Loser Bar ---
   const ModernLoserBar = ({ player, rank }: any) => (
     <div className="group relative overflow-hidden rounded-lg border transition-all duration-300 cursor-pointer animate-fade-in bg-gradient-to-r from-red-500/10 via-orange-500/5 to-pink-500/10 border-red-200/30 hover:border-red-300/60 hover:shadow-lg hover:shadow-red-500/10 hover:scale-[1.01] hover:-translate-y-0.5 backdrop-blur-sm border-l-4 border-l-red-500">
       {/* Animated Background Pattern */}
@@ -401,16 +475,31 @@ const LeaderboardPage: React.FC = () => {
         <div className="absolute top-0 right-0 w-32 h-32 bg-gradient-to-br from-red-400 to-pink-500 rounded-full blur-3xl"></div>
         <div className="absolute bottom-0 left-0 w-24 h-24 bg-gradient-to-tr from-orange-400 to-red-500 rounded-full blur-2xl"></div>
       </div>
-      
       <div className="relative z-10 p-4">
         <div className="flex items-center justify-between">
-          {/* Left Side - Rank and Username */}
+          {/* Left Side - Rank, Avatar, and Username */}
           <div className="flex items-center space-x-4">
-            {/* Rank Badge */}
-            <div className="w-12 h-12 rounded-full flex items-center justify-center text-sm font-bold shadow-lg flex-shrink-0 bg-gradient-to-br from-red-100 to-red-200 text-red-700 dark:from-red-900/30 dark:to-red-800/30 dark:text-red-400 transition-transform group-hover:scale-110">
-              {rank}
+            {/* Ranking Number (outside the circle) */}
+            <div className="flex flex-col items-center justify-center min-w-[32px]">
+              <span className="text-xl font-extrabold text-gray-700 dark:text-gray-200 drop-shadow-sm">{rank}</span>
             </div>
-            
+            {/* Profile Picture in colored circle */}
+            <div className="flex-shrink-0 w-12 h-12 rounded-full flex items-center justify-center bg-white border-4 border-red-400 shadow-md">
+              {player.profile_picture ? (
+                <img
+                  src={player.profile_picture}
+                  alt={`${player.username}'s profile`}
+                  className="w-10 h-10 rounded-full object-cover"
+                  onError={e => (e.currentTarget.src = '/default-avatar.svg')}
+                />
+              ) : (
+                <div className="w-10 h-10 rounded-full bg-gray-200 dark:bg-gray-600 flex items-center justify-center">
+                  <span className="text-gray-500 dark:text-gray-400 text-sm font-bold">
+                    {player.username.charAt(0).toUpperCase()}
+                  </span>
+                </div>
+              )}
+            </div>
             {/* Username and Rank Transition */}
             <div className="flex-1 min-w-0">
               <h3 className="font-bold text-gray-900 dark:text-white text-lg mb-1 group-hover:text-red-600 dark:group-hover:text-red-400 transition-colors truncate">
@@ -421,13 +510,12 @@ const LeaderboardPage: React.FC = () => {
               </div>
             </div>
           </div>
-          
           {/* Right Side - RP Loss and Percentage */}
           <div className="flex items-center space-x-3 flex-shrink-0">
-            <div className="px-4 py-2 rounded-full text-sm font-bold shadow-md bg-gradient-to-r from-red-500 to-pink-500 text-white">
+            <div className="px-4 py-2 rounded-full text-sm font-bold shadow-md bg-gradient-to-r from-red-500 to-orange-500 text-white">
               {player.rp_change.toLocaleString()} RP
             </div>
-            {/* Percentage */}
+            {/* Percentage or Label */}
             <div className="text-xs px-3 py-1.5 rounded-full font-medium bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400">
               {getDisplayPercentage(player)}
             </div>
@@ -616,7 +704,7 @@ const LeaderboardPage: React.FC = () => {
                   </div>
                 ) : (
                   (() => {
-                    const data = activeTab === 'gainers' ? gainers : losers;
+                    const data = activeTab === 'gainers' ? enrichedGainers : enrichedLosers;
                     if (!data || data.length === 0) {
                       const requested = (activeTab === 'gainers' ? gainersTimeRange : losersTimeRange);
                       const requestedHours = requested === '6h' ? 6 : requested === '12h' ? 12 : requested === '1d' ? 24 : 48;
@@ -642,7 +730,6 @@ const LeaderboardPage: React.FC = () => {
 
                     // Limit to top 10 and use modern cards
                     const top10Data = data.slice(0, 10);
-                    
                     // Find the oldest inserted_at timestamp in the data
                     const timestamps = data.map(e => e.inserted_at ? new Date(e.inserted_at) : null).filter(Boolean) as Date[];
                     let oldest = null;
@@ -669,7 +756,6 @@ const LeaderboardPage: React.FC = () => {
                             {periodMsg}
                           </div>
                         )}
-                        
                         {activeTab === 'gainers' ? (
                           // Use modern gainers bars with sections (Established above, New below)
                           <div className="space-y-6 stagger-animation">
@@ -681,7 +767,6 @@ const LeaderboardPage: React.FC = () => {
                             {renderLosersSection()}
                           </div>
                         )}
-
                         {data.length > 10 && (
                           <div className="text-center py-6">
                             <div className="inline-flex items-center gap-2 px-4 py-2 bg-gray-100 dark:bg-gray-800 rounded-full text-sm text-gray-600 dark:text-gray-400">

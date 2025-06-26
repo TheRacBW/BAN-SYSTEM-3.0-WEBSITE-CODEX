@@ -35,29 +35,33 @@ const StatsCard: React.FC<StatsCardProps> = ({ stats, type, title, icon }) => {
           // Get calculated rank (use existing or calculate from raw RP)
           const calculatedRank = stat.calculatedRank || 
             (stat.total_rp !== undefined ? calculateRankFromRPCached(stat.total_rp) : null);
-          
+
+          // Color for the avatar border based on rank
+          const borderColors = [
+            'border-yellow-500', // 1st
+            'border-gray-500',   // 2nd
+            'border-orange-500', // 3rd
+            'border-blue-500'    // others
+          ];
+          const borderColor = borderColors[index] || borderColors[3];
+
           return (
             <div
               key={stat.username}
-              className="flex items-center gap-3 p-3 rounded-lg bg-gray-50 dark:bg-gray-700/50 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+              className="flex items-center gap-4 p-3 rounded-lg bg-gray-50 dark:bg-gray-700/50 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
             >
-              {/* Position Badge */}
-              <div className={`flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold text-white ${
-                index === 0 ? 'bg-yellow-500' :
-                index === 1 ? 'bg-gray-500' :
-                index === 2 ? 'bg-orange-500' :
-                'bg-blue-500'
-              }`}>
-                #{index + 1}
+              {/* Ranking Number (outside the circle) */}
+              <div className="flex flex-col items-center justify-center min-w-[32px]">
+                <span className="text-xl font-extrabold text-gray-700 dark:text-gray-200 drop-shadow-sm">{index + 1}</span>
               </div>
 
-              {/* Profile Picture */}
-              <div className="flex-shrink-0">
+              {/* Profile Picture in colored circle */}
+              <div className={`flex-shrink-0 w-12 h-12 rounded-full flex items-center justify-center bg-white border-4 ${borderColor} shadow-md`}>
                 {stat.profile_picture ? (
                   <img
                     src={stat.profile_picture}
                     alt={`${stat.username}'s profile`}
-                    className="w-10 h-10 rounded-full border-2 border-gray-200 dark:border-gray-600"
+                    className="w-10 h-10 rounded-full object-cover"
                     onError={(e) => {
                       const target = e.target as HTMLImageElement;
                       target.style.display = 'none';
@@ -80,17 +84,13 @@ const StatsCard: React.FC<StatsCardProps> = ({ stats, type, title, icon }) => {
                 >
                   {stat.username}
                 </Link>
-                
                 {/* Rank Display */}
                 {calculatedRank && (
                   <div className="flex items-center gap-2 mt-1">
                     <RankBadge
-                      rankTier={calculatedRank.tier}
-                      rankNumber={calculatedRank.level}
-                      displayRp={calculatedRank.displayRP}
-                      totalRp={calculatedRank.totalRP}
-                      size="sm"
-                      showProgress={false}
+                      rankTitle={getRankDisplayName(calculatedRank.tier, calculatedRank.level)}
+                      rp={calculatedRank.totalRP}
+                      size="small"
                     />
                     <span className="text-xs text-gray-600 dark:text-gray-400">
                       {getRankDisplayName(calculatedRank.tier, calculatedRank.level)}
