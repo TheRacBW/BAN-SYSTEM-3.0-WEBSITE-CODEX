@@ -51,6 +51,12 @@ function toRankChangeDirection(val: any): 'up' | 'down' | 'same' {
   return 'same';
 }
 
+// Time filter helper
+function getTimeFilter(range: '6h' | '12h' | '1d' | '2d') {
+  const hours = { '6h': 6, '12h': 12, '1d': 24, '2d': 48 }[range];
+  return new Date(Date.now() - hours * 60 * 60 * 1000).toISOString();
+}
+
 class LeaderboardService {
   private previousSnapshot: LeaderboardEntry[] = [];
 
@@ -405,124 +411,52 @@ class LeaderboardService {
    * Get RP gainers for a time range using hybrid strategy (optimized RPC, fallback to rp_changes)
    */
   async getRPGainers(timeRange: string): Promise<any[]> {
-    const hoursBack = timeRange === '6h' ? 6 : timeRange === '12h' ? 12 : timeRange === '1d' ? 24 : 48;
-    const since = new Date(Date.now() - hoursBack * 60 * 60 * 1000).toISOString();
-    
-    console.log('🔍 GAINERS QUERY PARAMS:', {
-      timeRange,
-      hoursBack,
-      since,
-      currentTime: new Date().toISOString(),
-      timeDiff: Date.now() - hoursBack * 60 * 60 * 1000
-    });
+    console.log('🔍 GAINERS - Querying leaderboard_insights:', { timeRange });
+    try {
+      const { data, error } = await supabase
+        .from('leaderboard_insights')
+        .select('*')
+        .in('category', ['gainer_established', 'gainer_new'])
+        .gte('change_timestamp', getTimeFilter(timeRange as any))
+        .order('rp_change', { ascending: false });
 
-    // Try rp_changes_optimized first
-    const { data: optimizedData, error: optimizedError } = await supabase
-      .from('rp_changes_optimized')
-      .select('*')
-      .gt('rp_change', 0)
-      .gte('change_timestamp', since)
-      .order('rp_change', { ascending: false });
+      if (error) {
+        console.error('❌ Error fetching gainers from leaderboard_insights:', error);
+        return [];
+      }
 
-    console.log('🔍 OPTIMIZED TABLE RESULT:', {
-      dataCount: optimizedData?.length || 0,
-      error: optimizedError,
-      sampleData: optimizedData?.slice(0, 2)
-    });
-
-    if (optimizedError) {
-      console.error('❌ Error with rp_changes_optimized:', optimizedError);
-    }
-
-    // If optimized table has data, use it
-    if (optimizedData && optimizedData.length > 0) {
-      console.log('✅ Using rp_changes_optimized data');
-      return optimizedData;
-    }
-
-    // Fallback to regular rp_changes table
-    console.log('🔄 Falling back to rp_changes table');
-    const { data: fallbackData, error: fallbackError } = await supabase
-      .from('rp_changes')
-      .select('*')
-      .gt('rp_change', 0)
-      .gte('change_timestamp', since)
-      .order('rp_change', { ascending: false });
-
-    console.log('🔍 FALLBACK TABLE RESULT:', {
-      dataCount: fallbackData?.length || 0,
-      error: fallbackError,
-      sampleData: fallbackData?.slice(0, 2)
-    });
-
-    if (fallbackError) {
-      console.error('❌ Error with fallback rp_changes:', fallbackError);
+      console.log('✅ Gainers data:', data?.length || 0, 'records');
+      return data || [];
+    } catch (error) {
+      console.error('💥 Error in getRPGainers:', error);
       return [];
     }
-
-    return fallbackData || [];
   }
 
   /**
    * Get RP losers for a time range using hybrid strategy (optimized RPC, fallback to rp_changes)
    */
   async getRPLosers(timeRange: string): Promise<any[]> {
-    const hoursBack = timeRange === '6h' ? 6 : timeRange === '12h' ? 12 : timeRange === '1d' ? 24 : 48;
-    const since = new Date(Date.now() - hoursBack * 60 * 60 * 1000).toISOString();
-    
-    console.log('🔍 LOSERS QUERY PARAMS:', {
-      timeRange,
-      hoursBack,
-      since,
-      currentTime: new Date().toISOString(),
-      timeDiff: Date.now() - hoursBack * 60 * 60 * 1000
-    });
+    console.log('🔍 LOSERS - Querying leaderboard_insights:', { timeRange });
+    try {
+      const { data, error } = await supabase
+        .from('leaderboard_insights')
+        .select('*')
+        .in('category', ['loser_ranked', 'loser_dropped'])
+        .gte('change_timestamp', getTimeFilter(timeRange as any))
+        .order('rp_change', { ascending: true });
 
-    // Try rp_changes_optimized first
-    const { data: optimizedData, error: optimizedError } = await supabase
-      .from('rp_changes_optimized')
-      .select('*')
-      .lt('rp_change', 0)
-      .gte('change_timestamp', since)
-      .order('rp_change', { ascending: true });
+      if (error) {
+        console.error('❌ Error fetching losers from leaderboard_insights:', error);
+        return [];
+      }
 
-    console.log('🔍 OPTIMIZED TABLE RESULT:', {
-      dataCount: optimizedData?.length || 0,
-      error: optimizedError,
-      sampleData: optimizedData?.slice(0, 2)
-    });
-
-    if (optimizedError) {
-      console.error('❌ Error with rp_changes_optimized:', optimizedError);
-    }
-
-    // If optimized table has data, use it
-    if (optimizedData && optimizedData.length > 0) {
-      console.log('✅ Using rp_changes_optimized data');
-      return optimizedData;
-    }
-
-    // Fallback to regular rp_changes table
-    console.log('🔄 Falling back to rp_changes table');
-    const { data: fallbackData, error: fallbackError } = await supabase
-      .from('rp_changes')
-      .select('*')
-      .lt('rp_change', 0)
-      .gte('change_timestamp', since)
-      .order('rp_change', { ascending: true });
-
-    console.log('🔍 FALLBACK TABLE RESULT:', {
-      dataCount: fallbackData?.length || 0,
-      error: fallbackError,
-      sampleData: fallbackData?.slice(0, 2)
-    });
-
-    if (fallbackError) {
-      console.error('❌ Error with fallback rp_changes:', fallbackError);
+      console.log('✅ Losers data:', data?.length || 0, 'records');
+      return data || [];
+    } catch (error) {
+      console.error('💥 Error in getRPLosers:', error);
       return [];
     }
-
-    return fallbackData || [];
   }
 
   /**

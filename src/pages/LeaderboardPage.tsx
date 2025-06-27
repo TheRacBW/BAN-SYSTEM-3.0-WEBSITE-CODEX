@@ -7,40 +7,19 @@ import StatsCard from '../components/leaderboard/StatsCard';
 import { TestLeaderboardData } from '../components/TestLeaderboardData';
 import { robloxApi } from '../services/robloxApi';
 import { lookupRobloxUserIds } from '../lib/robloxUserLookup';
+import { supabase } from '../lib/supabase';
 
 // Move these helpers to the top of the file:
-const getFullRankTransition = (player: any) => {
-  // Prefer previous_rank_title, then previous_calculated_rank, then previous_rank, then fallback
-  const prevRank = player.previous_rank_title || player.previous_calculated_rank || player.previous_rank || '';
-  const currRank = player.new_calculated_rank || player.current_rank_title || '';
-  const prevRP = player.previous_rp;
-  const currRP = player.new_rp || player.current_rp;
-  // If no previous rank at all, fallback to 'Unknown'
-  const prevRankDisplay = prevRank && prevRank !== 'Unknown' ? prevRank : 'Unranked';
-  const currRankDisplay = currRank && currRank !== 'Unknown' ? currRank : 'Unranked';
-  if (player.getTransitionText) {
-    return player.getTransitionText();
-  }
-  return `${prevRankDisplay} (${prevRP} RP) → ${currRankDisplay} (${currRP} RP)`;
-};
-
 const getDisplayPercentage = (player: any) => {
-  // Only show "New Player joins LB" if truly new
-  if (
-    player.previous_calculated_rank === '[Not in Top 200]' ||
-    player.previous_calculated_rank === '[New Player]' ||
-    !player.previous_calculated_rank
-  ) {
+  // Use pre-computed percentage from leaderboard_insights
+  if (player.category === 'gainer_new') {
     return "New Player joins LB";
   }
-  const previousRP = player.previous_rp;
-  const rpChange = player.rp_change;
-  if (previousRP === 0 || previousRP === null || previousRP === undefined) {
-    return "0%";
+  if (player.percentage_change !== null && player.percentage_change !== undefined) {
+    const percentage = player.percentage_change;
+    return `${percentage > 0 ? '+' : ''}${percentage}%`;
   }
-  const percentage = (rpChange / previousRP) * 100;
-  const roundedPercentage = Math.round(percentage * 10) / 10;
-  return `${roundedPercentage > 0 ? '+' : ''}${roundedPercentage}%`;
+  return "0%";
 };
 
 const LeaderboardPage: React.FC = () => {
@@ -71,7 +50,80 @@ const LeaderboardPage: React.FC = () => {
     filteredEntries
   } = useLeaderboard();
 
-  const [showTest, setShowTest] = useState(true); // Temporarily show test
+  const [showTest, setShowTest] = useState(false); // Disable test component
+  const [isRefreshingInsights, setIsRefreshingInsights] = useState(false);
+  const [notification, setNotification] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
+
+  // Auto-hide notification after 3 seconds
+  useEffect(() => {
+    if (notification) {
+      const timer = setTimeout(() => {
+        setNotification(null);
+      }, 3000);
+      return () => clearTimeout(timer);
+    }
+  }, [notification]);
+
+  // Direct database refresh function as fallback
+  const refreshInsightsDirectly = async () => {
+    try {
+      console.log('🔄 Attempting direct database refresh...');
+      
+      // Clear existing insights data
+      const { error: clearError } = await supabase
+        .from('leaderboard_insights')
+        .delete()
+        .neq('id', 0); // Delete all records
+      
+      if (clearError) {
+        console.error('❌ Error clearing insights:', clearError);
+        setNotification({ message: '❌ Error clearing old insights data', type: 'error' });
+        return;
+      }
+      
+      // Insert fresh data from rp_changes_optimized
+      const { data: changes, error: fetchError } = await supabase
+        .from('rp_changes_optimized')
+        .select('*')
+        .order('change_timestamp', { ascending: false });
+      
+      if (fetchError) {
+        console.error('❌ Error fetching rp_changes_optimized:', fetchError);
+        setNotification({ message: '❌ Error fetching source data', type: 'error' });
+        return;
+      }
+      
+      // Process and insert insights
+      const insights = changes?.map(change => ({
+        username: change.username,
+        rp_change: change.rp_change,
+        change_timestamp: change.change_timestamp,
+        category: change.rp_change > 0 ? 'gainer_established' : 'loser_ranked',
+        transition_display: `${change.previous_calculated_rank} (${change.previous_rp} RP) → ${change.new_calculated_rank} (${change.new_rp} RP)`,
+        percentage_change: change.previous_rp > 0 ? Math.round((change.rp_change / change.previous_rp) * 100 * 10) / 10 : 0
+      })) || [];
+      
+      if (insights.length > 0) {
+        const { error: insertError } = await supabase
+          .from('leaderboard_insights')
+          .insert(insights);
+        
+        if (insertError) {
+          console.error('❌ Error inserting insights:', insertError);
+          setNotification({ message: '❌ Error inserting new insights data', type: 'error' });
+          return;
+        }
+      }
+      
+      console.log('✅ Direct refresh completed:', insights.length, 'records');
+      setNotification({ message: `✅ Direct refresh completed: ${insights.length} records`, type: 'success' });
+      refresh(); // Refresh the UI
+      
+    } catch (error) {
+      console.error('❌ Error in direct refresh:', error);
+      setNotification({ message: '❌ Error in direct refresh process', type: 'error' });
+    }
+  };
 
   // Time range options
   const timeRangeOptions = [
@@ -235,47 +287,18 @@ const LeaderboardPage: React.FC = () => {
 
   // --- Sectioning and Transition Helpers ---
   const categorizeGainer = (player: any) => {
-    if (
-      player.previous_calculated_rank === '[Not in Top 200]' ||
-      player.previous_calculated_rank === '[New Player]' ||
-      !player.previous_calculated_rank
-    ) {
-      return 'new';
-    }
-    return 'established';
+    // Use the pre-computed category from leaderboard_insights
+    return player.category === 'gainer_new' ? 'new' : 'established';
   };
+  
   const categorizeLoser = (player: any) => {
-    if (
-      player.new_calculated_rank === '[Not in Top 200]' ||
-      player.new_calculated_rank === '[Dropped Off]' ||
-      !player.new_calculated_rank
-    ) {
-      return 'dropped';
-    }
-    return 'established';
+    // Use the pre-computed category from leaderboard_insights
+    return player.category === 'loser_dropped' ? 'dropped' : 'established';
   };
+  
   const getTransitionText = (player: any, isGainer: boolean) => {
-    if (isGainer) {
-      if (
-        player.previous_calculated_rank === '[Not in Top 200]' ||
-        player.previous_calculated_rank === '[New Player]' ||
-        !player.previous_calculated_rank
-      ) {
-        return `[New Player] → ${player.new_calculated_rank} (${player.new_rp} RP)`;
-      } else {
-        return `${player.previous_calculated_rank} (${player.previous_rp} RP) → ${player.new_calculated_rank} (${player.new_rp} RP)`;
-      }
-    } else {
-      if (
-        player.new_calculated_rank === '[Not in Top 200]' ||
-        player.new_calculated_rank === '[Dropped Off]' ||
-        !player.new_calculated_rank
-      ) {
-        return `${player.previous_calculated_rank} (${player.previous_rp} RP) → Dropped from leaderboard`;
-      } else {
-        return `${player.previous_calculated_rank} (${player.previous_rp} RP) → ${player.new_calculated_rank} (${player.new_rp} RP)`;
-      }
-    }
+    // Use the pre-computed transition_display from leaderboard_insights
+    return player.transition_display || 'Unknown transition';
   };
 
   // --- Modern Gainers Section ---
@@ -449,7 +472,7 @@ const LeaderboardPage: React.FC = () => {
                   {player.username}
                 </h3>
                 <div className="text-sm text-gray-600 dark:text-gray-400 leading-relaxed">
-                  {player.getTransitionText ? player.getTransitionText() : getFullRankTransition(player)}
+                  {player.getTransitionText ? player.getTransitionText() : player.transition_display || 'Unknown transition'}
                 </div>
               </div>
             </div>
@@ -462,7 +485,7 @@ const LeaderboardPage: React.FC = () => {
                   : 'bg-gradient-to-r from-green-500 to-emerald-500 text-white'
                 }
               `}>
-                +{player.rp_change.toLocaleString()} RP
+                +{(player.rp_change || 0).toLocaleString()} RP
               </div>
               {/* Percentage or Label */}
               <div className={`
@@ -528,14 +551,14 @@ const LeaderboardPage: React.FC = () => {
                   {player.username}
                 </h3>
                 <div className="text-sm text-gray-600 dark:text-gray-400 leading-relaxed">
-                  {player.getTransitionText ? player.getTransitionText() : getFullRankTransition(player)}
+                  {player.getTransitionText ? player.getTransitionText() : player.transition_display || 'Unknown transition'}
                 </div>
               </div>
             </div>
             {/* Right Side - RP Loss and Percentage */}
             <div className="flex items-center space-x-3 flex-shrink-0">
               <div className="px-4 py-2 rounded-full text-sm font-bold shadow-md bg-gradient-to-r from-red-500 to-orange-500 text-white">
-                {player.rp_change.toLocaleString()} RP
+                {(player.rp_change || 0).toLocaleString()} RP
               </div>
               {/* Percentage or Label */}
               <div className="text-xs px-3 py-1.5 rounded-full font-medium bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400">
@@ -556,6 +579,25 @@ const LeaderboardPage: React.FC = () => {
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
+      {/* Notification Toast */}
+      {notification && (
+        <div className={`fixed top-4 right-4 z-50 px-4 py-3 rounded-lg shadow-lg transition-all duration-300 ${
+          notification.type === 'success' 
+            ? 'bg-green-100 text-green-800 border border-green-200' 
+            : 'bg-red-100 text-red-800 border border-red-200'
+        }`}>
+          <div className="flex items-center justify-between">
+            <span className="font-medium">{notification.message}</span>
+            <button
+              onClick={() => setNotification(null)}
+              className="ml-4 text-gray-500 hover:text-gray-700"
+            >
+              ×
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* Header */}
       <div className="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700">
         <div className="container mx-auto px-4 py-6">
@@ -597,6 +639,72 @@ const LeaderboardPage: React.FC = () => {
                 Clear Avatar Cache
               </button>
             )}
+
+            {/* Populate Leaderboard Insights Button */}
+            <button
+              onClick={async () => {
+                if (isRefreshingInsights) return; // Prevent multiple clicks
+                
+                setIsRefreshingInsights(true);
+                try {
+                  console.log('🔄 Triggering populate-leaderboard-insights...');
+                  
+                  // Try with explicit headers and body
+                  const { data, error } = await supabase.functions.invoke('populate-leaderboard-insights', {
+                    method: 'POST',
+                    headers: {
+                      'Content-Type': 'application/json',
+                    },
+                    body: {}, // Empty body but explicit
+                  });
+                  
+                  if (error) {
+                    console.error('❌ Failed to populate leaderboard insights:', error);
+                    
+                    // If it's a CORS or function not found error, show helpful message
+                    if (error.message.includes('CORS') || error.message.includes('Failed to send')) {
+                      setNotification({ 
+                        message: '❌ Edge function not accessible. Please check if the function is deployed and CORS is configured.', 
+                        type: 'error' 
+                      });
+                      
+                      // Offer to try direct database approach
+                      if (confirm('Edge function not accessible. Would you like to try refreshing the data directly?')) {
+                        await refreshInsightsDirectly();
+                      }
+                    } else {
+                      setNotification({ 
+                        message: `❌ Failed to refresh insights: ${error.message}`, 
+                        type: 'error' 
+                      });
+                    }
+                  } else {
+                    console.log('✅ Leaderboard insights populated successfully:', data);
+                    // Refresh the gainers/losers data after population
+                    refresh();
+                    // Show success feedback
+                    setNotification({ message: '✅ Leaderboard insights refreshed successfully!', type: 'success' });
+                  }
+                } catch (error) {
+                  console.error('❌ Error calling populate-leaderboard-insights:', error);
+                  setNotification({ 
+                    message: '❌ Edge function error. Please check if the function exists and is properly configured.', 
+                    type: 'error' 
+                  });
+                } finally {
+                  setIsRefreshingInsights(false);
+                }
+              }}
+              disabled={isRefreshingInsights}
+              className={`ml-4 px-3 py-1.5 rounded-lg font-semibold text-xs shadow transition ${
+                isRefreshingInsights 
+                  ? 'bg-gray-100 text-gray-500 cursor-not-allowed' 
+                  : 'bg-blue-100 text-blue-700 hover:bg-blue-200'
+              }`}
+              title="Manually trigger the populate-leaderboard-insights edge function to refresh gainers/losers data from rp_changes_optimized"
+            >
+              {isRefreshingInsights ? '🔄 Refreshing...' : 'Refresh Insights'}
+            </button>
           </div>
         </div>
       </div>

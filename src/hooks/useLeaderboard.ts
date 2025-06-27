@@ -189,12 +189,7 @@ export const useLeaderboard = () => {
       const data = await leaderboardService.getRPGainers(timeRange);
       console.log('🔄 GAINERS QUERY RESULT:', data);
       console.log('🔄 GAINERS COUNT:', data?.length);
-      // Patch: calculate current_rp if missing
-      const processed = (data || []).map(gainer => ({
-        ...gainer,
-        current_rp: gainer.current_rp !== undefined ? gainer.current_rp : (gainer.previous_rp ?? 0) + (gainer.rp_change ?? 0)
-      }));
-      setGainers(processed);
+      setGainers(data || []);
     } catch (err) {
       console.error('❌ Error fetching gainers:', err);
       setGainers([]);
@@ -209,12 +204,7 @@ export const useLeaderboard = () => {
       const data = await leaderboardService.getRPLosers(timeRange);
       console.log('🔄 LOSERS QUERY RESULT:', data);
       console.log('🔄 LOSERS COUNT:', data?.length);
-      // Patch: calculate current_rp if missing
-      const processed = (data || []).map(loser => ({
-        ...loser,
-        current_rp: loser.current_rp !== undefined ? loser.current_rp : (loser.previous_rp ?? 0) + (loser.rp_change ?? 0)
-      }));
-      setLosers(processed);
+      setLosers(data || []);
     } catch (err) {
       console.error('❌ Error fetching losers:', err);
       setLosers([]);
