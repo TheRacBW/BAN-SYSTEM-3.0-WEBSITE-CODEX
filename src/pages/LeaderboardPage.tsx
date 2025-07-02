@@ -8,6 +8,7 @@ import { TestLeaderboardData } from '../components/TestLeaderboardData';
 import { robloxApi } from '../services/robloxApi';
 import { lookupRobloxUserIds } from '../lib/robloxUserLookup';
 import { supabase } from '../lib/supabase';
+import { CSSTransition, TransitionGroup } from 'react-transition-group';
 
 // Move these helpers to the top of the file:
 const getDisplayPercentage = (player: any) => {
@@ -47,12 +48,14 @@ const LeaderboardPage: React.FC = () => {
     setLosersTimeRange,
     isLoadingGainers,
     isLoadingLosers,
-    filteredEntries
+    filteredEntries,
+    lastInsightsUpdate
   } = useLeaderboard();
 
   const [showTest, setShowTest] = useState(false); // Disable test component
   const [isRefreshingInsights, setIsRefreshingInsights] = useState(false);
   const [notification, setNotification] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
+  const [showRealtimeToast, setShowRealtimeToast] = useState(false);
 
   // Auto-hide notification after 3 seconds
   useEffect(() => {
@@ -321,14 +324,17 @@ const LeaderboardPage: React.FC = () => {
               </div>
             </div>
             <div className="space-y-3">
-              {establishedPlayers.map((player, index) => (
-                <ModernGainerBar
-                  key={player.username}
-                  player={{ ...player, getTransitionText: () => getTransitionText(player, true) }}
-                  rank={index + 1}
-                  isNewPlayer={false}
-                />
-              ))}
+              <TransitionGroup className="space-y-3">
+                {establishedPlayers.map((player, index) => (
+                  <CSSTransition key={player.username} timeout={300} classNames="fade-slide">
+                    <ModernGainerBar
+                      player={{ ...player, getTransitionText: () => getTransitionText(player, true) }}
+                      rank={index + 1}
+                      isNewPlayer={false}
+                    />
+                  </CSSTransition>
+                ))}
+              </TransitionGroup>
             </div>
           </div>
         )}
@@ -345,14 +351,17 @@ const LeaderboardPage: React.FC = () => {
               </div>
             </div>
             <div className="space-y-3">
-              {newPlayers.map((player, index) => (
-                <ModernGainerBar
-                  key={player.username}
-                  player={{ ...player, getTransitionText: () => getTransitionText(player, true) }}
-                  rank={establishedPlayers.length + index + 1}
-                  isNewPlayer={true}
-                />
-              ))}
+              <TransitionGroup className="space-y-3">
+                {newPlayers.map((player, index) => (
+                  <CSSTransition key={player.username} timeout={300} classNames="fade-slide">
+                    <ModernGainerBar
+                      player={{ ...player, getTransitionText: () => getTransitionText(player, true) }}
+                      rank={establishedPlayers.length + index + 1}
+                      isNewPlayer={true}
+                    />
+                  </CSSTransition>
+                ))}
+              </TransitionGroup>
             </div>
           </div>
         )}
@@ -383,13 +392,16 @@ const LeaderboardPage: React.FC = () => {
               </div>
             </div>
             <div className="space-y-3">
-              {establishedLosers.map((player, index) => (
-                <ModernLoserBar
-                  key={player.username}
-                  player={{ ...player, getTransitionText: () => getTransitionText(player, false) }}
-                  rank={index + 1}
-                />
-              ))}
+              <TransitionGroup className="space-y-3">
+                {establishedLosers.map((player, index) => (
+                  <CSSTransition key={player.username} timeout={300} classNames="fade-slide">
+                    <ModernLoserBar
+                      player={{ ...player, getTransitionText: () => getTransitionText(player, false) }}
+                      rank={index + 1}
+                    />
+                  </CSSTransition>
+                ))}
+              </TransitionGroup>
             </div>
           </div>
         )}
@@ -406,13 +418,16 @@ const LeaderboardPage: React.FC = () => {
               </div>
             </div>
             <div className="space-y-3">
-              {droppedPlayers.map((player, index) => (
-                <ModernLoserBar
-                  key={player.username}
-                  player={{ ...player, getTransitionText: () => getTransitionText(player, false) }}
-                  rank={establishedLosers.length + index + 1}
-                />
-              ))}
+              <TransitionGroup className="space-y-3">
+                {droppedPlayers.map((player, index) => (
+                  <CSSTransition key={player.username} timeout={300} classNames="fade-slide">
+                    <ModernLoserBar
+                      player={{ ...player, getTransitionText: () => getTransitionText(player, false) }}
+                      rank={establishedLosers.length + index + 1}
+                    />
+                  </CSSTransition>
+                ))}
+              </TransitionGroup>
             </div>
           </div>
         )}
@@ -576,6 +591,42 @@ const LeaderboardPage: React.FC = () => {
       </div>
     );
   };
+
+  // Add a toast for real-time updates
+  useEffect(() => {
+    const subscription = supabase
+      .channel('leaderboard_refresh')
+      .on('postgres_changes', {
+        event: 'INSERT',
+        schema: 'public',
+        table: 'leaderboard_refresh_trigger'
+      }, (payload) => {
+        console.log('Lua script completed, refreshing leaderboard...');
+        refresh(); // Use the existing refresh function
+        setShowRealtimeToast(true);
+        setTimeout(() => setShowRealtimeToast(false), 3000);
+      })
+      .subscribe();
+    return () => {
+      subscription.unsubscribe();
+    };
+  }, [refresh]);
+
+  // Improved skeleton loader for gainers/losers
+  const SkeletonLoader = () => (
+    <div className="space-y-4">
+      {[...Array(5)].map((_, i) => (
+        <div key={i} className="animate-pulse flex items-center space-x-4 p-4 bg-gray-100 dark:bg-gray-800 rounded-lg">
+          <div className="w-10 h-10 bg-gray-300 dark:bg-gray-700 rounded-full" />
+          <div className="flex-1 space-y-2">
+            <div className="h-4 bg-gray-300 dark:bg-gray-700 rounded w-1/3" />
+            <div className="h-3 bg-gray-200 dark:bg-gray-600 rounded w-1/2" />
+          </div>
+          <div className="w-16 h-6 bg-gray-200 dark:bg-gray-700 rounded" />
+        </div>
+      ))}
+    </div>
+  );
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
@@ -822,20 +873,7 @@ const LeaderboardPage: React.FC = () => {
                 </div>
 
                 {(activeTab === 'gainers' ? isLoadingGainers : isLoadingLosers) ? (
-                  <div className="flex items-center justify-center py-16">
-                    <div className="text-center">
-                      <div className="relative mb-6">
-                        <div className="w-16 h-16 border-4 border-gray-200 dark:border-gray-700 border-t-blue-600 dark:border-t-blue-400 rounded-full animate-spin mx-auto"></div>
-                        <div className="absolute inset-0 w-16 h-16 border-4 border-transparent border-t-green-500 dark:border-t-green-400 rounded-full animate-spin mx-auto" style={{ animationDelay: '0.5s' }}></div>
-                      </div>
-                      <p className="text-gray-600 dark:text-gray-400 font-medium">
-                        Loading {activeTab === 'gainers' ? 'hottest gainers' : 'biggest losers'}...
-                      </p>
-                      <p className="text-sm text-gray-500 dark:text-gray-500 mt-1">
-                        Analyzing recent RP changes
-                      </p>
-                    </div>
-                  </div>
+                  <SkeletonLoader />
                 ) : (
                   (() => {
                     const data = activeTab === 'gainers' ? enrichedGainers : enrichedLosers;
@@ -920,13 +958,44 @@ const LeaderboardPage: React.FC = () => {
                     );
                   })()
                 )}
+                {activeTab === 'gainers' || activeTab === 'losers' && lastInsightsUpdate && (
+                  <div className="text-xs text-gray-500 dark:text-gray-400 mb-2 text-right">
+                    Insights last updated: {formatLastUpdate(lastInsightsUpdate)}
+                  </div>
+                )}
               </div>
             )}
           </div>
         )}
       </div>
+      {showRealtimeToast && (
+        <div className="fixed top-20 right-4 z-50 px-4 py-3 rounded-lg shadow-lg bg-blue-100 text-blue-800 border border-blue-200 transition-all duration-300">
+          <span className="font-medium">Leaderboard insights just updated!</span>
+        </div>
+      )}
     </div>
   );
 };
 
-export default LeaderboardPage; 
+export default LeaderboardPage;
+
+/*
+.fade-slide-enter {
+  opacity: 0;
+  transform: translateY(10px);
+}
+.fade-slide-enter-active {
+  opacity: 1;
+  transform: translateY(0);
+  transition: opacity 300ms, transform 300ms;
+}
+.fade-slide-exit {
+  opacity: 1;
+  transform: translateY(0);
+}
+.fade-slide-exit-active {
+  opacity: 0;
+  transform: translateY(-10px);
+  transition: opacity 300ms, transform 300ms;
+}
+*/ 

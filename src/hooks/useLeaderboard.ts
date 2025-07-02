@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { leaderboardService } from '../services/leaderboardService';
 // import { robloxApi } from '../services/robloxApi'; // No longer needed for user ID lookup
 import { lookupRobloxUserIds } from '../lib/robloxUserLookup';
@@ -39,6 +39,12 @@ export const useLeaderboard = () => {
 
   // Progressive loading: fetch leaderboard, then enrich avatars in background
   const [entriesWithAvatars, setEntriesWithAvatars] = useState<LeaderboardEntryWithChanges[]>([]);
+
+  // Caching for time range queries
+  const gainersCache = useRef<Record<string, any[]>>({});
+  const losersCache = useRef<Record<string, any[]>>({});
+  const [lastInsightsUpdate, setLastInsightsUpdate] = useState<string>('');
+  const debounceTimeout = useRef<NodeJS.Timeout | null>(null);
 
   // Utility to convert LeaderboardEntry to LeaderboardEntryWithChanges
   function toWithChanges(entry: any): LeaderboardEntryWithChanges {
@@ -181,32 +187,59 @@ export const useLeaderboard = () => {
     }
   }, []);
 
-  // Fetch gainers/losers for a time range
+  // Debounced setters for time range
+  const setGainersTimeRangeDebounced = (range: string) => {
+    if (debounceTimeout.current) clearTimeout(debounceTimeout.current);
+    debounceTimeout.current = setTimeout(() => setGainersTimeRange(range as any), 200);
+  };
+  const setLosersTimeRangeDebounced = (range: string) => {
+    if (debounceTimeout.current) clearTimeout(debounceTimeout.current);
+    debounceTimeout.current = setTimeout(() => setLosersTimeRange(range as any), 200);
+  };
+
+  // Fetch gainers/losers for a time range with caching
   const fetchGainers = useCallback(async (timeRange: string) => {
-    console.log('🔄 FETCHING GAINERS for timeRange:', timeRange);
+    if (gainersCache.current[timeRange]) {
+      setGainers(gainersCache.current[timeRange]);
+      // Set last update from cache if available
+      if (gainersCache.current[timeRange].length > 0) {
+        setLastInsightsUpdate(gainersCache.current[timeRange][0].change_timestamp);
+      }
+      return;
+    }
     setIsLoadingGainers(true);
     try {
       const data = await leaderboardService.getRPGainers(timeRange);
-      console.log('🔄 GAINERS QUERY RESULT:', data);
-      console.log('🔄 GAINERS COUNT:', data?.length);
+      gainersCache.current[timeRange] = data;
       setGainers(data || []);
+      if (data && data.length > 0) {
+        setLastInsightsUpdate(data[0].change_timestamp);
+      }
     } catch (err) {
-      console.error('❌ Error fetching gainers:', err);
       setGainers([]);
     } finally {
       setIsLoadingGainers(false);
     }
   }, []);
+
   const fetchLosers = useCallback(async (timeRange: string) => {
-    console.log('🔄 FETCHING LOSERS for timeRange:', timeRange);
+    if (losersCache.current[timeRange]) {
+      setLosers(losersCache.current[timeRange]);
+      // Set last update from cache if available
+      if (losersCache.current[timeRange].length > 0) {
+        setLastInsightsUpdate(losersCache.current[timeRange][0].change_timestamp);
+      }
+      return;
+    }
     setIsLoadingLosers(true);
     try {
       const data = await leaderboardService.getRPLosers(timeRange);
-      console.log('🔄 LOSERS QUERY RESULT:', data);
-      console.log('🔄 LOSERS COUNT:', data?.length);
+      losersCache.current[timeRange] = data;
       setLosers(data || []);
+      if (data && data.length > 0) {
+        setLastInsightsUpdate(data[0].change_timestamp);
+      }
     } catch (err) {
-      console.error('❌ Error fetching losers:', err);
       setLosers([]);
     } finally {
       setIsLoadingLosers(false);
@@ -261,12 +294,14 @@ export const useLeaderboard = () => {
     }
   })();
 
-  // Manual refresh
+  // Invalidate cache on refresh
   const refresh = useCallback(() => {
+    gainersCache.current = {};
+    losersCache.current = {};
     fetchLeaderboard();
     fetchGainers(gainersTimeRange);
     fetchLosers(losersTimeRange);
-  }, [fetchLeaderboard, fetchGainers, fetchLosers]);
+  }, [fetchLeaderboard, fetchGainers, fetchLosers, gainersTimeRange, losersTimeRange]);
 
   // Smart refresh with cache
   const refreshLeaderboard = useCallback(async (silent = false) => {
@@ -327,11 +362,12 @@ export const useLeaderboard = () => {
     gainers,
     losers,
     gainersTimeRange,
-    setGainersTimeRange,
+    setGainersTimeRange: setGainersTimeRangeDebounced,
     losersTimeRange,
-    setLosersTimeRange,
+    setLosersTimeRange: setLosersTimeRangeDebounced,
     isLoadingGainers,
     isLoadingLosers,
-    filteredEntries
+    filteredEntries,
+    lastInsightsUpdate
   };
 }; 
