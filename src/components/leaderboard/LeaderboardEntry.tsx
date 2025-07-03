@@ -108,6 +108,34 @@ const LeaderboardEntryComponent: React.FC<LeaderboardEntryProps> = ({
     >
       {/* Avatar + Level Badge */}
       <div className="relative flex-shrink-0">
+        {/* Crown for top 3 with pulse/glow and sparkle */}
+        {index === 0 && (
+          <span className="absolute -top-4 -left-2 flex items-center justify-center" title="Top 1">
+            {/* Gold pulse */}
+            <span className="absolute w-6 h-6 rounded-full animate-gold-pulse z-0" style={{boxShadow: '0 0 10px 4px #FFD70066'}}></span>
+            <span className="relative z-10 text-2xl select-none" role="img" aria-label="Gold Crown">👑</span>
+            {/* Sparkle */}
+            <span className="absolute left-4 top-0 z-20 text-yellow-200 text-lg animate-sparkle select-none" role="img" aria-label="Sparkle">✨</span>
+          </span>
+        )}
+        {index === 1 && (
+          <span className="absolute -top-4 -left-2 flex items-center justify-center" title="Top 2">
+            {/* Silver pulse */}
+            <span className="absolute w-6 h-6 rounded-full animate-silver-pulse z-0" style={{boxShadow: '0 0 10px 4px #C0C0C066'}}></span>
+            <span className="relative z-10 text-2xl select-none" role="img" aria-label="Silver Crown">🥈</span>
+            {/* Sparkle */}
+            <span className="absolute left-4 top-0 z-20 text-gray-200 text-lg animate-sparkle select-none" role="img" aria-label="Sparkle">✨</span>
+          </span>
+        )}
+        {index === 2 && (
+          <span className="absolute -top-4 -left-2 flex items-center justify-center" title="Top 3">
+            {/* Bronze pulse */}
+            <span className="absolute w-6 h-6 rounded-full animate-bronze-pulse z-0" style={{boxShadow: '0 0 10px 4px #a45b25AA'}}></span>
+            <span className="relative z-10 text-2xl select-none" role="img" aria-label="Bronze Crown">🥉</span>
+            {/* Sparkle */}
+            <span className="absolute left-4 top-0 z-20 text-orange-200 text-lg animate-sparkle select-none" role="img" aria-label="Sparkle">✨</span>
+          </span>
+        )}
         {entry.profile_picture ? (
           <img
             src={entry.profile_picture}
@@ -119,8 +147,8 @@ const LeaderboardEntryComponent: React.FC<LeaderboardEntryProps> = ({
         ) : (
           <div className="w-16 h-16 rounded-full bg-gray-700 animate-pulse" />
         )}
-        {/* Level badge (rank position) */}
-        <span className="absolute -bottom-1 -right-1 bg-[#222c3c] text-white text-xs font-bold rounded-full px-2 py-0.5 border-2 border-[#151e2e] shadow-md">
+        {/* Level badge (rank position) - larger and more distinct, now bottom left */}
+        <span className="absolute -bottom-2 -left-2 bg-[#222c3c] text-white text-lg font-extrabold rounded-full px-3 py-1 border-2 border-[#151e2e] shadow-md z-10">
           {entry.rank_position}
         </span>
       </div>
@@ -152,7 +180,6 @@ const LeaderboardEntryComponent: React.FC<LeaderboardEntryProps> = ({
               boxShadow: getRPBarColors(entry.rank_title).glow,
             }}
           >
-            <RankBadge rankTitle={entry.rank_title} rp={entry.rp} size="small" />
             <span className="text-white font-semibold text-sm drop-shadow">{getRankDisplayName(calculatedRank.tier, calculatedRank.level)}</span>
             <span className="text-blue-200 text-xs font-bold ml-2">{entry.rp} RP</span>
           </div>
