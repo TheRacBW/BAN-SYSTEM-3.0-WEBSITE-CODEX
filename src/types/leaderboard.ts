@@ -75,7 +75,7 @@ export interface LeaderboardState {
   activeTab: 'main' | 'gainers' | 'losers';
 }
 
-export type TabType = 'main' | 'gainers' | 'losers';
+export type TabType = 'main' | 'gainers' | 'losers' | 'currently-ranking';
 
 // Legacy rank tier configuration (kept for backward compatibility)
 export const RANK_TIERS: Record<RankTier, { minRp: number; maxRp: number; color: string; emoji: string }> = {

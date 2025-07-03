@@ -527,4 +527,62 @@ export const getRecentRPChanges = async (usernames: string[]): Promise<Record<st
     }
   }
   return result;
-}; 
+};
+
+/**
+ * Get players who are currently ranking (had RP change since the last leaderboard update)
+ */
+export async function getCurrentlyRankingPlayers(): Promise<LeaderboardEntry[]> {
+  // 1. Get the most recent leaderboard update time
+  const { data: leaderboardRows, error: leaderboardError } = await supabase
+    .from('leaderboard')
+    .select('inserted_at')
+    .order('inserted_at', { ascending: false })
+    .limit(1);
+  if (leaderboardError) {
+    console.error('❌ Error fetching leaderboard update time:', leaderboardError);
+    return [];
+  }
+  const lastUpdate = leaderboardRows && leaderboardRows.length > 0 ? leaderboardRows[0].inserted_at : null;
+  if (!lastUpdate) return [];
+
+  // 2. Get all RP changes since that time (only where rp_change != 0)
+  const { data: changes, error: changesError } = await supabase
+    .from('rp_changes')
+    .select('username, change_timestamp, rp_change')
+    .gte('change_timestamp', lastUpdate)
+    .neq('rp_change', 0);
+  if (changesError) {
+    console.error('❌ Error fetching recent RP changes:', changesError);
+    return [];
+  }
+  if (!changes || changes.length === 0) return [];
+  // 3. Get unique usernames and most recent change_timestamp for each
+  const userMap = new Map<string, string>();
+  changes.forEach((c: any) => {
+    if (!userMap.has(c.username) || userMap.get(c.username)! < c.change_timestamp) {
+      userMap.set(c.username, c.change_timestamp);
+    }
+  });
+  const usernames = Array.from(userMap.keys());
+  if (usernames.length === 0) return [];
+  // 4. Join with leaderboard for current info, only top 200
+  const { data: leaderboard, error: leaderboardJoinError } = await supabase
+    .from('leaderboard')
+    .select('*')
+    .in('username', usernames)
+    .lte('rank_position', 200);
+  if (leaderboardJoinError) {
+    console.error('❌ Error joining with leaderboard:', leaderboardJoinError);
+    return [];
+  }
+  if (!leaderboard || leaderboard.length === 0) return [];
+  // 5. Attach last active timestamp
+  const enriched = leaderboard.map((entry: any) => ({
+    ...entry,
+    last_active: userMap.get(entry.username) || null
+  }));
+  // 6. Sort by rank_position ascending
+  enriched.sort((a, b) => a.rank_position - b.rank_position);
+  return enriched;
+} 

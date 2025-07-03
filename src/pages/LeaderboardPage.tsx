@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Search, RefreshCw, TrendingUp, TrendingDown, Trophy, Clock, Wifi, WifiOff } from 'lucide-react';
+import { Search, RefreshCw, TrendingUp, TrendingDown, Trophy, Clock, Wifi, WifiOff, ExternalLink } from 'lucide-react';
 import { useLeaderboard } from '../hooks/useLeaderboard';
 import { TabType } from '../types/leaderboard';
 import LeaderboardEntryComponent from '../components/leaderboard/LeaderboardEntry';
@@ -10,7 +10,7 @@ import { lookupRobloxUserIds } from '../lib/robloxUserLookup';
 import { supabase } from '../lib/supabase';
 import { CSSTransition, TransitionGroup } from 'react-transition-group';
 import { AnimatePresence, motion } from 'framer-motion';
-import { getRecentRPChanges } from '../services/leaderboardService';
+import { getRecentRPChanges, getCurrentlyRankingPlayers } from '../services/leaderboardService';
 
 // Move these helpers to the top of the file:
 const getDisplayPercentage = (player: any) => {
@@ -153,10 +153,11 @@ const LeaderboardPage: React.FC = () => {
     return `${diffInDays} day${diffInDays > 1 ? 's' : ''} ago`;
   };
 
-  const tabs: { id: TabType; label: string; icon: React.ReactNode }[] = [
+  const tabs: { id: TabType | 'currently-ranking'; label: string; icon: React.ReactNode }[] = [
     { id: 'main', label: 'Leaderboard', icon: <Trophy size={20} /> },
     { id: 'gainers', label: 'Hottest Gainers', icon: <TrendingUp size={20} /> },
-    { id: 'losers', label: 'Biggest Losers', icon: <TrendingDown size={20} /> }
+    { id: 'losers', label: 'Biggest Losers', icon: <TrendingDown size={20} /> },
+    { id: 'currently-ranking', label: 'Currently Ranking', icon: <Clock size={20} /> }
   ];
 
   // Debug: Clear cache
@@ -700,6 +701,183 @@ const LeaderboardPage: React.FC = () => {
     getRecentRPChanges(usernames).then(setRecentRPChanges);
   }, [filteredEntries]);
 
+  // --- Currently Ranking State ---
+  const [currentlyRanking, setCurrentlyRanking] = useState<any[]>([]);
+  const [isLoadingCurrentlyRanking, setIsLoadingCurrentlyRanking] = useState(false);
+
+  useEffect(() => {
+    if (activeTab === 'currently-ranking') {
+      setIsLoadingCurrentlyRanking(true);
+      getCurrentlyRankingPlayers().then(players => {
+        setCurrentlyRanking(players);
+        setIsLoadingCurrentlyRanking(false);
+      });
+    }
+  }, [activeTab, lastUpdate]);
+
+  // --- Render Currently Ranking Section ---
+  const renderCurrentlyRankingSection = () => {
+    if (isLoadingCurrentlyRanking) {
+      return <div className="h-64 flex items-center justify-center text-gray-400">Loading currently ranking players...</div>;
+    }
+    if (!currentlyRanking || currentlyRanking.length === 0) {
+      return <div className="h-64 flex items-center justify-center text-gray-400">No players are currently ranking.</div>;
+    }
+    return (
+      <div>
+        <h2 className="text-2xl font-bold text-gray-900 dark:text-gray-100 mb-4 flex items-center gap-2">
+          <Clock size={22} className="text-blue-500 dark:text-blue-400" />
+          Currently Ranking
+          <span className="ml-2 text-base font-normal text-gray-500 dark:text-gray-400">({currentlyRanking.length} players)</span>
+        </h2>
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-5">
+          {currentlyRanking.map((entry, idx) => (
+            <div
+              key={entry.username}
+              className="bg-white dark:bg-gray-800 rounded-2xl shadow-lg p-5 flex flex-col items-center group transition hover:shadow-2xl border border-gray-200/60 dark:border-gray-700/60 hover:border-blue-400"
+            >
+              <div className="relative mb-3">
+                <img
+                  src={entry.profile_picture || '/default-avatar.svg'}
+                  alt={entry.username + ' avatar'}
+                  className="w-16 h-16 rounded-full object-cover border-4 border-blue-200 dark:border-blue-900 shadow"
+                  onError={e => (e.currentTarget.src = '/default-avatar.svg')}
+                  loading="lazy"
+                />
+                <span className="absolute -bottom-2 -right-2 bg-blue-500 text-white text-xs px-2 py-0.5 rounded-full shadow font-semibold">
+                  #{entry.rank_position}
+                </span>
+              </div>
+              <div className="flex flex-col items-center gap-1">
+                <span className="font-semibold text-lg text-gray-900 dark:text-white truncate max-w-[120px]">{entry.username}</span>
+                <span className="inline-flex items-center gap-2 px-3 py-1 rounded-full text-xs font-medium bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-200 mb-1">
+                  <img src={(() => {
+                    const tier: string = (entry.rank_title?.split(' ')[0]?.toUpperCase() ?? 'BRONZE');
+                    const urls: Record<string, string> = {
+                      'BRONZE': 'https://static.wikia.nocookie.net/robloxbedwars/images/5/5a/Bronze_Rank_Icon.png',
+                      'SILVER': 'https://static.wikia.nocookie.net/robloxbedwars/images/6/64/Silver_Rank_Icon.png',
+                      'GOLD': 'https://static.wikia.nocookie.net/robloxbedwars/images/9/92/Gold_Rank_Icon.png',
+                      'PLATINUM': 'https://static.wikia.nocookie.net/robloxbedwars/images/0/08/Platinum_Rank_Icon.png',
+                      'DIAMOND': 'https://static.wikia.nocookie.net/robloxbedwars/images/c/cb/Diamond_Rank_Icon.png',
+                      'EMERALD': 'https://static.wikia.nocookie.net/robloxbedwars/images/0/06/Emerald_Rank_Icon.png',
+                      'NIGHTMARE': 'https://static.wikia.nocookie.net/robloxbedwars/images/7/76/Nightmare_Rank_Icon.png',
+                    };
+                    return urls[tier as keyof typeof urls] || urls['BRONZE'];
+                  })()} alt="rank icon" className="w-5 h-5 mr-1 inline-block" />
+                  {entry.rank_title}
+                </span>
+                <span className="text-blue-600 dark:text-blue-300 font-bold text-base">{entry.rp} RP</span>
+                <span className="text-xs text-gray-500 dark:text-gray-400 mt-1">Last active: {entry.last_active ? formatLastUpdate(entry.last_active) : '—'}</span>
+              </div>
+              {entry.user_id && (
+                <a
+                  href={`https://www.roblox.com/users/${entry.user_id}/profile`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="mt-3 inline-flex items-center gap-1 text-xs text-blue-600 dark:text-blue-400 hover:underline"
+                >
+                  View Roblox Profile
+                  <ExternalLink size={14} />
+                </a>
+              )}
+            </div>
+          ))}
+        </div>
+      </div>
+    );
+  };
+
+  // --- Tab Content Switch ---
+  let tabContent;
+  if (activeTab === 'main') {
+    tabContent = (
+      <div>
+        <div className="flex items-center justify-between mb-4">
+          <h2 className="text-xl font-semibold text-gray-900 dark:text-gray-100">
+            Top 200 Players
+          </h2>
+          <span className="text-sm text-gray-600 dark:text-gray-400">
+            {filteredEntries.length} players
+          </span>
+        </div>
+        {filteredEntries.length === 0 ? (
+          <div className="text-center py-12">
+            <p className="text-gray-600 dark:text-gray-400">
+              {searchQuery ? 'No players found matching your search.' : 'No players found.'}
+            </p>
+          </div>
+        ) : (
+          <div className="flex flex-col gap-3 w-full">
+            {filteredEntries.map((entry: import('../types/leaderboard').LeaderboardEntryWithChanges) => (
+              <LeaderboardEntryComponent
+                key={entry.username}
+                entry={entry}
+                index={entry.rank_position - 1}
+                recentChange={recentRPChanges[entry.username]}
+              />
+            ))}
+          </div>
+        )}
+      </div>
+    );
+  } else if (activeTab === 'gainers' || activeTab === 'losers') {
+    tabContent = (
+      <div>
+        <div className="flex items-center justify-between mb-6">
+          <div>
+            <h2 className="text-2xl font-bold text-gray-900 dark:text-gray-100 mb-2">
+              {activeTab === 'gainers' ? '🔥 Hottest Gainers' : '📉 Biggest Losers'}
+              {searchQuery && (
+                <span className="ml-3 text-sm font-normal text-blue-600 dark:text-blue-400">
+                  (Searching: "{searchQuery}")
+                </span>
+              )}
+            </h2>
+            <p className="text-gray-600 dark:text-gray-400">
+              {activeTab === 'gainers' ? 'Players with the biggest RP gains' : 'Players with the biggest RP losses'}
+              {searchQuery && (
+                <span className="ml-2 text-blue-600 dark:text-blue-400">
+                  • Filtered results
+                </span>
+              )}
+            </p>
+          </div>
+          {/* Modern Segmented Control for Time Filter */}
+          <div className="flex bg-gray-100 dark:bg-gray-700 p-1 rounded-lg">
+            {['6h', '12h', '1d', '2d'].map(opt => (
+              <button
+                key={opt}
+                type="button"
+                className={`px-3 py-1.5 text-sm font-medium rounded-md transition-all ${
+                  ((activeTab === 'gainers' ? gainersTimeRange : losersTimeRange) === opt) 
+                    ? 'bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 shadow-sm' 
+                    : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100'
+                }`}
+                onClick={() => {
+                  activeTab === 'gainers' ? setGainersTimeRange(opt as any) : setLosersTimeRange(opt as any);
+                }}
+              >
+                {opt}
+              </button>
+            ))}
+          </div>
+        </div>
+        {(activeTab === 'gainers' ? isLoadingGainers : isLoadingLosers) ? (
+          <SkeletonLoader />
+        ) : (
+          activeTab === 'gainers' ? renderGainersSection() : renderLosersSection()
+        )}
+        {(activeTab === 'gainers' || activeTab === 'losers') && lastInsightsUpdate && (
+          <div className="text-xs text-gray-500 dark:text-gray-400 mb-2 text-right">
+            Insights last updated: {formatLastUpdate(lastInsightsUpdate)}
+          </div>
+        )}
+      </div>
+    );
+  } else if (activeTab === 'currently-ranking') {
+    tabContent = renderCurrentlyRankingSection();
+  }
+
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
       {/* Notification Toast */}
@@ -851,172 +1029,7 @@ const LeaderboardPage: React.FC = () => {
                 transition={{ duration: 0.28, ease: 'easeInOut' }}
                 className="w-full"
               >
-                {activeTab === 'main' && (
-                  <div>
-                    <div className="flex items-center justify-between mb-4">
-                      <h2 className="text-xl font-semibold text-gray-900 dark:text-gray-100">
-                        Top 200 Players
-                      </h2>
-                      <span className="text-sm text-gray-600 dark:text-gray-400">
-                        {filteredEntries.length} players
-                      </span>
-                    </div>
-                    {filteredEntries.length === 0 ? (
-                      <div className="text-center py-12">
-                        <p className="text-gray-600 dark:text-gray-400">
-                          {searchQuery ? 'No players found matching your search.' : 'No players found.'}
-                        </p>
-                      </div>
-                    ) : (
-                      <div className="flex flex-col gap-3 w-full">
-                        {filteredEntries.map((entry: import('../types/leaderboard').LeaderboardEntryWithChanges) => (
-                          <LeaderboardEntryComponent
-                            key={entry.username}
-                            entry={entry}
-                            index={entry.rank_position - 1}
-                            recentChange={recentRPChanges[entry.username]}
-                          />
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                )}
-                {(activeTab === 'gainers' || activeTab === 'losers') && (
-                  <div>
-                    <div className="flex items-center justify-between mb-6">
-                      <div>
-                        <h2 className="text-2xl font-bold text-gray-900 dark:text-gray-100 mb-2">
-                          {activeTab === 'gainers' ? '🔥 Hottest Gainers' : '📉 Biggest Losers'}
-                          {searchQuery && (
-                            <span className="ml-3 text-sm font-normal text-blue-600 dark:text-blue-400">
-                              (Searching: "{searchQuery}")
-                            </span>
-                          )}
-                        </h2>
-                        <p className="text-gray-600 dark:text-gray-400">
-                          {activeTab === 'gainers' ? 'Players with the biggest RP gains' : 'Players with the biggest RP losses'}
-                          {searchQuery && (
-                            <span className="ml-2 text-blue-600 dark:text-blue-400">
-                              • Filtered results
-                            </span>
-                          )}
-                        </p>
-                      </div>
-                      {/* Modern Segmented Control for Time Filter */}
-                      <div className="flex bg-gray-100 dark:bg-gray-700 p-1 rounded-lg">
-                        {['6h', '12h', '1d', '2d'].map(opt => (
-                          <button
-                            key={opt}
-                            type="button"
-                            className={`px-3 py-1.5 text-sm font-medium rounded-md transition-all ${
-                              ((activeTab === 'gainers' ? gainersTimeRange : losersTimeRange) === opt) 
-                                ? 'bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 shadow-sm' 
-                                : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100'
-                            }`}
-                            onClick={() => {
-                              console.log('🕐 TIME RANGE CHANGE:', activeTab, 'from', activeTab === 'gainers' ? gainersTimeRange : losersTimeRange, 'to', opt);
-                              activeTab === 'gainers' ? setGainersTimeRange(opt as any) : setLosersTimeRange(opt as any);
-                            }}
-                          >
-                            {opt}
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-
-                    {(activeTab === 'gainers' ? isLoadingGainers : isLoadingLosers) ? (
-                      <SkeletonLoader />
-                    ) : (
-                      (() => {
-                        const data = activeTab === 'gainers' ? enrichedGainers : enrichedLosers;
-                        const currentTimeRange = activeTab === 'gainers' ? gainersTimeRange : losersTimeRange;
-                        console.log('📊 DISPLAYING DATA:', {
-                          activeTab,
-                          currentTimeRange,
-                          dataLength: data?.length || 0,
-                          data: data?.slice(0, 3) // Show first 3 items for debugging
-                        });
-                        if (!data || data.length === 0) {
-                          const requested = currentTimeRange;
-                          const requestedHours = requested === '6h' ? 6 : requested === '12h' ? 12 : requested === '1d' ? 24 : 48;
-                          return (
-                            <div className="text-center py-16">
-                              <div className="max-w-md mx-auto">
-                                <div className="text-6xl mb-4">
-                                  {activeTab === 'gainers' ? '📈' : '📉'}
-                                </div>
-                                <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-2">
-                                  No {activeTab === 'gainers' ? 'RP gains' : 'RP losses'} found
-                                </h3>
-                                <p className="text-gray-600 dark:text-gray-400 mb-4">
-                                  No {activeTab === 'gainers' ? 'RP gains' : 'RP losses'} found in the last {requestedHours} hours.
-                                </p>
-                                <div className="text-sm text-gray-500 dark:text-gray-500">
-                                  Try a longer timeframe to see more activity.
-                                </div>
-                              </div>
-                            </div>
-                          );
-                        }
-
-                        // Limit to top 10 and use modern cards
-                        const top10Data = data.slice(0, 10);
-                        // Find the oldest inserted_at timestamp in the data
-                        const timestamps = data.map(e => e.inserted_at ? new Date(e.inserted_at) : null).filter(Boolean) as Date[];
-                        let oldest = null;
-                        if (timestamps.length > 0) {
-                          oldest = timestamps.reduce((min, d) => d < min ? d : min, timestamps[0]);
-                        }
-                        let periodMsg = '';
-                        if (oldest) {
-                          const now = new Date();
-                          const hours = Math.round((now.getTime() - oldest.getTime()) / (1000 * 60 * 60));
-                          const requested = currentTimeRange;
-                          const requestedHours = requested === '6h' ? 6 : requested === '12h' ? 12 : requested === '1d' ? 24 : 48;
-                          if (hours < requestedHours) {
-                            periodMsg = `Partial data: Only last ${hours} hours available for this period.`;
-                          } else {
-                            periodMsg = `Showing last ${requestedHours} hours of data.`;
-                          }
-                        }
-
-                        return (
-                          <div className="space-y-4">
-                            {periodMsg && (
-                              <div className="text-center py-3 text-sm text-gray-500 dark:text-gray-400 bg-gray-50 dark:bg-gray-800 rounded-lg">
-                                {periodMsg}
-                              </div>
-                            )}
-                            {activeTab === 'gainers' ? (
-                              // Use modern gainers bars with sections (Established above, New below)
-                              <div className="space-y-6 stagger-animation">
-                                {renderGainersSection()}
-                              </div>
-                            ) : (
-                              // Use modern losers bars with sections (RP Losers above, Dropped below)
-                              <div className="space-y-6 stagger-animation">
-                                {renderLosersSection()}
-                              </div>
-                            )}
-                            {data.length > 10 && (
-                              <div className="text-center py-6">
-                                <div className="inline-flex items-center gap-2 px-4 py-2 bg-gray-100 dark:bg-gray-800 rounded-full text-sm text-gray-600 dark:text-gray-400">
-                                  <span>📊</span>
-                                  <span>Showing top 10 of {data.length} {activeTab === 'gainers' ? 'gainers' : 'losers'}</span>
-                                </div>
-                              </div>
-                            )}
-                          </div>
-                        );
-                      })()
-                    )}
-                    {activeTab === 'gainers' || activeTab === 'losers' && lastInsightsUpdate && (
-                      <div className="text-xs text-gray-500 dark:text-gray-400 mb-2 text-right">
-                        Insights last updated: {formatLastUpdate(lastInsightsUpdate)}
-                      </div>
-                    )}
-                  </div>
-                )}
+                {tabContent}
               </motion.div>
             </AnimatePresence>
           </div>
