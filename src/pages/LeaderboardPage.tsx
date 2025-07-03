@@ -323,19 +323,28 @@ const LeaderboardPage: React.FC = () => {
                 {establishedPlayers.length} active
               </div>
             </div>
-            <div className="space-y-3">
-              <TransitionGroup className="space-y-3">
-                {establishedPlayers.map((player, index) => (
-                  <CSSTransition key={player.username} timeout={300} classNames="fade-slide">
-                    <ModernGainerBar
-                      player={{ ...player, getTransitionText: () => getTransitionText(player, true) }}
-                      rank={index + 1}
-                      isNewPlayer={false}
-                    />
-                  </CSSTransition>
-                ))}
-              </TransitionGroup>
+            <div className="max-h-[420px] overflow-y-auto scrollbar-thin scrollbar-thumb-gray-300 dark:scrollbar-thumb-gray-600 scrollbar-track-gray-100 dark:scrollbar-track-gray-800 rounded-xl border border-gray-200/50 dark:border-gray-700/50 scrollable-section shadow-sm hover:shadow-md transition-shadow duration-200">
+              <div className="space-y-3 p-3">
+                <TransitionGroup className="space-y-3">
+                  {establishedPlayers.map((player, index) => (
+                    <CSSTransition key={player.username} timeout={300} classNames="fade-slide">
+                      <ModernGainerBar
+                        player={{ ...player, getTransitionText: () => getTransitionText(player, true) }}
+                        rank={index + 1}
+                        isNewPlayer={false}
+                      />
+                    </CSSTransition>
+                  ))}
+                </TransitionGroup>
+              </div>
             </div>
+            {establishedPlayers.length > 6 && (
+              <div className="text-center mt-2">
+                <span className="text-xs text-gray-500 dark:text-gray-400 bg-gray-100 dark:bg-gray-800 px-2 py-1 rounded-full">
+                  Showing 6 of {establishedPlayers.length} players
+                </span>
+              </div>
+            )}
           </div>
         )}
         {/* New to Leaderboard */}
@@ -350,19 +359,28 @@ const LeaderboardPage: React.FC = () => {
                 {newPlayers.length} fresh
               </div>
             </div>
-            <div className="space-y-3">
-              <TransitionGroup className="space-y-3">
-                {newPlayers.map((player, index) => (
-                  <CSSTransition key={player.username} timeout={300} classNames="fade-slide">
-                    <ModernGainerBar
-                      player={{ ...player, getTransitionText: () => getTransitionText(player, true) }}
-                      rank={establishedPlayers.length + index + 1}
-                      isNewPlayer={true}
-                    />
-                  </CSSTransition>
-                ))}
-              </TransitionGroup>
+            <div className="max-h-[420px] overflow-y-auto scrollbar-thin scrollbar-thumb-gray-300 dark:scrollbar-thumb-gray-600 scrollbar-track-gray-100 dark:scrollbar-track-gray-800 rounded-xl border border-gray-200/50 dark:border-gray-700/50 scrollable-section shadow-sm hover:shadow-md transition-shadow duration-200">
+              <div className="space-y-3 p-3">
+                <TransitionGroup className="space-y-3">
+                  {newPlayers.map((player, index) => (
+                    <CSSTransition key={player.username} timeout={300} classNames="fade-slide">
+                      <ModernGainerBar
+                        player={{ ...player, getTransitionText: () => getTransitionText(player, true) }}
+                        rank={establishedPlayers.length + index + 1}
+                        isNewPlayer={true}
+                      />
+                    </CSSTransition>
+                  ))}
+                </TransitionGroup>
+              </div>
             </div>
+            {newPlayers.length > 6 && (
+              <div className="text-center mt-2">
+                <span className="text-xs text-gray-500 dark:text-gray-400 bg-gray-100 dark:bg-gray-800 px-2 py-1 rounded-full">
+                  Showing 6 of {newPlayers.length} players
+                </span>
+              </div>
+            )}
           </div>
         )}
         {establishedPlayers.length === 0 && newPlayers.length === 0 && (
@@ -391,18 +409,27 @@ const LeaderboardPage: React.FC = () => {
                 {establishedLosers.length} active
               </div>
             </div>
-            <div className="space-y-3">
-              <TransitionGroup className="space-y-3">
-                {establishedLosers.map((player, index) => (
-                  <CSSTransition key={player.username} timeout={300} classNames="fade-slide">
-                    <ModernLoserBar
-                      player={{ ...player, getTransitionText: () => getTransitionText(player, false) }}
-                      rank={index + 1}
-                    />
-                  </CSSTransition>
-                ))}
-              </TransitionGroup>
+            <div className="max-h-[420px] overflow-y-auto scrollbar-thin scrollbar-thumb-gray-300 dark:scrollbar-thumb-gray-600 scrollbar-track-gray-100 dark:scrollbar-track-gray-800 rounded-xl border border-gray-200/50 dark:border-gray-700/50 scrollable-section shadow-sm hover:shadow-md transition-shadow duration-200">
+              <div className="space-y-3 p-3">
+                <TransitionGroup className="space-y-3">
+                  {establishedLosers.map((player, index) => (
+                    <CSSTransition key={player.username} timeout={300} classNames="fade-slide">
+                      <ModernLoserBar
+                        player={{ ...player, getTransitionText: () => getTransitionText(player, false) }}
+                        rank={index + 1}
+                      />
+                    </CSSTransition>
+                  ))}
+                </TransitionGroup>
+              </div>
             </div>
+            {establishedLosers.length > 6 && (
+              <div className="text-center mt-2">
+                <span className="text-xs text-gray-500 dark:text-gray-400 bg-gray-100 dark:bg-gray-800 px-2 py-1 rounded-full">
+                  Showing 6 of {establishedLosers.length} players
+                </span>
+              </div>
+            )}
           </div>
         )}
         {/* Dropped from Top 200 */}
@@ -417,18 +444,27 @@ const LeaderboardPage: React.FC = () => {
                 {droppedPlayers.length} dropped
               </div>
             </div>
-            <div className="space-y-3">
-              <TransitionGroup className="space-y-3">
-                {droppedPlayers.map((player, index) => (
-                  <CSSTransition key={player.username} timeout={300} classNames="fade-slide">
-                    <ModernLoserBar
-                      player={{ ...player, getTransitionText: () => getTransitionText(player, false) }}
-                      rank={establishedLosers.length + index + 1}
-                    />
-                  </CSSTransition>
-                ))}
-              </TransitionGroup>
+            <div className="max-h-[420px] overflow-y-auto scrollbar-thin scrollbar-thumb-gray-300 dark:scrollbar-thumb-gray-600 scrollbar-track-gray-100 dark:scrollbar-track-gray-800 rounded-xl border border-gray-200/50 dark:border-gray-700/50 scrollable-section shadow-sm hover:shadow-md transition-shadow duration-200">
+              <div className="space-y-3 p-3">
+                <TransitionGroup className="space-y-3">
+                  {droppedPlayers.map((player, index) => (
+                    <CSSTransition key={player.username} timeout={300} classNames="fade-slide">
+                      <ModernLoserBar
+                        player={{ ...player, getTransitionText: () => getTransitionText(player, false) }}
+                        rank={establishedLosers.length + index + 1}
+                      />
+                    </CSSTransition>
+                  ))}
+                </TransitionGroup>
+              </div>
             </div>
+            {droppedPlayers.length > 6 && (
+              <div className="text-center mt-2">
+                <span className="text-xs text-gray-500 dark:text-gray-400 bg-gray-100 dark:bg-gray-800 px-2 py-1 rounded-full">
+                  Showing 6 of {droppedPlayers.length} players
+                </span>
+              </div>
+            )}
           </div>
         )}
         {establishedLosers.length === 0 && droppedPlayers.length === 0 && (

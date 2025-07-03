@@ -52,6 +52,125 @@
     @apply rounded-full;
     @apply hover:bg-gray-400 dark:hover:bg-gray-500;
   }
+
+  /* Modern Custom Scrollbar Classes for Leaderboard Sections */
+  .scrollbar-thin {
+    scrollbar-width: thin;
+    scrollbar-color: #d1d5db #f3f4f6;
+  }
+
+  .dark .scrollbar-thin {
+    scrollbar-color: #4b5563 #1f2937;
+  }
+
+  .scrollbar-thin::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+  }
+
+  .scrollbar-thin::-webkit-scrollbar-track {
+    background: transparent;
+    border-radius: 4px;
+    margin: 4px 0;
+  }
+
+  .scrollbar-thin::-webkit-scrollbar-thumb {
+    background: linear-gradient(135deg, #d1d5db 0%, #9ca3af 100%);
+    border-radius: 4px;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    transition: all 0.2s ease;
+  }
+
+  .scrollbar-thin::-webkit-scrollbar-thumb:hover {
+    background: linear-gradient(135deg, #9ca3af 0%, #6b7280 100%);
+    transform: scale(1.05);
+  }
+
+  .scrollbar-thin::-webkit-scrollbar-thumb:active {
+    background: linear-gradient(135deg, #6b7280 0%, #4b5563 100%);
+  }
+
+  /* Dark theme scrollbar */
+  .dark .scrollbar-thin::-webkit-scrollbar-thumb {
+    background: linear-gradient(135deg, #4b5563 0%, #374151 100%);
+    border: 1px solid rgba(0, 0, 0, 0.2);
+  }
+
+  .dark .scrollbar-thin::-webkit-scrollbar-thumb:hover {
+    background: linear-gradient(135deg, #374151 0%, #1f2937 100%);
+  }
+
+  .dark .scrollbar-thin::-webkit-scrollbar-thumb:active {
+    background: linear-gradient(135deg, #1f2937 0%, #111827 100%);
+  }
+
+  /* Scrollbar track styling */
+  .scrollbar-track-gray-100::-webkit-scrollbar-track {
+    background: rgba(243, 244, 246, 0.3);
+    border-radius: 4px;
+  }
+
+  .dark .scrollbar-track-gray-800::-webkit-scrollbar-track {
+    background: rgba(31, 41, 55, 0.3);
+    border-radius: 4px;
+  }
+
+  /* Enhanced Scrollable Section with Modern Fade */
+  .scrollable-section {
+    position: relative;
+    border-radius: 8px;
+    overflow: hidden;
+  }
+
+  .scrollable-section::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 20px;
+    background: linear-gradient(to bottom, rgba(255, 255, 255, 0.9), transparent);
+    pointer-events: none;
+    z-index: 2;
+    border-radius: 8px 8px 0 0;
+  }
+
+  .scrollable-section::after {
+    content: '';
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    height: 20px;
+    background: linear-gradient(to top, rgba(255, 255, 255, 0.9), transparent);
+    pointer-events: none;
+    z-index: 2;
+    border-radius: 0 0 8px 8px;
+  }
+
+  /* Dark theme fade indicators */
+  .dark .scrollable-section::before {
+    background: linear-gradient(to bottom, rgba(31, 41, 55, 0.9), transparent);
+  }
+
+  .dark .scrollable-section::after {
+    background: linear-gradient(to top, rgba(31, 41, 55, 0.9), transparent);
+  }
+
+  /* Smooth scrolling for better UX */
+  .scrollable-section {
+    scroll-behavior: smooth;
+  }
+
+  /* Custom scrollbar for Firefox */
+  .scrollable-section {
+    scrollbar-width: thin;
+    scrollbar-color: #d1d5db transparent;
+  }
+
+  .dark .scrollable-section {
+    scrollbar-color: #4b5563 transparent;
+  }
 }
 
 @layer components {
