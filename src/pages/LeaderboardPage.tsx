@@ -715,12 +715,53 @@ const LeaderboardPage: React.FC = () => {
     }
   }, [activeTab, lastUpdate]);
 
+  // --- Avatar enrichment for currently ranking ---
+  const [enrichedCurrentlyRanking, setEnrichedCurrentlyRanking] = useState<any[]>(currentlyRanking);
+
+  useEffect(() => {
+    const enrich = async (players: any[], setPlayers: (arr: any[]) => void) => {
+      const toLookup = players.filter(p => !p.user_id);
+      const usernames = toLookup.map(p => p.username);
+      const lookupResults = await lookupRobloxUserIds(usernames);
+      const lookupMap = new Map(
+        lookupResults.map(r => [r.username.toLowerCase(), r])
+      );
+      const userIdsToFetch: number[] = [];
+      const enriched = players.map(p => {
+        const found = lookupMap.get(p.username.toLowerCase());
+        let user_id = found?.user_id ?? p.user_id;
+        if (typeof user_id === 'string' && !isNaN(Number(user_id))) user_id = Number(user_id);
+        // Always set profile_picture from lookup result if present
+        let profile_picture = (found && (found as any).profile_picture_url) ? (found as any).profile_picture_url : p.profile_picture || null;
+        if (!profile_picture && user_id) userIdsToFetch.push(user_id);
+        return {
+          ...p,
+          user_id,
+          profile_picture
+        };
+      });
+      let pictureMap = new Map<number, string>();
+      if (userIdsToFetch.length > 0) {
+        pictureMap = await robloxApi.getProfilePicturesBatch(userIdsToFetch);
+      }
+      const fullyEnriched = enriched.map(p => {
+        if (p.profile_picture) return p;
+        if (p.user_id && pictureMap.has(p.user_id)) {
+          return { ...p, profile_picture: pictureMap.get(p.user_id) };
+        }
+        return p;
+      });
+      setPlayers(fullyEnriched);
+    };
+    enrich(currentlyRanking, setEnrichedCurrentlyRanking);
+  }, [currentlyRanking]);
+
   // --- Render Currently Ranking Section ---
   const renderCurrentlyRankingSection = () => {
     if (isLoadingCurrentlyRanking) {
       return <div className="h-64 flex items-center justify-center text-gray-400">Loading currently ranking players...</div>;
     }
-    if (!currentlyRanking || currentlyRanking.length === 0) {
+    if (!enrichedCurrentlyRanking || enrichedCurrentlyRanking.length === 0) {
       return <div className="h-64 flex items-center justify-center text-gray-400">No players are currently ranking.</div>;
     }
     return (
@@ -728,10 +769,10 @@ const LeaderboardPage: React.FC = () => {
         <h2 className="text-2xl font-bold text-gray-900 dark:text-gray-100 mb-4 flex items-center gap-2">
           <Clock size={22} className="text-blue-500 dark:text-blue-400" />
           Currently Ranking
-          <span className="ml-2 text-base font-normal text-gray-500 dark:text-gray-400">({currentlyRanking.length} players)</span>
+          <span className="ml-2 text-base font-normal text-gray-500 dark:text-gray-400">({enrichedCurrentlyRanking.length} players)</span>
         </h2>
         <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-5">
-          {currentlyRanking.map((entry, idx) => (
+          {enrichedCurrentlyRanking.map((entry, idx) => (
             <div
               key={entry.username}
               className="bg-white dark:bg-gray-800 rounded-2xl shadow-lg p-5 flex flex-col items-center group transition hover:shadow-2xl border border-gray-200/60 dark:border-gray-700/60 hover:border-blue-400"
