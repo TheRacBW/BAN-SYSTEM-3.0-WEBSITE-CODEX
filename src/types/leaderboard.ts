@@ -159,4 +159,34 @@ export interface RPChangeWithTimeRange {
   rank_change_text?: string;
   change_count?: number;
   latest_change?: string;
+}
+
+export interface RPChangeEntry {
+  id: string;
+  username: string;
+  previous_rp: number;
+  new_rp: number;
+  rp_change: number;
+  previous_rank: number;
+  new_rank: number;
+  previous_calculated_rank: string;
+  new_calculated_rank: string;
+  change_timestamp: string;
+  rank_tier_change?: number;
+}
+
+export interface PlayerStats {
+  totalGames: number;
+  totalRPGained: number;
+  highestRP: number;
+  currentRank: string;
+  promotions: number;
+  avgRPPerGame: number;
+  winRate: number;
+}
+
+export interface PlayerHistoryModalProps {
+  username: string;
+  isVisible: boolean;
+  onClose: () => void;
 } 
