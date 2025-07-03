@@ -10,6 +10,7 @@ import { lookupRobloxUserIds } from '../lib/robloxUserLookup';
 import { supabase } from '../lib/supabase';
 import { CSSTransition, TransitionGroup } from 'react-transition-group';
 import { AnimatePresence, motion } from 'framer-motion';
+import { getRecentRPChanges } from '../services/leaderboardService';
 
 // Move these helpers to the top of the file:
 const getDisplayPercentage = (player: any) => {
@@ -57,6 +58,7 @@ const LeaderboardPage: React.FC = () => {
   const [isRefreshingInsights, setIsRefreshingInsights] = useState(false);
   const [notification, setNotification] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
   const [showRealtimeToast, setShowRealtimeToast] = useState(false);
+  const [recentRPChanges, setRecentRPChanges] = useState<Record<string, import('../services/leaderboardService').RPChangeData>>({});
 
   // Auto-hide notification after 3 seconds
   useEffect(() => {
@@ -691,6 +693,13 @@ const LeaderboardPage: React.FC = () => {
     </div>
   );
 
+  // Fetch recent RP changes when entries change
+  useEffect(() => {
+    if (!filteredEntries || filteredEntries.length === 0) return;
+    const usernames = filteredEntries.map(e => e.username);
+    getRecentRPChanges(usernames).then(setRecentRPChanges);
+  }, [filteredEntries]);
+
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
       {/* Notification Toast */}
@@ -865,6 +874,7 @@ const LeaderboardPage: React.FC = () => {
                             key={entry.username}
                             entry={entry}
                             index={index}
+                            recentChange={recentRPChanges[entry.username]}
                           />
                         ))}
                       </div>
