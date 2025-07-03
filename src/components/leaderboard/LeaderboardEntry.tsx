@@ -110,18 +110,45 @@ const LeaderboardEntryComponent: React.FC<LeaderboardEntryProps> = ({
       <div className="flex items-center gap-3 flex-shrink-0">
         {/* Position number with outlined hexagon for #1, no border for #2/#3, number has gradient fill, hexagon on tip */}
         {index === 0 && (
-          <span className="flex items-center justify-center w-10 h-10 select-none" style={{clipPath: 'polygon(50% 0%, 93% 25%, 93% 75%, 50% 100%, 7% 75%, 7% 25%)', border: '3px solid #FFD700', background: 'transparent', boxSizing: 'border-box'}}>
-            <span className="text-2xl font-extrabold bg-gradient-to-br from-yellow-300 via-yellow-500 to-yellow-700 bg-clip-text text-transparent">1</span>
+          <span className="flex items-center justify-center w-10 h-10 select-none relative" style={{clipPath: 'polygon(50% 0%, 93% 25%, 93% 75%, 50% 100%, 7% 75%, 7% 25%)', border: '3px solid #FFD700', background: 'transparent', boxSizing: 'border-box'}}>
+            <span className="relative inline-block">
+              <span className="text-2xl font-extrabold bg-gradient-to-br from-yellow-300 via-yellow-500 to-yellow-700 bg-clip-text text-transparent z-10 relative">1</span>
+              <span className="absolute inset-0 pointer-events-none animate-gold-shine z-20"
+                style={{
+                  background: 'linear-gradient(120deg, transparent 40%, rgba(255, 215, 0, 0.25) 50%, transparent 60%)',
+                  backgroundSize: '200% 100%',
+                  mixBlendMode: 'lighten'
+                }}
+              />
+            </span>
           </span>
         )}
         {index === 1 && (
-          <span className="flex items-center justify-center w-10 h-10 select-none" style={{clipPath: 'polygon(50% 0%, 93% 25%, 93% 75%, 50% 100%, 7% 75%, 7% 25%)', background: 'transparent', boxSizing: 'border-box'}}>
-            <span className="text-2xl font-extrabold bg-gradient-to-br from-gray-200 via-gray-400 to-gray-500 bg-clip-text text-transparent">2</span>
+          <span className="flex items-center justify-center w-10 h-10 select-none relative" style={{clipPath: 'polygon(50% 0%, 93% 25%, 93% 75%, 50% 100%, 7% 75%, 7% 25%)', background: 'transparent', boxSizing: 'border-box'}}>
+            <span className="relative inline-block">
+              <span className="text-2xl font-extrabold bg-gradient-to-br from-gray-200 via-gray-400 to-gray-500 bg-clip-text text-transparent z-10 relative">2</span>
+              <span className="absolute inset-0 pointer-events-none animate-silver-shine z-20"
+                style={{
+                  background: 'linear-gradient(120deg, transparent 40%, rgba(160,160,160,0.18) 50%, transparent 60%)',
+                  backgroundSize: '200% 100%',
+                  mixBlendMode: 'lighten'
+                }}
+              />
+            </span>
           </span>
         )}
         {index === 2 && (
-          <span className="flex items-center justify-center w-10 h-10 select-none" style={{clipPath: 'polygon(50% 0%, 93% 25%, 93% 75%, 50% 100%, 7% 75%, 7% 25%)', background: 'transparent', boxSizing: 'border-box'}}>
-            <span className="text-2xl font-extrabold bg-gradient-to-br from-[#a97142] via-[#8c6239] to-[#5c2e10] bg-clip-text text-transparent">3</span>
+          <span className="flex items-center justify-center w-10 h-10 select-none relative" style={{clipPath: 'polygon(50% 0%, 93% 25%, 93% 75%, 50% 100%, 7% 75%, 7% 25%)', background: 'transparent', boxSizing: 'border-box'}}>
+            <span className="relative inline-block">
+              <span className="text-2xl font-extrabold bg-gradient-to-br from-[#a97142] via-[#8c6239] to-[#5c2e10] bg-clip-text text-transparent z-10 relative">3</span>
+              <span className="absolute inset-0 pointer-events-none animate-bronze-shine z-20"
+                style={{
+                  background: 'linear-gradient(120deg, transparent 40%, rgba(234, 182, 118, 0.15) 50%, transparent 60%)',
+                  backgroundSize: '200% 100%',
+                  mixBlendMode: 'lighten'
+                }}
+              />
+            </span>
           </span>
         )}
         {index > 2 && (
