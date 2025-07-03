@@ -9,11 +9,13 @@ import { Tooltip } from 'react-tooltip';
 interface LeaderboardEntryProps {
   entry: LeaderboardEntryWithChanges;
   index: number;
+  recentChange?: import('../../services/leaderboardService').RPChangeData;
 }
 
 const LeaderboardEntryComponent: React.FC<LeaderboardEntryProps> = ({
   entry,
-  index
+  index,
+  recentChange
 }) => {
   // Use calculated rank for badge/progress/sorting only
   const calculatedRank = entry.calculatedRank || calculateRankFromRPCached(entry.rp || 0);
@@ -114,6 +116,12 @@ const LeaderboardEntryComponent: React.FC<LeaderboardEntryProps> = ({
   // Debug log for render
   console.log('[LeaderboardEntry] Render', entry.username, 'img src:', entry.profile_picture, 'userId:', entry.user_id, 'profileUrl:', profileUrl);
 
+  // --- RP/Position Change Indicator Logic ---
+  const rpDelta = recentChange?.rp_change ?? 0;
+  const posDelta = recentChange?.rank_change ?? 0;
+  const showRPChange = rpDelta !== 0;
+  const showPosChange = posDelta !== 0;
+
   return (
     <div
       className={`leaderboard-entry flex items-center gap-6 p-4 bg-[#151e2e] rounded-2xl shadow-md mb-3 transition-all duration-300 group hover:shadow-xl border border-transparent hover:border-blue-500`}
@@ -200,6 +208,25 @@ const LeaderboardEntryComponent: React.FC<LeaderboardEntryProps> = ({
             </a>
           ) : (
             <span className="text-white font-semibold text-lg truncate max-w-[160px]">{entry.username}</span>
+          )}
+          {/* --- RP/Position Change Indicators --- */}
+          {(showRPChange || showPosChange) && (
+            <span className="flex items-center gap-1 ml-2 animate-fade-in">
+              {showRPChange && (
+                <span className={`flex items-center text-xs font-bold px-2 py-0.5 rounded-full ${rpDelta > 0 ? 'bg-green-700/80 text-green-200' : 'bg-red-700/80 text-red-200'} shadow-sm animate-pop`}
+                  title={`RP Change: ${rpDelta > 0 ? '+' : ''}${rpDelta}`}>
+                  {rpDelta > 0 ? <ArrowUp size={14} className="mr-0.5" /> : <ArrowDown size={14} className="mr-0.5" />}
+                  {rpDelta > 0 ? '+' : ''}{rpDelta}
+                </span>
+              )}
+              {showPosChange && (
+                <span className={`flex items-center text-xs font-bold px-2 py-0.5 rounded-full ${posDelta < 0 ? 'bg-green-800/80 text-green-100' : 'bg-red-800/80 text-red-100'} shadow-sm animate-pop`}
+                  title={`Position Change: ${posDelta < 0 ? '+' : ''}${-posDelta}`}>
+                  {posDelta < 0 ? <ArrowUp size={13} className="mr-0.5" /> : <ArrowDown size={13} className="mr-0.5" />}
+                  {posDelta < 0 ? '+' : ''}{-posDelta}
+                </span>
+              )}
+            </span>
           )}
         </div>
         <div className="flex items-center gap-2 mt-1">

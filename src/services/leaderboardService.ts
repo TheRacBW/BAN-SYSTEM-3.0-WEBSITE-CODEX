@@ -57,6 +57,16 @@ function getTimeFilter(range: '6h' | '12h' | '1d' | '2d') {
   return new Date(Date.now() - hours * 60 * 60 * 1000).toISOString();
 }
 
+// Type for RP change data
+export interface RPChangeData {
+  username: string;
+  rp_change: number;
+  rank_change: number;
+  change_timestamp: string;
+  previous_rp: number;
+  new_rp: number;
+}
+
 class LeaderboardService {
   private previousSnapshot: LeaderboardEntry[] = [];
 
@@ -487,4 +497,34 @@ class LeaderboardService {
   }
 }
 
-export const leaderboardService = new LeaderboardService(); 
+export const leaderboardService = new LeaderboardService();
+
+/**
+ * Batch fetch the most recent RP change for each leaderboard player from rp_changes (last 24h)
+ */
+export const getRecentRPChanges = async (usernames: string[]): Promise<Record<string, RPChangeData>> => {
+  if (!usernames.length) return {};
+  // Supabase does not support DISTINCT ON, so use a raw SQL RPC or fetch all and filter in JS
+  // For now, fetch all recent changes for these users and filter in JS
+  const { data, error } = await supabase
+    .from('rp_changes')
+    .select('username, rp_change, rank_change, change_timestamp, previous_rp, new_rp')
+    .in('username', usernames)
+    .gte('change_timestamp', new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString())
+    .order('username', { ascending: true })
+    .order('change_timestamp', { ascending: false });
+
+  if (error) {
+    console.error('Error fetching recent RP changes:', error);
+    return {};
+  }
+
+  // Filter to only the most recent change per username
+  const result: Record<string, RPChangeData> = {};
+  for (const row of data || []) {
+    if (!result[row.username]) {
+      result[row.username] = row as RPChangeData;
+    }
+  }
+  return result;
+}; 
