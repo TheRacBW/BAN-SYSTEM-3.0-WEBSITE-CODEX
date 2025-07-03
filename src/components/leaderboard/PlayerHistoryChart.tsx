@@ -11,7 +11,7 @@ import {
   ReferenceArea,
   ReferenceDot,
 } from 'recharts';
-import { getRankTierInfo } from '../../utils/rankingSystem';
+import { getRankTierInfo, getLadderScore } from '../../utils/rankingSystem';
 
 // Define rank zones and gradients (should match your system)
 const RANK_ZONES = [
@@ -57,15 +57,19 @@ const CustomYAxisTick = (props: any) => {
 const PlayerHistoryChart: React.FC<{ data: RPChangeEntry[] }> = ({ data }) => {
   if (!data || data.length === 0) return null;
 
-  // Prepare display data with displayRank
-  const displayData = data.map(entry => ({ ...entry, displayRank: getDisplayRank(entry) }));
+  // Prepare display data with displayRank and ladderScore
+  const displayData = data.map(entry => ({
+    ...entry,
+    displayRank: getDisplayRank(entry),
+    ladderScore: getLadderScore(getDisplayRank(entry), entry.new_rp)
+  }));
 
   // Find promotions (where rank tier changes)
   const promotions = data.filter((e, i) => i > 0 && getZoneForRP(e.new_rp)?.name !== getZoneForRP(data[i-1].new_rp)?.name);
 
-  // Find min/max RP for Y axis
-  const minRP = Math.min(...data.map(e => e.new_rp));
-  const maxRP = Math.max(...data.map(e => e.new_rp));
+  // Find min/max ladderScore for Y axis
+  const minLadder = Math.min(...displayData.map(e => e.ladderScore));
+  const maxLadder = Math.max(...displayData.map(e => e.ladderScore));
 
   // Find all unique rank zones in the data
   const usedZones = RANK_ZONES.filter(zone => data.some(e => e.new_rp >= zone.min && e.new_rp <= zone.max));
@@ -76,18 +80,18 @@ const PlayerHistoryChart: React.FC<{ data: RPChangeEntry[] }> = ({ data }) => {
     return acc;
   }, {} as Record<string, string>);
 
-  // Build segments for colored lines and dots
-  const segments: { data: RPChangeEntry[]; color: string }[] = [];
-  let current: RPChangeEntry[] = [data[0]];
+  // Build segments for colored lines and dots (use ladderScore for Y)
+  const segments: { data: typeof displayData; color: string }[] = [];
+  let current: typeof displayData = [displayData[0]];
   let currentZone = getZoneForRP(data[0].new_rp);
-  for (let i = 1; i < data.length; i++) {
+  for (let i = 1; i < displayData.length; i++) {
     const zone = getZoneForRP(data[i].new_rp);
     if (zone?.name !== currentZone?.name) {
       segments.push({ data: current, color: currentZone?.color || '#60A5FA' });
-      current = [data[i - 1], data[i]];
+      current = [displayData[i - 1], displayData[i]];
       currentZone = zone;
     } else {
-      current.push(data[i]);
+      current.push(displayData[i]);
     }
   }
   if (current.length > 1) segments.push({ data: current, color: currentZone?.color || '#60A5FA' });
@@ -126,10 +130,10 @@ const PlayerHistoryChart: React.FC<{ data: RPChangeEntry[] }> = ({ data }) => {
             minTickGap={20}
           />
           <YAxis
-            dataKey="new_rp"
+            dataKey="ladderScore"
             stroke="#9CA3AF"
             fontSize={12}
-            domain={[minRP - 20, maxRP + 20]}
+            domain={[minLadder - 20, maxLadder + 20]}
             tick={<CustomYAxisTick />}
             width={120}
           />
@@ -139,12 +143,11 @@ const PlayerHistoryChart: React.FC<{ data: RPChangeEntry[] }> = ({ data }) => {
             content={({ active, payload, label }) => {
               if (active && payload && payload.length > 0) {
                 const entry = payload[0].payload;
-                // Ensure label is a string for formatDate
                 const dateLabel = typeof label === 'string' ? label : String(label);
                 return (
                   <div style={{ background: '#1F2937', border: '1px solid #374151', color: '#fff', padding: 10, borderRadius: 8 }}>
                     <div><strong>{formatDate(dateLabel)}</strong></div>
-                    <div>Rank: {getDisplayRank(entry)}</div>
+                    <div>Rank: {entry.displayRank}</div>
                     <div>RP: {entry.new_rp}</div>
                   </div>
                 );
@@ -152,12 +155,12 @@ const PlayerHistoryChart: React.FC<{ data: RPChangeEntry[] }> = ({ data }) => {
               return null;
             }}
           />
-          {/* Render colored line segments and dots */}
+          {/* Render colored line segments and dots using ladderScore for Y */}
           {segments.map((seg, idx) => (
             <Fragment key={idx}>
               <Line
                 type="monotone"
-                dataKey="new_rp"
+                dataKey="ladderScore"
                 data={seg.data}
                 stroke={seg.color}
                 strokeWidth={3}
@@ -170,7 +173,7 @@ const PlayerHistoryChart: React.FC<{ data: RPChangeEntry[] }> = ({ data }) => {
                   <ReferenceDot
                     key={pt.change_timestamp + '-dot'}
                     x={pt.change_timestamp}
-                    y={pt.new_rp}
+                    y={pt.ladderScore}
                     r={5}
                     fill={seg.color}
                     stroke="#fff"
@@ -183,11 +186,12 @@ const PlayerHistoryChart: React.FC<{ data: RPChangeEntry[] }> = ({ data }) => {
           {/* Promotion markers, color-coded by new rank */}
           {promotions.map((e, i) => {
             const zone = getZoneForRP(e.new_rp);
+            const entry = displayData.find(d => d.change_timestamp === e.change_timestamp);
             return (
               <ReferenceDot
                 key={e.change_timestamp + '-promo'}
                 x={e.change_timestamp}
-                y={e.new_rp}
+                y={entry ? entry.ladderScore : undefined}
                 r={9}
                 fill={zone?.gradient ? `url(#${gradientIds[zone.name]})` : zone?.color || '#F59E0B'}
                 stroke="#fff"

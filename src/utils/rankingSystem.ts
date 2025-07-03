@@ -448,4 +448,36 @@ export function calculateRankFromRPCached(totalRP: number): CalculatedRank {
  */
 export function clearRankCache(): void {
   rankCache.clear();
+}
+
+// Rank hierarchy from highest to lowest
+const RANK_HIERARCHY = [
+  'Nightmare',
+  'Emerald',
+  'Diamond 3', 'Diamond 2', 'Diamond 1',
+  'Platinum 4', 'Platinum 3', 'Platinum 2', 'Platinum 1',
+  'Gold 4', 'Gold 3', 'Gold 2', 'Gold 1',
+  'Silver 4', 'Silver 3', 'Silver 2', 'Silver 1',
+  'Bronze 4', 'Bronze 3', 'Bronze 2', 'Bronze 1',
+];
+
+/**
+ * Maps a rank+division+RP to a global ladder score for chart plotting.
+ * @param rankTitle e.g. 'Diamond 2', 'Emerald', 'Nightmare', etc.
+ * @param rp The RP value within that division
+ * @returns Numeric ladder score (higher is better)
+ */
+export function getLadderScore(rankTitle: string, rp: number): number {
+  // Normalize rankTitle for hierarchy lookup
+  const normalized = rankTitle.trim().replace(/\s+/g, ' ');
+  const baseIndex = RANK_HIERARCHY.findIndex(r => r.toLowerCase() === normalized.toLowerCase());
+  if (baseIndex === -1) return rp; // fallback: just use RP
+  // Higher rank = higher base score
+  const baseScore = (RANK_HIERARCHY.length - baseIndex) * 1000;
+  // NIGHTMARE is special: treat as highest, add RP directly
+  if (normalized.toLowerCase() === 'nightmare') return baseScore + rp;
+  // EMERALD is just above Diamond 3, add RP
+  if (normalized.toLowerCase() === 'emerald') return baseScore + rp;
+  // For all others, add RP within division
+  return baseScore + rp;
 } 
