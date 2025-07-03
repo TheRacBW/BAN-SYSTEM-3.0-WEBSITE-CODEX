@@ -209,23 +209,11 @@ const LeaderboardEntryComponent: React.FC<LeaderboardEntryProps> = ({
           ) : (
             <span className="text-white font-semibold text-lg truncate max-w-[160px]">{entry.username}</span>
           )}
-          {/* --- RP/Position Change Indicators --- */}
-          {(showRPChange || showPosChange) && (
-            <span className="flex items-center gap-1 ml-2 animate-fade-in">
-              {showRPChange && (
-                <span className={`flex items-center text-xs font-bold px-2 py-0.5 rounded-full ${rpDelta > 0 ? 'bg-green-700/80 text-green-200' : 'bg-red-700/80 text-red-200'} shadow-sm animate-pop`}
-                  title={`RP Change: ${rpDelta > 0 ? '+' : ''}${rpDelta}`}>
-                  {rpDelta > 0 ? <ArrowUp size={14} className="mr-0.5" /> : <ArrowDown size={14} className="mr-0.5" />}
-                  {rpDelta > 0 ? '+' : ''}{rpDelta}
-                </span>
-              )}
-              {showPosChange && (
-                <span className={`flex items-center text-xs font-bold px-2 py-0.5 rounded-full ${posDelta < 0 ? 'bg-green-800/80 text-green-100' : 'bg-red-800/80 text-red-100'} shadow-sm animate-pop`}
-                  title={`Position Change: ${posDelta < 0 ? '+' : ''}${-posDelta}`}>
-                  {posDelta < 0 ? <ArrowUp size={13} className="mr-0.5" /> : <ArrowDown size={13} className="mr-0.5" />}
-                  {posDelta < 0 ? '+' : ''}{-posDelta}
-                </span>
-              )}
+          {/* --- Position Change Indicator as plain text, color-coded, on same line --- */}
+          {showPosChange && (
+            <span className={`ml-2 text-xs font-medium ${posDelta > 0 ? 'text-green-400' : 'text-red-400'}`}
+              title={posDelta > 0 ? `Moved up ${posDelta} place${posDelta === 1 ? '' : 's'}` : `Dropped ${-posDelta} place${posDelta === -1 ? '' : 's'}`}>
+              {posDelta > 0 ? `↑ Gained ${posDelta} place${posDelta === 1 ? '' : 's'}` : `↓ Dropped ${-posDelta} place${-posDelta === 1 ? '' : 's'}`}
             </span>
           )}
         </div>
@@ -247,38 +235,31 @@ const LeaderboardEntryComponent: React.FC<LeaderboardEntryProps> = ({
         </div>
       </div>
 
-      {/* RP Change (pill) */}
-      <div className="flex flex-col items-end min-w-[80px]">
-        {entry.rp_change !== 0 && (
-          <span
-            className={`px-3 py-1 rounded-full font-bold text-xs mb-1 shadow-md ${entry.rp_change > 0 ? 'bg-green-600 text-white' : 'bg-red-600 text-white'}`}
-          >
-            {entry.rp_change > 0 ? `+${entry.rp_change}` : entry.rp_change} RP
-            {entry.position_change !== 0 && (
-              <span className="ml-1">{entry.position_change > 0 ? '↑' : '↓'}{Math.abs(entry.position_change)}</span>
-            )}
-          </span>
-        )}
-        {/* Total RP */}
-        <span className="text-white font-bold text-2xl leading-tight">{formatRP(entry.rp)}</span>
-        <span className="text-gray-400 text-xs">Total RP</span>
-      </div>
-
-      {/* Progress Bar */}
-      <div className="flex flex-col justify-center w-40 min-w-[140px] ml-4">
-        <div className="flex justify-between text-xs text-gray-400 mb-1">
-          <span>{progressValue}</span>
-          <span>{progressMax}</span>
-        </div>
-        <div className="w-full h-2 bg-[#222c3c] rounded-full overflow-hidden relative">
-          <div
-            className="h-2 rounded-full animate-gradient-x transition-all duration-700"
-            style={{
-              width: `${progressPercent}%`,
-              background: getRPBarColors(entry.rank_title).gradient,
-              boxShadow: getRPBarColors(entry.rank_title).glow,
-            }}
-          />
+      {/* --- RP Change Indicator to the left of Total RP --- */}
+      <div className="flex flex-col items-end justify-between h-full ml-auto">
+        <div className="flex items-center gap-2">
+          {/* RP Change Indicator */}
+          {showRPChange && (
+            <span className={`inline-block text-xs font-bold rounded-full px-3 py-1 mr-2 ${rpDelta > 0 ? 'bg-green-700 text-white' : 'bg-red-700 text-white'}`}
+              title={rpDelta > 0 ? `Gained ${rpDelta} RP` : `Lost ${-rpDelta} RP`}>
+              {rpDelta > 0 ? `+${rpDelta} RP` : `${rpDelta} RP`}
+            </span>
+          )}
+          {/* Total RP and progress bar (existing code) */}
+          <div className="flex flex-col items-end">
+            <span className="text-2xl font-bold text-white leading-none">{formatRP(entry.rp)}</span>
+            <span className="text-xs text-gray-400">Total RP</span>
+            <div className="w-32 h-2 bg-gray-800 rounded-full mt-1">
+              <div
+                className="h-2 rounded-full transition-all duration-500"
+                style={{
+                  width: `${progressPercent}%`,
+                  background: getRPBarColors(entry.rank_title).gradient,
+                  boxShadow: getRPBarColors(entry.rank_title).glow
+                }}
+              />
+            </div>
+          </div>
         </div>
       </div>
     </div>
