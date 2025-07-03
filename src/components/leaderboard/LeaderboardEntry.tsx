@@ -106,23 +106,41 @@ const LeaderboardEntryComponent: React.FC<LeaderboardEntryProps> = ({
       style={{ minHeight: 88 }}
       data-rank={rankTier}
     >
-      {/* Avatar + Level Badge */}
-      <div className="relative flex-shrink-0">
+      {/* Position number and avatar, styled like the reference leaderboard */}
+      <div className="flex items-center gap-3 flex-shrink-0">
+        {/* Position number with outlined hexagon for #1, no border for #2/#3, number has gradient fill, hexagon on tip */}
+        {index === 0 && (
+          <span className="flex items-center justify-center w-10 h-10 select-none" style={{clipPath: 'polygon(50% 0%, 93% 25%, 93% 75%, 50% 100%, 7% 75%, 7% 25%)', border: '3px solid #FFD700', background: 'transparent', boxSizing: 'border-box'}}>
+            <span className="text-2xl font-extrabold bg-gradient-to-br from-yellow-300 via-yellow-500 to-yellow-700 bg-clip-text text-transparent">1</span>
+          </span>
+        )}
+        {index === 1 && (
+          <span className="flex items-center justify-center w-10 h-10 select-none" style={{clipPath: 'polygon(50% 0%, 93% 25%, 93% 75%, 50% 100%, 7% 75%, 7% 25%)', background: 'transparent', boxSizing: 'border-box'}}>
+            <span className="text-2xl font-extrabold bg-gradient-to-br from-gray-200 via-gray-400 to-gray-500 bg-clip-text text-transparent">2</span>
+          </span>
+        )}
+        {index === 2 && (
+          <span className="flex items-center justify-center w-10 h-10 select-none" style={{clipPath: 'polygon(50% 0%, 93% 25%, 93% 75%, 50% 100%, 7% 75%, 7% 25%)', background: 'transparent', boxSizing: 'border-box'}}>
+            <span className="text-2xl font-extrabold bg-gradient-to-br from-[#a97142] via-[#8c6239] to-[#5c2e10] bg-clip-text text-transparent">3</span>
+          </span>
+        )}
+        {index > 2 && (
+          <span className="flex items-center justify-center w-8 h-8 text-gray-400 font-bold text-lg select-none">
+            {entry.rank_position}
+          </span>
+        )}
+        {/* Profile picture */}
         {entry.profile_picture ? (
           <img
             src={entry.profile_picture}
             alt={`${entry.username}'s profile`}
-            className="w-16 h-16 rounded-full border-2 border-[#222c3c] shadow-md object-cover bg-[#1e293b]"
+            className="w-14 h-14 rounded-full object-cover bg-[#1e293b]"
             onError={handleProfileError}
             loading="lazy"
           />
         ) : (
-          <div className="w-16 h-16 rounded-full bg-gray-700 animate-pulse" />
+          <div className="w-14 h-14 rounded-full bg-gray-700 animate-pulse" />
         )}
-        {/* Level badge (rank position) - larger and more distinct, now bottom left */}
-        <span className="absolute -bottom-2 -left-2 bg-[#222c3c] text-white text-lg font-extrabold rounded-full px-3 py-1 border-2 border-[#151e2e] shadow-md z-10">
-          {entry.rank_position}
-        </span>
       </div>
 
       {/* Username, Rank Badge, and Roblox Link */}
