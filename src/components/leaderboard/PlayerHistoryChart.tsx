@@ -12,6 +12,7 @@ import {
   ReferenceDot,
 } from 'recharts';
 import { getRankTierInfo, getLadderScore } from '../../utils/rankingSystem';
+import * as FaIcons from 'react-icons/fa';
 
 // Define rank zones and gradients (should match your system)
 const RANK_ZONES = [
@@ -75,9 +76,10 @@ const RANK_LABEL_GRADIENTS = {
 };
 
 // Enhanced custom Y-axis tick with gradient color
-const CustomYAxisTick = (rankTicks: ChartDataPoint[]) => ({ x, y, payload }: any) => {
+const CustomYAxisTick = (rankTicks: { value: number; label: string }[]) => ({ x, y, payload }: any) => {
   const rank = rankTicks.find(tick => Math.abs(tick.value - payload.value) < 10);
-  if (!rank) return null;
+  // Always return an SVG element (empty <g /> if not found)
+  if (!rank) return <g />;
   // Find the base rank for gradient (e.g., DIAMOND from DIAMOND 2)
   const base = Object.keys(RANK_LABEL_GRADIENTS).find(key => rank.label.toUpperCase().includes(key));
   const gradId = base ? `rank-label-gradient-${base}` : undefined;
@@ -112,8 +114,28 @@ type ChartDataPoint = {
   change_timestamp: string;
 };
 
-const PlayerHistoryChart: React.FC<{ data: RPChangeEntry[] }> = ({ data }) => {
+const PlayerHistoryChart: React.FC<{ data: RPChangeEntry[]; stats?: any }> = ({ data, stats }) => {
   if (!data || data.length === 0) return null;
+
+  // Calculate joined leaderboard date (first entry)
+  const joinedDate = data[0]?.change_timestamp ? formatDate(data[0].change_timestamp) : '—';
+
+  // Calculate highest RP and rank
+  const highestEntry = data.reduce((max, entry) => (entry.new_rp > max.new_rp ? entry : max), data[0]);
+  const highestRP = highestEntry?.new_rp ?? '—';
+  const highestRank = highestEntry?.new_calculated_rank ?? '—';
+
+  // Calculate current rank
+  const currentEntry = data[data.length - 1];
+  const currentRank = currentEntry?.new_calculated_rank ?? '—';
+
+  // Calculate total RP gained
+  const totalRPGained = (data[data.length - 1]?.new_rp ?? 0) - (data[0]?.previous_rp ?? 0);
+
+  // Calculate promotions (number)
+  const promotions = data.filter((e, i) => i > 0 && e.new_calculated_rank !== data[i-1].new_calculated_rank).length;
+  // Promotion events (array) for chart markers
+  const promotionEvents = data.filter((e, i) => i > 0 && e.new_calculated_rank !== data[i-1].new_calculated_rank);
 
   // Prepare chart data: add displayRank, ladderScore, and timestamp
   const chartData = data.map(entry => ({
@@ -136,9 +158,6 @@ const PlayerHistoryChart: React.FC<{ data: RPChangeEntry[] }> = ({ data }) => {
     yMin = mid - minRange / 2;
     yMax = mid + minRange / 2;
   }
-
-  // Find promotions (where rank tier changes)
-  const promotions = data.filter((e, i) => i > 0 && getZoneForRP(e.new_rp)?.name !== getZoneForRP(data[i-1].new_rp)?.name);
 
   // Find all unique rank zones in the data
   const usedZones = RANK_ZONES.filter(zone => data.some(e => e.new_rp >= zone.min && e.new_rp <= zone.max));
@@ -214,109 +233,140 @@ const PlayerHistoryChart: React.FC<{ data: RPChangeEntry[] }> = ({ data }) => {
   };
 
   return (
-    <div className="w-full h-72 bg-gray-800 rounded-lg mt-2 relative">
-      <ResponsiveContainer width="100%" height="100%">
-        <LineChart data={chartData} margin={{ top: 20, right: 30, left: 0, bottom: 20 }}>
-          {/* SVG Gradients for rank zones and the line */}
-          <defs>
-            {usedZones.map(zone => (
-              <linearGradient id={gradientIds[zone.name]} key={zone.name} x1="0" y1="0" x2="1" y2="0">
-                <stop offset="0%" stopColor={zone.gradient[0]} />
-                <stop offset="100%" stopColor={zone.gradient[1]} />
-              </linearGradient>
-            ))}
-            {/* Gradient for the line */}
-            <linearGradient id="rank-gradient" x1="0" y1="0" x2="1" y2="0">
-              {stops.map((stop, i) => (
-                <stop key={i} offset={stop.offset} stopColor={stop.color} />
+    <>
+      {/* Modern info box */}
+      <div className="flex flex-wrap gap-4 items-center justify-start bg-gray-800 rounded-lg px-6 py-4 mb-2 shadow">
+        <div className="flex items-center gap-2 text-yellow-400 text-base font-semibold">
+          <span className="inline-block"><FaIcons.FaTrophy /></span>
+          <span>Total RP Gained:</span>
+          <span className="font-bold text-white">{totalRPGained}</span>
+        </div>
+        <div className="flex items-center gap-2 text-blue-400 text-base font-semibold">
+          <span className="inline-block"><FaIcons.FaCrown /></span>
+          <span>Highest RP:</span>
+          <span className="font-bold text-white">{highestRP}</span>
+          <span className="ml-2 text-xs text-blue-300">({highestRank})</span>
+        </div>
+        <div className="flex items-center gap-2 text-purple-400 text-base font-semibold">
+          <span className="inline-block"><FaIcons.FaCrown /></span>
+          <span>Current Rank:</span>
+          <span className="font-bold text-white">{currentRank}</span>
+        </div>
+        <div className="flex items-center gap-2 text-green-400 text-base font-semibold">
+          <span className="inline-block"><FaIcons.FaArrowUp /></span>
+          <span>Promotions:</span>
+          <span className="font-bold text-white">{promotions}</span>
+        </div>
+        <div className="flex items-center gap-2 text-gray-300 text-base font-semibold">
+          <span className="inline-block"><FaIcons.FaCalendarAlt /></span>
+          <span>Joined Leaderboard:</span>
+          <span className="font-bold text-white">{joinedDate}</span>
+        </div>
+      </div>
+      <div className="w-full h-72 bg-gray-800 rounded-lg mt-2 relative">
+        <ResponsiveContainer width="100%" height="100%">
+          <LineChart data={chartData} margin={{ top: 20, right: 30, left: 0, bottom: 20 }}>
+            {/* SVG Gradients for rank zones and the line */}
+            <defs>
+              {usedZones.map(zone => (
+                <linearGradient id={gradientIds[zone.name]} key={zone.name} x1="0" y1="0" x2="1" y2="0">
+                  <stop offset="0%" stopColor={zone.gradient[0]} />
+                  <stop offset="100%" stopColor={zone.gradient[1]} />
+                </linearGradient>
               ))}
-            </linearGradient>
-            {/* Gradients for rank label text */}
-            {Object.entries(RANK_LABEL_GRADIENTS).map(([key, [from, to]]) => (
-              <linearGradient id={`rank-label-gradient-${key}`} key={key} x1="0" y1="0" x2="1" y2="0">
-                <stop offset="0%" stopColor={from} />
-                <stop offset="100%" stopColor={to} />
+              {/* Gradient for the line */}
+              <linearGradient id="rank-gradient" x1="0" y1="0" x2="1" y2="0">
+                {stops.map((stop, i) => (
+                  <stop key={i} offset={stop.offset} stopColor={stop.color} />
+                ))}
               </linearGradient>
-            ))}
-          </defs>
-          {/* Background rank zones with gradients */}
-          {usedZones.map(zone => (
-            <ReferenceArea
-              key={zone.name}
-              y1={zone.min}
-              y2={zone.max}
-              stroke={zone.color}
-              fill={`url(#${gradientIds[zone.name]})`}
-              fillOpacity={0.18}
-              ifOverflow="extendDomain"
-            />
-          ))}
-          <CartesianGrid stroke="#374151" strokeDasharray="3 3" />
-          <XAxis
-            dataKey="change_timestamp"
-            tickFormatter={formatDate}
-            stroke="#9CA3AF"
-            fontSize={12}
-            minTickGap={20}
-          />
-          <YAxis
-            dataKey="ladderScore"
-            stroke="#9CA3AF"
-            fontSize={12}
-            domain={[yMin, yMax]}
-            allowDataOverflow={true}
-            ticks={rankTicks.map(tick => tick.value)}
-            tick={CustomYAxisTick(rankTicks)}
-            width={120}
-          />
-          <Tooltip
-            contentStyle={{ background: '#1F2937', border: '1px solid #374151', color: '#fff' }}
-            labelFormatter={formatDate}
-            content={({ active, payload, label }) => {
-              if (active && payload && payload.length > 0) {
-                const entry = payload[0].payload;
-                const dateLabel = typeof label === 'string' ? label : String(label);
-                return (
-                  <div style={{ background: '#1F2937', border: '1px solid #374151', color: '#fff', padding: 10, borderRadius: 8 }}>
-                    <div><strong>{formatDate(dateLabel)}</strong></div>
-                    <div>Rank: {entry.displayRank}</div>
-                    <div>RP: {entry.new_rp}</div>
-                  </div>
-                );
-              }
-              return null;
-            }}
-          />
-          {/* Single continuous line with smooth gradient */}
-          <Line
-            type="monotone"
-            dataKey="ladderScore"
-            stroke="url(#rank-gradient)"
-            strokeWidth={3}
-            dot={{ fill: '#3B82F6', r: 4, stroke: '#fff', strokeWidth: 2 }}
-            isAnimationActive={true}
-          />
-          {/* Promotion markers, color-coded by new rank */}
-          {promotions.map((e, i) => {
-            const zone = getZoneForRP(e.new_rp);
-            const entry = chartData.find(d => d.change_timestamp === e.change_timestamp);
-            return (
-              <ReferenceDot
-                key={e.change_timestamp + '-promo'}
-                x={e.change_timestamp}
-                y={entry ? entry.ladderScore : undefined}
-                r={9}
-                fill={zone?.gradient ? `url(#${gradientIds[zone.name]})` : zone?.color || '#F59E0B'}
-                stroke="#fff"
-                strokeWidth={3}
-                label={{ value: `PROMO: ${zone?.name || ''}`, position: 'top', fill: zone?.color || '#F59E0B', fontSize: 12, fontWeight: 700 }}
+              {/* Gradients for rank label text */}
+              {Object.entries(RANK_LABEL_GRADIENTS).map(([key, [from, to]]) => (
+                <linearGradient id={`rank-label-gradient-${key}`} key={key} x1="0" y1="0" x2="1" y2="0">
+                  <stop offset="0%" stopColor={from} />
+                  <stop offset="100%" stopColor={to} />
+                </linearGradient>
+              ))}
+            </defs>
+            {/* Background rank zones with gradients */}
+            {usedZones.map(zone => (
+              <ReferenceArea
+                key={zone.name}
+                y1={zone.min}
+                y2={zone.max}
+                stroke={zone.color}
+                fill={`url(#${gradientIds[zone.name]})`}
+                fillOpacity={0.18}
+                ifOverflow="extendDomain"
               />
-            );
-          })}
-        </LineChart>
-      </ResponsiveContainer>
-      <div className="absolute top-2 right-4 text-xs text-gray-500">{data.length} entries</div>
-    </div>
+            ))}
+            <CartesianGrid stroke="#374151" strokeDasharray="3 3" />
+            <XAxis
+              dataKey="change_timestamp"
+              tickFormatter={formatDate}
+              stroke="#9CA3AF"
+              fontSize={12}
+              minTickGap={20}
+            />
+            <YAxis
+              dataKey="ladderScore"
+              stroke="#9CA3AF"
+              fontSize={12}
+              domain={[yMin, yMax]}
+              allowDataOverflow={true}
+              ticks={rankTicks.map(tick => tick.value)}
+              tick={CustomYAxisTick(rankTicks)}
+              width={120}
+            />
+            <Tooltip
+              contentStyle={{ background: '#1F2937', border: '1px solid #374151', color: '#fff' }}
+              labelFormatter={formatDate}
+              content={({ active, payload, label }) => {
+                if (active && payload && payload.length > 0) {
+                  const entry = payload[0].payload;
+                  const dateLabel = typeof label === 'string' ? label : String(label);
+                  return (
+                    <div style={{ background: '#1F2937', border: '1px solid #374151', color: '#fff', padding: 10, borderRadius: 8 }}>
+                      <div><strong>{formatDate(dateLabel)}</strong></div>
+                      <div>Rank: {entry.displayRank}</div>
+                      <div>RP: {entry.new_rp}</div>
+                    </div>
+                  );
+                }
+                return null;
+              }}
+            />
+            {/* Single continuous line with smooth gradient */}
+            <Line
+              type="monotone"
+              dataKey="ladderScore"
+              stroke="url(#rank-gradient)"
+              strokeWidth={3}
+              dot={{ fill: '#3B82F6', r: 4, stroke: '#fff', strokeWidth: 2 }}
+              isAnimationActive={true}
+            />
+            {/* Promotion markers, color-coded by new rank */}
+            {promotionEvents.map((e, i) => {
+              const zone = getZoneForRP(e.new_rp);
+              const entry = chartData.find(d => d.change_timestamp === e.change_timestamp);
+              return (
+                <ReferenceDot
+                  key={e.change_timestamp + '-promo'}
+                  x={e.change_timestamp}
+                  y={entry ? entry.ladderScore : undefined}
+                  r={9}
+                  fill={zone?.gradient ? `url(#${gradientIds[zone.name]})` : zone?.color || '#F59E0B'}
+                  stroke="#fff"
+                  strokeWidth={3}
+                  label={{ value: `PROMO: ${zone?.name || ''}`, position: 'top', fill: zone?.color || '#F59E0B', fontSize: 12, fontWeight: 700 }}
+                />
+              );
+            })}
+          </LineChart>
+        </ResponsiveContainer>
+        <div className="absolute top-2 right-4 text-xs text-gray-500">{data.length} entries</div>
+      </div>
+    </>
   );
 };
 
