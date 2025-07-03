@@ -147,8 +147,8 @@ const LeaderboardEntryComponent: React.FC<LeaderboardEntryProps> = ({
         ) : (
           <div className="w-16 h-16 rounded-full bg-gray-700 animate-pulse" />
         )}
-        {/* Level badge (rank position) - larger and more distinct, now bottom left */}
-        <span className="absolute -bottom-2 -left-2 bg-[#222c3c] text-white text-lg font-extrabold rounded-full px-3 py-1 border-2 border-[#151e2e] shadow-md z-10">
+        {/* Level badge (rank position) - even smaller and farther right */}
+        <span className="absolute -bottom-1 -right-2 bg-[#222c3c] text-white text-sm font-bold rounded-full px-1.5 py-0 border border-[#151e2e] shadow-md z-10">
           {entry.rank_position}
         </span>
       </div>
