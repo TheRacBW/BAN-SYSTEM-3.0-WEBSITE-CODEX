@@ -54,53 +54,55 @@ const CustomYAxisTick = (props: any) => {
   );
 };
 
+// Helper to get color for a given rank name
+const getRankColor = (rankName: string) => {
+  const zone = RANK_ZONES.find(z => z.name.toLowerCase() === rankName.toLowerCase());
+  return zone ? zone.color : '#60A5FA';
+};
+
 const PlayerHistoryChart: React.FC<{ data: RPChangeEntry[] }> = ({ data }) => {
   if (!data || data.length === 0) return null;
 
-  // Prepare display data with displayRank and ladderScore
-  const displayData = data.map(entry => ({
+  // Prepare chart data: add displayRank, ladderScore, and timestamp
+  const chartData = data.map(entry => ({
     ...entry,
     displayRank: getDisplayRank(entry),
-    ladderScore: getLadderScore(getDisplayRank(entry), entry.new_rp)
+    ladderScore: getLadderScore(getDisplayRank(entry), entry.new_rp),
+    timestamp: new Date(entry.change_timestamp).getTime(),
   }));
+  // Sort by timestamp
+  chartData.sort((a, b) => a.timestamp - b.timestamp);
+
+  // Calculate min/max for Y-axis
+  const minLadder = Math.min(...chartData.map(e => e.ladderScore));
+  const maxLadder = Math.max(...chartData.map(e => e.ladderScore));
+  const padding = (maxLadder - minLadder) * 0.1;
 
   // Find promotions (where rank tier changes)
   const promotions = data.filter((e, i) => i > 0 && getZoneForRP(e.new_rp)?.name !== getZoneForRP(data[i-1].new_rp)?.name);
 
-  // Find min/max ladderScore for Y axis
-  const minLadder = Math.min(...displayData.map(e => e.ladderScore));
-  const maxLadder = Math.max(...displayData.map(e => e.ladderScore));
-
   // Find all unique rank zones in the data
   const usedZones = RANK_ZONES.filter(zone => data.some(e => e.new_rp >= zone.min && e.new_rp <= zone.max));
-
-  // Generate unique gradient IDs for SVG defs
   const gradientIds = usedZones.reduce((acc, zone) => {
     acc[zone.name] = `rank-gradient-${zone.name}`;
     return acc;
   }, {} as Record<string, string>);
 
-  // Build segments for colored lines and dots (use ladderScore for Y)
-  const segments: { data: typeof displayData; color: string }[] = [];
-  let current: typeof displayData = [displayData[0]];
-  let currentZone = getZoneForRP(data[0].new_rp);
-  for (let i = 1; i < displayData.length; i++) {
-    const zone = getZoneForRP(data[i].new_rp);
-    if (zone?.name !== currentZone?.name) {
-      segments.push({ data: current, color: currentZone?.color || '#60A5FA' });
-      current = [displayData[i - 1], displayData[i]];
-      currentZone = zone;
-    } else {
-      current.push(displayData[i]);
-    }
-  }
-  if (current.length > 1) segments.push({ data: current, color: currentZone?.color || '#60A5FA' });
+  // Build gradient stops for the line
+  const getRankColor = (rankName: string) => {
+    const zone = RANK_ZONES.find(z => z.name.toLowerCase() === rankName.toLowerCase());
+    return zone ? zone.color : '#3B82F6';
+  };
+  const stops = chartData.map((pt, i) => {
+    const offset = (i / (chartData.length - 1)) * 100;
+    return { color: getRankColor(pt.displayRank), offset: `${offset}%` };
+  });
 
   return (
     <div className="w-full h-72 bg-gray-800 rounded-lg mt-2 relative">
       <ResponsiveContainer width="100%" height="100%">
-        <LineChart data={displayData} margin={{ top: 20, right: 30, left: 0, bottom: 20 }}>
-          {/* SVG Gradients for rank zones */}
+        <LineChart data={chartData} margin={{ top: 20, right: 30, left: 0, bottom: 20 }}>
+          {/* SVG Gradients for rank zones and the line */}
           <defs>
             {usedZones.map(zone => (
               <linearGradient id={gradientIds[zone.name]} key={zone.name} x1="0" y1="0" x2="1" y2="0">
@@ -108,6 +110,12 @@ const PlayerHistoryChart: React.FC<{ data: RPChangeEntry[] }> = ({ data }) => {
                 <stop offset="100%" stopColor={zone.gradient[1]} />
               </linearGradient>
             ))}
+            {/* Gradient for the line */}
+            <linearGradient id="rank-gradient" x1="0" y1="0" x2="1" y2="0">
+              {stops.map((stop, i) => (
+                <stop key={i} offset={stop.offset} stopColor={stop.color} />
+              ))}
+            </linearGradient>
           </defs>
           {/* Background rank zones with gradients */}
           {usedZones.map(zone => (
@@ -133,7 +141,7 @@ const PlayerHistoryChart: React.FC<{ data: RPChangeEntry[] }> = ({ data }) => {
             dataKey="ladderScore"
             stroke="#9CA3AF"
             fontSize={12}
-            domain={[minLadder - 20, maxLadder + 20]}
+            domain={[minLadder - padding, maxLadder + padding]}
             tick={<CustomYAxisTick />}
             width={120}
           />
@@ -155,38 +163,19 @@ const PlayerHistoryChart: React.FC<{ data: RPChangeEntry[] }> = ({ data }) => {
               return null;
             }}
           />
-          {/* Render colored line segments and dots using ladderScore for Y */}
-          {segments.map((seg, idx) => (
-            <Fragment key={idx}>
-              <Line
-                type="monotone"
-                dataKey="ladderScore"
-                data={seg.data}
-                stroke={seg.color}
-                strokeWidth={3}
-                dot={false}
-                isAnimationActive={true}
-              />
-              {seg.data.map((pt, i) => (
-                // Only render dot for first point or if not duplicate
-                (i === 0 && idx === 0) || i > 0 ? (
-                  <ReferenceDot
-                    key={pt.change_timestamp + '-dot'}
-                    x={pt.change_timestamp}
-                    y={pt.ladderScore}
-                    r={5}
-                    fill={seg.color}
-                    stroke="#fff"
-                    strokeWidth={2}
-                  />
-                ) : null
-              ))}
-            </Fragment>
-          ))}
+          {/* Single continuous line with smooth gradient */}
+          <Line
+            type="monotone"
+            dataKey="ladderScore"
+            stroke="url(#rank-gradient)"
+            strokeWidth={3}
+            dot={{ fill: '#3B82F6', r: 4, stroke: '#fff', strokeWidth: 2 }}
+            isAnimationActive={true}
+          />
           {/* Promotion markers, color-coded by new rank */}
           {promotions.map((e, i) => {
             const zone = getZoneForRP(e.new_rp);
-            const entry = displayData.find(d => d.change_timestamp === e.change_timestamp);
+            const entry = chartData.find(d => d.change_timestamp === e.change_timestamp);
             return (
               <ReferenceDot
                 key={e.change_timestamp + '-promo'}
