@@ -171,6 +171,9 @@ export interface RPChangeEntry {
   new_rank: number;
   previous_calculated_rank: string;
   new_calculated_rank: string;
+  // TODO: Once the database is updated, these will be populated with raw rank titles from the game
+  previous_rank_title?: string; // Raw game rank (future)
+  new_rank_title?: string;      // Raw game rank (future)
   change_timestamp: string;
   rank_tier_change?: number;
 }
