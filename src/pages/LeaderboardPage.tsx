@@ -9,6 +9,7 @@ import { robloxApi } from '../services/robloxApi';
 import { lookupRobloxUserIds } from '../lib/robloxUserLookup';
 import { supabase } from '../lib/supabase';
 import { CSSTransition, TransitionGroup } from 'react-transition-group';
+import { AnimatePresence, motion } from 'framer-motion';
 
 // Move these helpers to the top of the file:
 const getDisplayPercentage = (player: any) => {
@@ -832,171 +833,182 @@ const LeaderboardPage: React.FC = () => {
                 <span>Updating...</span>
               </div>
             )}
-            {activeTab === 'main' && (
-              <div>
-                <div className="flex items-center justify-between mb-4">
-                  <h2 className="text-xl font-semibold text-gray-900 dark:text-gray-100">
-                    Top 200 Players
-                  </h2>
-                  <span className="text-sm text-gray-600 dark:text-gray-400">
-                    {filteredEntries.length} players
-                  </span>
-                </div>
-                {filteredEntries.length === 0 ? (
-                  <div className="text-center py-12">
-                    <p className="text-gray-600 dark:text-gray-400">
-                      {searchQuery ? 'No players found matching your search.' : 'No players found.'}
-                    </p>
-                  </div>
-                ) : (
-                  <div className="flex flex-col gap-3 w-full">
-                    {filteredEntries.map((entry: import('../types/leaderboard').LeaderboardEntryWithChanges, index: number) => (
-                      <LeaderboardEntryComponent
-                        key={entry.username}
-                        entry={entry}
-                        index={index}
-                      />
-                    ))}
-                  </div>
-                )}
-              </div>
-            )}
-            {(activeTab === 'gainers' || activeTab === 'losers') && (
-              <div>
-                <div className="flex items-center justify-between mb-6">
+            <AnimatePresence mode="wait">
+              <motion.div
+                key={activeTab}
+                initial={{ x: 40, opacity: 0 }}
+                animate={{ x: 0, opacity: 1 }}
+                exit={{ x: -40, opacity: 0 }}
+                transition={{ duration: 0.28, ease: 'easeInOut' }}
+                className="w-full"
+              >
+                {activeTab === 'main' && (
                   <div>
-                    <h2 className="text-2xl font-bold text-gray-900 dark:text-gray-100 mb-2">
-                      {activeTab === 'gainers' ? '🔥 Hottest Gainers' : '📉 Biggest Losers'}
-                      {searchQuery && (
-                        <span className="ml-3 text-sm font-normal text-blue-600 dark:text-blue-400">
-                          (Searching: "{searchQuery}")
-                        </span>
-                      )}
-                    </h2>
-                    <p className="text-gray-600 dark:text-gray-400">
-                      {activeTab === 'gainers' ? 'Players with the biggest RP gains' : 'Players with the biggest RP losses'}
-                      {searchQuery && (
-                        <span className="ml-2 text-blue-600 dark:text-blue-400">
-                          • Filtered results
-                        </span>
-                      )}
-                    </p>
-                  </div>
-                  {/* Modern Segmented Control for Time Filter */}
-                  <div className="flex bg-gray-100 dark:bg-gray-700 p-1 rounded-lg">
-                    {['6h', '12h', '1d', '2d'].map(opt => (
-                      <button
-                        key={opt}
-                        type="button"
-                        className={`px-3 py-1.5 text-sm font-medium rounded-md transition-all ${
-                          ((activeTab === 'gainers' ? gainersTimeRange : losersTimeRange) === opt) 
-                            ? 'bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 shadow-sm' 
-                            : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100'
-                        }`}
-                        onClick={() => {
-                          console.log('🕐 TIME RANGE CHANGE:', activeTab, 'from', activeTab === 'gainers' ? gainersTimeRange : losersTimeRange, 'to', opt);
-                          activeTab === 'gainers' ? setGainersTimeRange(opt as any) : setLosersTimeRange(opt as any);
-                        }}
-                      >
-                        {opt}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-
-                {(activeTab === 'gainers' ? isLoadingGainers : isLoadingLosers) ? (
-                  <SkeletonLoader />
-                ) : (
-                  (() => {
-                    const data = activeTab === 'gainers' ? enrichedGainers : enrichedLosers;
-                    const currentTimeRange = activeTab === 'gainers' ? gainersTimeRange : losersTimeRange;
-                    console.log('📊 DISPLAYING DATA:', {
-                      activeTab,
-                      currentTimeRange,
-                      dataLength: data?.length || 0,
-                      data: data?.slice(0, 3) // Show first 3 items for debugging
-                    });
-                    if (!data || data.length === 0) {
-                      const requested = currentTimeRange;
-                      const requestedHours = requested === '6h' ? 6 : requested === '12h' ? 12 : requested === '1d' ? 24 : 48;
-                      return (
-                        <div className="text-center py-16">
-                          <div className="max-w-md mx-auto">
-                            <div className="text-6xl mb-4">
-                              {activeTab === 'gainers' ? '📈' : '📉'}
-                            </div>
-                            <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-2">
-                              No {activeTab === 'gainers' ? 'RP gains' : 'RP losses'} found
-                            </h3>
-                            <p className="text-gray-600 dark:text-gray-400 mb-4">
-                              No {activeTab === 'gainers' ? 'RP gains' : 'RP losses'} found in the last {requestedHours} hours.
-                            </p>
-                            <div className="text-sm text-gray-500 dark:text-gray-500">
-                              Try a longer timeframe to see more activity.
-                            </div>
-                          </div>
-                        </div>
-                      );
-                    }
-
-                    // Limit to top 10 and use modern cards
-                    const top10Data = data.slice(0, 10);
-                    // Find the oldest inserted_at timestamp in the data
-                    const timestamps = data.map(e => e.inserted_at ? new Date(e.inserted_at) : null).filter(Boolean) as Date[];
-                    let oldest = null;
-                    if (timestamps.length > 0) {
-                      oldest = timestamps.reduce((min, d) => d < min ? d : min, timestamps[0]);
-                    }
-                    let periodMsg = '';
-                    if (oldest) {
-                      const now = new Date();
-                      const hours = Math.round((now.getTime() - oldest.getTime()) / (1000 * 60 * 60));
-                      const requested = currentTimeRange;
-                      const requestedHours = requested === '6h' ? 6 : requested === '12h' ? 12 : requested === '1d' ? 24 : 48;
-                      if (hours < requestedHours) {
-                        periodMsg = `Partial data: Only last ${hours} hours available for this period.`;
-                      } else {
-                        periodMsg = `Showing last ${requestedHours} hours of data.`;
-                      }
-                    }
-
-                    return (
-                      <div className="space-y-4">
-                        {periodMsg && (
-                          <div className="text-center py-3 text-sm text-gray-500 dark:text-gray-400 bg-gray-50 dark:bg-gray-800 rounded-lg">
-                            {periodMsg}
-                          </div>
-                        )}
-                        {activeTab === 'gainers' ? (
-                          // Use modern gainers bars with sections (Established above, New below)
-                          <div className="space-y-6 stagger-animation">
-                            {renderGainersSection()}
-                          </div>
-                        ) : (
-                          // Use modern losers bars with sections (RP Losers above, Dropped below)
-                          <div className="space-y-6 stagger-animation">
-                            {renderLosersSection()}
-                          </div>
-                        )}
-                        {data.length > 10 && (
-                          <div className="text-center py-6">
-                            <div className="inline-flex items-center gap-2 px-4 py-2 bg-gray-100 dark:bg-gray-800 rounded-full text-sm text-gray-600 dark:text-gray-400">
-                              <span>📊</span>
-                              <span>Showing top 10 of {data.length} {activeTab === 'gainers' ? 'gainers' : 'losers'}</span>
-                            </div>
-                          </div>
-                        )}
+                    <div className="flex items-center justify-between mb-4">
+                      <h2 className="text-xl font-semibold text-gray-900 dark:text-gray-100">
+                        Top 200 Players
+                      </h2>
+                      <span className="text-sm text-gray-600 dark:text-gray-400">
+                        {filteredEntries.length} players
+                      </span>
+                    </div>
+                    {filteredEntries.length === 0 ? (
+                      <div className="text-center py-12">
+                        <p className="text-gray-600 dark:text-gray-400">
+                          {searchQuery ? 'No players found matching your search.' : 'No players found.'}
+                        </p>
                       </div>
-                    );
-                  })()
-                )}
-                {activeTab === 'gainers' || activeTab === 'losers' && lastInsightsUpdate && (
-                  <div className="text-xs text-gray-500 dark:text-gray-400 mb-2 text-right">
-                    Insights last updated: {formatLastUpdate(lastInsightsUpdate)}
+                    ) : (
+                      <div className="flex flex-col gap-3 w-full">
+                        {filteredEntries.map((entry: import('../types/leaderboard').LeaderboardEntryWithChanges, index: number) => (
+                          <LeaderboardEntryComponent
+                            key={entry.username}
+                            entry={entry}
+                            index={index}
+                          />
+                        ))}
+                      </div>
+                    )}
                   </div>
                 )}
-              </div>
-            )}
+                {(activeTab === 'gainers' || activeTab === 'losers') && (
+                  <div>
+                    <div className="flex items-center justify-between mb-6">
+                      <div>
+                        <h2 className="text-2xl font-bold text-gray-900 dark:text-gray-100 mb-2">
+                          {activeTab === 'gainers' ? '🔥 Hottest Gainers' : '📉 Biggest Losers'}
+                          {searchQuery && (
+                            <span className="ml-3 text-sm font-normal text-blue-600 dark:text-blue-400">
+                              (Searching: "{searchQuery}")
+                            </span>
+                          )}
+                        </h2>
+                        <p className="text-gray-600 dark:text-gray-400">
+                          {activeTab === 'gainers' ? 'Players with the biggest RP gains' : 'Players with the biggest RP losses'}
+                          {searchQuery && (
+                            <span className="ml-2 text-blue-600 dark:text-blue-400">
+                              • Filtered results
+                            </span>
+                          )}
+                        </p>
+                      </div>
+                      {/* Modern Segmented Control for Time Filter */}
+                      <div className="flex bg-gray-100 dark:bg-gray-700 p-1 rounded-lg">
+                        {['6h', '12h', '1d', '2d'].map(opt => (
+                          <button
+                            key={opt}
+                            type="button"
+                            className={`px-3 py-1.5 text-sm font-medium rounded-md transition-all ${
+                              ((activeTab === 'gainers' ? gainersTimeRange : losersTimeRange) === opt) 
+                                ? 'bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 shadow-sm' 
+                                : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100'
+                            }`}
+                            onClick={() => {
+                              console.log('🕐 TIME RANGE CHANGE:', activeTab, 'from', activeTab === 'gainers' ? gainersTimeRange : losersTimeRange, 'to', opt);
+                              activeTab === 'gainers' ? setGainersTimeRange(opt as any) : setLosersTimeRange(opt as any);
+                            }}
+                          >
+                            {opt}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+
+                    {(activeTab === 'gainers' ? isLoadingGainers : isLoadingLosers) ? (
+                      <SkeletonLoader />
+                    ) : (
+                      (() => {
+                        const data = activeTab === 'gainers' ? enrichedGainers : enrichedLosers;
+                        const currentTimeRange = activeTab === 'gainers' ? gainersTimeRange : losersTimeRange;
+                        console.log('📊 DISPLAYING DATA:', {
+                          activeTab,
+                          currentTimeRange,
+                          dataLength: data?.length || 0,
+                          data: data?.slice(0, 3) // Show first 3 items for debugging
+                        });
+                        if (!data || data.length === 0) {
+                          const requested = currentTimeRange;
+                          const requestedHours = requested === '6h' ? 6 : requested === '12h' ? 12 : requested === '1d' ? 24 : 48;
+                          return (
+                            <div className="text-center py-16">
+                              <div className="max-w-md mx-auto">
+                                <div className="text-6xl mb-4">
+                                  {activeTab === 'gainers' ? '📈' : '📉'}
+                                </div>
+                                <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-2">
+                                  No {activeTab === 'gainers' ? 'RP gains' : 'RP losses'} found
+                                </h3>
+                                <p className="text-gray-600 dark:text-gray-400 mb-4">
+                                  No {activeTab === 'gainers' ? 'RP gains' : 'RP losses'} found in the last {requestedHours} hours.
+                                </p>
+                                <div className="text-sm text-gray-500 dark:text-gray-500">
+                                  Try a longer timeframe to see more activity.
+                                </div>
+                              </div>
+                            </div>
+                          );
+                        }
+
+                        // Limit to top 10 and use modern cards
+                        const top10Data = data.slice(0, 10);
+                        // Find the oldest inserted_at timestamp in the data
+                        const timestamps = data.map(e => e.inserted_at ? new Date(e.inserted_at) : null).filter(Boolean) as Date[];
+                        let oldest = null;
+                        if (timestamps.length > 0) {
+                          oldest = timestamps.reduce((min, d) => d < min ? d : min, timestamps[0]);
+                        }
+                        let periodMsg = '';
+                        if (oldest) {
+                          const now = new Date();
+                          const hours = Math.round((now.getTime() - oldest.getTime()) / (1000 * 60 * 60));
+                          const requested = currentTimeRange;
+                          const requestedHours = requested === '6h' ? 6 : requested === '12h' ? 12 : requested === '1d' ? 24 : 48;
+                          if (hours < requestedHours) {
+                            periodMsg = `Partial data: Only last ${hours} hours available for this period.`;
+                          } else {
+                            periodMsg = `Showing last ${requestedHours} hours of data.`;
+                          }
+                        }
+
+                        return (
+                          <div className="space-y-4">
+                            {periodMsg && (
+                              <div className="text-center py-3 text-sm text-gray-500 dark:text-gray-400 bg-gray-50 dark:bg-gray-800 rounded-lg">
+                                {periodMsg}
+                              </div>
+                            )}
+                            {activeTab === 'gainers' ? (
+                              // Use modern gainers bars with sections (Established above, New below)
+                              <div className="space-y-6 stagger-animation">
+                                {renderGainersSection()}
+                              </div>
+                            ) : (
+                              // Use modern losers bars with sections (RP Losers above, Dropped below)
+                              <div className="space-y-6 stagger-animation">
+                                {renderLosersSection()}
+                              </div>
+                            )}
+                            {data.length > 10 && (
+                              <div className="text-center py-6">
+                                <div className="inline-flex items-center gap-2 px-4 py-2 bg-gray-100 dark:bg-gray-800 rounded-full text-sm text-gray-600 dark:text-gray-400">
+                                  <span>📊</span>
+                                  <span>Showing top 10 of {data.length} {activeTab === 'gainers' ? 'gainers' : 'losers'}</span>
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })()
+                    )}
+                    {activeTab === 'gainers' || activeTab === 'losers' && lastInsightsUpdate && (
+                      <div className="text-xs text-gray-500 dark:text-gray-400 mb-2 text-right">
+                        Insights last updated: {formatLastUpdate(lastInsightsUpdate)}
+                      </div>
+                    )}
+                  </div>
+                )}
+              </motion.div>
+            </AnimatePresence>
           </div>
         )}
       </div>
