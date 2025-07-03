@@ -24,6 +24,31 @@ const RANK_ZONES = [
   { name: 'Nightmare', min: 2000, max: 2900, color: '#8B5CF6', gradient: ['#c084fc', '#7e22ce'] },
 ];
 
+// Define rank positions for Y-axis ticks
+const RANK_Y_POSITIONS = [
+  { value: 20700, label: 'NIGHTMARE' },
+  { value: 20600, label: 'EMERALD' },
+  { value: 20503, label: 'DIAMOND 3' },
+  { value: 20502, label: 'DIAMOND 2' },
+  { value: 20501, label: 'DIAMOND 1' },
+  { value: 20404, label: 'PLATINUM 4' },
+  { value: 20403, label: 'PLATINUM 3' },
+  { value: 20402, label: 'PLATINUM 2' },
+  { value: 20401, label: 'PLATINUM 1' },
+  { value: 20304, label: 'GOLD 4' },
+  { value: 20303, label: 'GOLD 3' },
+  { value: 20302, label: 'GOLD 2' },
+  { value: 20301, label: 'GOLD 1' },
+  { value: 20204, label: 'SILVER 4' },
+  { value: 20203, label: 'SILVER 3' },
+  { value: 20202, label: 'SILVER 2' },
+  { value: 20201, label: 'SILVER 1' },
+  { value: 20104, label: 'BRONZE 4' },
+  { value: 20103, label: 'BRONZE 3' },
+  { value: 20102, label: 'BRONZE 2' },
+  { value: 20101, label: 'BRONZE 1' },
+];
+
 function getZoneForRP(rp: number) {
   return RANK_ZONES.find(zone => rp >= zone.min && rp <= zone.max);
 }
@@ -38,17 +63,32 @@ const getRankNameForRP = (rp: number) => getZoneForRP(rp)?.name || '';
 // TODO: Replace calculated ranks with raw rank titles once DB is updated
 const getDisplayRank = (entry: RPChangeEntry) => entry.new_rank_title || entry.new_calculated_rank || 'Unknown';
 
-// Custom Y-axis ticks to show RP and rank names
-const CustomYAxisTick = (props: any) => {
-  const { x, y, payload } = props;
-  // Use displayRank for label
+// Enhanced custom Y-axis tick with color
+const CustomYAxisTick = ({ x, y, payload }: any) => {
+  const rank = RANK_Y_POSITIONS.find(rank => Math.abs(rank.value - payload.value) < 50);
+  if (!rank) return null;
+  const getRankColor = (label: string) => {
+    if (label.includes('NIGHTMARE')) return '#8B5CF6';
+    if (label.includes('EMERALD')) return '#10B981';
+    if (label.includes('DIAMOND')) return '#3B82F6';
+    if (label.includes('PLATINUM')) return '#06B6D4';
+    if (label.includes('GOLD')) return '#F59E0B';
+    if (label.includes('SILVER')) return '#6B7280';
+    if (label.includes('BRONZE')) return '#CD7C32';
+    return '#9CA3AF';
+  };
   return (
-    <g>
-      <text x={x - 8} y={y + 4} textAnchor="end" fill="#9CA3AF" fontWeight={700} fontSize={13}>
-        {payload.value}
-        {payload.displayRank && (
-          <tspan dx="6" fill="#9CA3AF" fontSize="10">{` (${payload.displayRank})`}</tspan>
-        )}
+    <g transform={`translate(${x},${y})`}>
+      <text
+        x={0}
+        y={0}
+        dy={4}
+        textAnchor="end"
+        fill={getRankColor(rank.label)}
+        fontSize="10"
+        fontWeight="500"
+      >
+        {rank.label}
       </text>
     </g>
   );
@@ -58,6 +98,14 @@ const CustomYAxisTick = (props: any) => {
 const getRankColor = (rankName: string) => {
   const zone = RANK_ZONES.find(z => z.name.toLowerCase() === rankName.toLowerCase());
   return zone ? zone.color : '#60A5FA';
+};
+
+// Define a type for chart data points
+type ChartDataPoint = {
+  [key: string]: any;
+  displayRank: string;
+  ladderScore: number;
+  change_timestamp: string;
 };
 
 const PlayerHistoryChart: React.FC<{ data: RPChangeEntry[] }> = ({ data }) => {
@@ -105,6 +153,62 @@ const PlayerHistoryChart: React.FC<{ data: RPChangeEntry[] }> = ({ data }) => {
     return { color: getRankColor(pt.displayRank), offset: `${offset}%` };
   });
 
+  // Calculate rank positions from actual chart data
+  const calculateRankPositions = (chartData: ChartDataPoint[]) => {
+    const rankPositions = new Map<string, number>();
+    chartData.forEach((entry: ChartDataPoint) => {
+      const rank = entry.displayRank; // Use displayRank (calculated or raw)
+      const totalRP = entry.ladderScore;
+      if (!rankPositions.has(rank)) {
+        rankPositions.set(rank, totalRP);
+      }
+    });
+    return rankPositions;
+  };
+
+  const useRankBasedYAxis = (chartData: ChartDataPoint[]) => {
+    const rankPositions = calculateRankPositions(chartData);
+    // Convert to array and sort by ladderScore value
+    const rankTicks = Array.from(rankPositions.entries())
+      .map(([rank, value]) => ({ value, label: rank }))
+      .sort((a, b) => a.value - b.value);
+    return rankTicks;
+  };
+
+  const findRankTransitions = (chartData: ChartDataPoint[]) => {
+    const transitions = [];
+    for (let i = 1; i < chartData.length; i++) {
+      const prev = chartData[i - 1];
+      const curr = chartData[i];
+      if (prev.displayRank !== curr.displayRank) {
+        transitions.push({
+          fromRank: prev.displayRank,
+          toRank: curr.displayRank,
+          fromTotalRP: prev.ladderScore,
+          toTotalRP: curr.ladderScore,
+          timestamp: curr.change_timestamp
+        });
+      }
+    }
+    return transitions;
+  };
+
+  // Calculate rank ticks and log debug info
+  const rankTicks = useRankBasedYAxis(chartData);
+  // Debug: log the values
+  console.log('Rank Positions from Data:');
+  rankTicks.forEach(tick => {
+    console.log(`${tick.label}: ${tick.value}`);
+  });
+  const transitions = findRankTransitions(chartData);
+  console.log('Rank Transitions:', transitions);
+
+  // Custom tick formatter for Y-axis
+  const formatYAxisTick = (value: number) => {
+    const closestRank = rankTicks.find(tick => Math.abs(tick.value - value) < 10);
+    return closestRank ? closestRank.label : '';
+  };
+
   return (
     <div className="w-full h-72 bg-gray-800 rounded-lg mt-2 relative">
       <ResponsiveContainer width="100%" height="100%">
@@ -150,7 +254,9 @@ const PlayerHistoryChart: React.FC<{ data: RPChangeEntry[] }> = ({ data }) => {
             fontSize={12}
             domain={[yMin, yMax]}
             allowDataOverflow={true}
-            tick={<CustomYAxisTick />}
+            ticks={rankTicks.map(tick => tick.value)}
+            tickFormatter={formatYAxisTick}
+            tick={{ fontSize: 10, fill: '#9CA3AF' }}
             width={120}
           />
           <Tooltip
