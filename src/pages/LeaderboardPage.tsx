@@ -307,8 +307,16 @@ const LeaderboardPage: React.FC = () => {
   // --- Modern Gainers Section ---
   const renderGainersSection = () => {
     console.log('[renderGainersSection] enrichedGainers:', enrichedGainers);
-    const newPlayers = enrichedGainers.filter(categorizeGainer).filter(p => categorizeGainer(p) === 'new');
-    const establishedPlayers = enrichedGainers.filter(categorizeGainer).filter(p => categorizeGainer(p) === 'established');
+    
+    // Filter players based on search query
+    const filteredGainers = searchQuery 
+      ? enrichedGainers.filter(player => 
+          player.username.toLowerCase().includes(searchQuery.toLowerCase())
+        )
+      : enrichedGainers;
+    
+    const newPlayers = filteredGainers.filter(categorizeGainer).filter(p => categorizeGainer(p) === 'new');
+    const establishedPlayers = filteredGainers.filter(categorizeGainer).filter(p => categorizeGainer(p) === 'established');
     return (
       <div className="space-y-6">
         {/* Established Players */}
@@ -320,7 +328,7 @@ const LeaderboardPage: React.FC = () => {
                 📈 Established Players
               </h3>
               <div className="bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400 px-2 py-1 rounded-full text-xs font-medium">
-                {establishedPlayers.length} active
+                {searchQuery ? `${establishedPlayers.length} found` : `${establishedPlayers.length} active`}
               </div>
             </div>
             <div className="max-h-[420px] overflow-y-auto scrollbar-thin scrollbar-thumb-gray-300 dark:scrollbar-thumb-gray-600 scrollbar-track-gray-100 dark:scrollbar-track-gray-800 rounded-xl border border-gray-200/50 dark:border-gray-700/50 scrollable-section shadow-sm hover:shadow-md transition-shadow duration-200">
@@ -356,7 +364,7 @@ const LeaderboardPage: React.FC = () => {
                 🆕 New to Leaderboard
               </h3>
               <div className="bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-400 px-2 py-1 rounded-full text-xs font-medium">
-                {newPlayers.length} fresh
+                {searchQuery ? `${newPlayers.length} found` : `${newPlayers.length} fresh`}
               </div>
             </div>
             <div className="max-h-[420px] overflow-y-auto scrollbar-thin scrollbar-thumb-gray-300 dark:scrollbar-thumb-gray-600 scrollbar-track-gray-100 dark:scrollbar-track-gray-800 rounded-xl border border-gray-200/50 dark:border-gray-700/50 scrollable-section shadow-sm hover:shadow-md transition-shadow duration-200">
@@ -384,7 +392,12 @@ const LeaderboardPage: React.FC = () => {
           </div>
         )}
         {establishedPlayers.length === 0 && newPlayers.length === 0 && (
-          <div className="text-center py-8 text-gray-500 dark:text-gray-400">No RP gainers found in recent activity.</div>
+          <div className="text-center py-8 text-gray-500 dark:text-gray-400">
+            {searchQuery 
+              ? `No gainers found matching "${searchQuery}"` 
+              : 'No RP gainers found in recent activity.'
+            }
+          </div>
         )}
       </div>
     );
@@ -393,8 +406,16 @@ const LeaderboardPage: React.FC = () => {
   // --- Modern Losers Section ---
   const renderLosersSection = () => {
     console.log('[renderLosersSection] enrichedLosers:', enrichedLosers);
-    const droppedPlayers = enrichedLosers.filter(categorizeLoser).filter(p => categorizeLoser(p) === 'dropped');
-    const establishedLosers = enrichedLosers.filter(categorizeLoser).filter(p => categorizeLoser(p) === 'established');
+    
+    // Filter players based on search query
+    const filteredLosers = searchQuery 
+      ? enrichedLosers.filter(player => 
+          player.username.toLowerCase().includes(searchQuery.toLowerCase())
+        )
+      : enrichedLosers;
+    
+    const droppedPlayers = filteredLosers.filter(categorizeLoser).filter(p => categorizeLoser(p) === 'dropped');
+    const establishedLosers = filteredLosers.filter(categorizeLoser).filter(p => categorizeLoser(p) === 'established');
     return (
       <div className="space-y-6">
         {/* Established Players */}
@@ -406,7 +427,7 @@ const LeaderboardPage: React.FC = () => {
                 📉 Established Players
               </h3>
               <div className="bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400 px-2 py-1 rounded-full text-xs font-medium">
-                {establishedLosers.length} active
+                {searchQuery ? `${establishedLosers.length} found` : `${establishedLosers.length} active`}
               </div>
             </div>
             <div className="max-h-[420px] overflow-y-auto scrollbar-thin scrollbar-thumb-gray-300 dark:scrollbar-thumb-gray-600 scrollbar-track-gray-100 dark:scrollbar-track-gray-800 rounded-xl border border-gray-200/50 dark:border-gray-700/50 scrollable-section shadow-sm hover:shadow-md transition-shadow duration-200">
@@ -441,7 +462,7 @@ const LeaderboardPage: React.FC = () => {
                 🚫 Dropped from Top 200
               </h3>
               <div className="bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-400 px-2 py-1 rounded-full text-xs font-medium">
-                {droppedPlayers.length} dropped
+                {searchQuery ? `${droppedPlayers.length} found` : `${droppedPlayers.length} dropped`}
               </div>
             </div>
             <div className="max-h-[420px] overflow-y-auto scrollbar-thin scrollbar-thumb-gray-300 dark:scrollbar-thumb-gray-600 scrollbar-track-gray-100 dark:scrollbar-track-gray-800 rounded-xl border border-gray-200/50 dark:border-gray-700/50 scrollable-section shadow-sm hover:shadow-md transition-shadow duration-200">
@@ -468,7 +489,12 @@ const LeaderboardPage: React.FC = () => {
           </div>
         )}
         {establishedLosers.length === 0 && droppedPlayers.length === 0 && (
-          <div className="text-center py-8 text-gray-500 dark:text-gray-400">No RP losses found in recent activity.</div>
+          <div className="text-center py-8 text-gray-500 dark:text-gray-400">
+            {searchQuery 
+              ? `No losers found matching "${searchQuery}"` 
+              : 'No RP losses found in recent activity.'
+            }
+          </div>
         )}
       </div>
     );
@@ -881,9 +907,19 @@ const LeaderboardPage: React.FC = () => {
                   <div>
                     <h2 className="text-2xl font-bold text-gray-900 dark:text-gray-100 mb-2">
                       {activeTab === 'gainers' ? '🔥 Hottest Gainers' : '📉 Biggest Losers'}
+                      {searchQuery && (
+                        <span className="ml-3 text-sm font-normal text-blue-600 dark:text-blue-400">
+                          (Searching: "{searchQuery}")
+                        </span>
+                      )}
                     </h2>
                     <p className="text-gray-600 dark:text-gray-400">
                       {activeTab === 'gainers' ? 'Players with the biggest RP gains' : 'Players with the biggest RP losses'}
+                      {searchQuery && (
+                        <span className="ml-2 text-blue-600 dark:text-blue-400">
+                          • Filtered results
+                        </span>
+                      )}
                     </p>
                   </div>
                   {/* Modern Segmented Control for Time Filter */}
