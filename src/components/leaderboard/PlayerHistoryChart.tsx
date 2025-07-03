@@ -76,7 +76,14 @@ const PlayerHistoryChart: React.FC<{ data: RPChangeEntry[] }> = ({ data }) => {
   // Calculate min/max for Y-axis
   const minLadder = Math.min(...chartData.map(e => e.ladderScore));
   const maxLadder = Math.max(...chartData.map(e => e.ladderScore));
-  const padding = (maxLadder - minLadder) * 0.1;
+  let yMin = minLadder;
+  let yMax = maxLadder;
+  const minRange = Math.max(20, (maxLadder || 1) * 0.05);
+  if (maxLadder - minLadder < minRange) {
+    const mid = (maxLadder + minLadder) / 2;
+    yMin = mid - minRange / 2;
+    yMax = mid + minRange / 2;
+  }
 
   // Find promotions (where rank tier changes)
   const promotions = data.filter((e, i) => i > 0 && getZoneForRP(e.new_rp)?.name !== getZoneForRP(data[i-1].new_rp)?.name);
@@ -141,7 +148,8 @@ const PlayerHistoryChart: React.FC<{ data: RPChangeEntry[] }> = ({ data }) => {
             dataKey="ladderScore"
             stroke="#9CA3AF"
             fontSize={12}
-            domain={[minLadder - padding, maxLadder + padding]}
+            domain={[yMin, yMax]}
+            allowDataOverflow={true}
             tick={<CustomYAxisTick />}
             width={120}
           />
