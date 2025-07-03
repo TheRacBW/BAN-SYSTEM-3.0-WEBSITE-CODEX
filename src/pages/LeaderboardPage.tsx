@@ -712,111 +712,71 @@ const LeaderboardPage: React.FC = () => {
       )}
 
       {/* Header */}
-      <div className="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700">
-        <div className="container mx-auto px-4 py-6">
-          <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
-            <div>
-              <h1 className="text-3xl font-bold text-gray-900 dark:text-gray-100 mb-2">
-                Leaderboard
-              </h1>
-              <div className="flex items-center gap-4 text-sm text-gray-600 dark:text-gray-400">
-                <div className="flex items-center gap-2">
-                  <Clock size={16} />
-                  <span>Last updated: {formatLastUpdate(lastUpdate)}</span>
-                </div>
-                <div className={`flex items-center gap-2 ${isLive ? 'text-green-600 dark:text-green-400' : 'text-gray-500 dark:text-gray-400'}`}>
-                  {isLive ? <Wifi size={16} /> : <WifiOff size={16} />}
-                  <span className="font-medium">{isLive ? 'LIVE' : 'OFFLINE'}</span>
-                </div>
-              </div>
+      <div className="w-full bg-[#232B39] dark:bg-gray-800 border-b border-gray-200/10 dark:border-gray-700/40 px-0">
+        <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4 px-8 py-6 w-full">
+          <div className="flex flex-col gap-2">
+            <h1 className="text-3xl font-semibold text-gray-900 dark:text-white tracking-wide mb-1" style={{letterSpacing: '0.01em'}}>Leaderboard</h1>
+            <div className="flex items-center gap-3 flex-wrap">
+              <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-200 text-xs font-medium">
+                <Clock size={16} className="mr-1" />
+                Last updated: {formatLastUpdate(lastUpdate)}
+              </span>
+              <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-medium"
+                style={{ background: isLive ? 'rgba(34,197,94,0.12)' : 'rgba(156,163,175,0.12)' }}>
+                <span className={`w-2 h-2 rounded-full ${isLive ? 'bg-green-500' : 'bg-gray-400'} inline-block`}></span>
+                <span className={isLive ? 'text-green-600 dark:text-green-400' : 'text-gray-500 dark:text-gray-400'}>
+                  {isLive ? 'Online' : 'Offline'}
+                </span>
+              </span>
             </div>
+          </div>
 
-            <div className="flex items-center gap-3">
-              <button
-                onClick={refresh}
-                disabled={isLoading}
-                className="px-4 py-2 border border-gray-300 dark:border-gray-600 rounded hover:bg-gray-50 dark:hover:bg-gray-700 flex items-center gap-2"
-              >
-                <RefreshCw size={16} className={isLoading ? 'animate-spin' : ''} />
-                Refresh
-              </button>
-            </div>
+          <div className="flex items-center gap-4 flex-wrap justify-end">
+            <button
+              onClick={refresh}
+              disabled={isLoading}
+              className={`inline-flex items-center gap-2 px-4 py-2 rounded-lg font-medium transition text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-400 focus:ring-offset-2 dark:focus:ring-offset-gray-900 ${isLoading ? 'opacity-60 cursor-not-allowed' : ''}`}
+            >
+              <RefreshCw size={18} className={isLoading ? 'animate-spin' : ''} />
+              Refresh
+            </button>
 
-            {/* Debug: Clear Cache Button (dev only) */}
-            {process.env.NODE_ENV !== 'production' && (
-              <button
-                onClick={handleClearCache}
-                className="ml-4 px-3 py-1.5 rounded-lg bg-red-100 text-red-700 font-semibold text-xs shadow hover:bg-red-200 transition"
-                title="Clear Roblox avatar cache (debug)"
-              >
-                Clear Avatar Cache
-              </button>
-            )}
+            {/* Hide Clear Avatar Cache button visually, but keep code for dev use */}
+            {/* <button
+              onClick={handleClearCache}
+              className="ml-2 px-3 py-1.5 rounded-lg bg-red-100 text-red-700 font-semibold text-xs shadow hover:bg-red-200 transition hidden"
+              title="Clear Roblox avatar cache (debug)"
+            >
+              Clear Avatar Cache
+            </button> */}
 
-            {/* Populate Leaderboard Insights Button */}
             <button
               onClick={async () => {
-                if (isRefreshingInsights) return; // Prevent multiple clicks
-                
+                if (isRefreshingInsights) return;
                 setIsRefreshingInsights(true);
                 try {
-                  console.log('🔄 Triggering populate-leaderboard-insights...');
-                  
-                  // Try with explicit headers and body
                   const { data, error } = await supabase.functions.invoke('populate-leaderboard-insights', {
                     method: 'POST',
-                    headers: {
-                      'Content-Type': 'application/json',
-                    },
-                    body: {}, // Empty body but explicit
+                    headers: { 'Content-Type': 'application/json' },
+                    body: {},
                   });
-                  
                   if (error) {
-                    console.error('❌ Failed to populate leaderboard insights:', error);
-                    
-                    // If it's a CORS or function not found error, show helpful message
-                    if (error.message.includes('CORS') || error.message.includes('Failed to send')) {
-                      setNotification({ 
-                        message: '❌ Edge function not accessible. Please check if the function is deployed and CORS is configured.', 
-                        type: 'error' 
-                      });
-                      
-                      // Offer to try direct database approach
-                      if (confirm('Edge function not accessible. Would you like to try refreshing the data directly?')) {
-                        await refreshInsightsDirectly();
-                      }
-                    } else {
-                      setNotification({ 
-                        message: `❌ Failed to refresh insights: ${error.message}`, 
-                        type: 'error' 
-                      });
-                    }
+                    setNotification({ message: `❌ Failed to refresh insights: ${error.message}`, type: 'error' });
                   } else {
-                    console.log('✅ Leaderboard insights populated successfully:', data);
-                    // Refresh the gainers/losers data after population
                     refresh();
-                    // Show success feedback
                     setNotification({ message: '✅ Leaderboard insights refreshed successfully!', type: 'success' });
                   }
                 } catch (error) {
-                  console.error('❌ Error calling populate-leaderboard-insights:', error);
-                  setNotification({ 
-                    message: '❌ Edge function error. Please check if the function exists and is properly configured.', 
-                    type: 'error' 
-                  });
+                  setNotification({ message: '❌ Error calling populate-leaderboard-insights.', type: 'error' });
                 } finally {
                   setIsRefreshingInsights(false);
                 }
               }}
               disabled={isRefreshingInsights}
-              className={`ml-4 px-3 py-1.5 rounded-lg font-semibold text-xs shadow transition ${
-                isRefreshingInsights 
-                  ? 'bg-gray-100 text-gray-500 cursor-not-allowed' 
-                  : 'bg-blue-100 text-blue-700 hover:bg-blue-200'
-              }`}
+              className={`inline-flex items-center gap-2 px-4 py-2 rounded-lg font-medium transition text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-400 focus:ring-offset-2 dark:focus:ring-offset-gray-900 ${isRefreshingInsights ? 'opacity-60 cursor-not-allowed' : ''}`}
               title="Manually trigger the populate-leaderboard-insights edge function to refresh gainers/losers data from rp_changes_optimized"
             >
-              {isRefreshingInsights ? '🔄 Refreshing...' : 'Refresh Insights'}
+              {isRefreshingInsights ? <RefreshCw size={18} className="animate-spin" /> : <RefreshCw size={18} />} Refresh Insights
             </button>
           </div>
         </div>
