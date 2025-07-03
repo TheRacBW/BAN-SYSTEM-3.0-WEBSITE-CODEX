@@ -63,20 +63,24 @@ const getRankNameForRP = (rp: number) => getZoneForRP(rp)?.name || '';
 // TODO: Replace calculated ranks with raw rank titles once DB is updated
 const getDisplayRank = (entry: RPChangeEntry) => entry.new_rank_title || entry.new_calculated_rank || 'Unknown';
 
-// Enhanced custom Y-axis tick with color
-const CustomYAxisTick = ({ x, y, payload }: any) => {
-  const rank = RANK_Y_POSITIONS.find(rank => Math.abs(rank.value - payload.value) < 50);
+// Gradient definitions for rank label text (darker, more saturated)
+const RANK_LABEL_GRADIENTS = {
+  'NIGHTMARE': ['#9333ea', '#581c87'],
+  'EMERALD': ['#10b981', '#065f46'],
+  'DIAMOND': ['#3b82f6', '#1e40af'],
+  'PLATINUM': ['#22d3ee', '#155e75'],
+  'GOLD': ['#eab308', '#78350f'],
+  'SILVER': ['#9ca3af', '#374151'],
+  'BRONZE': ['#a45b25', '#5c2e10'],
+};
+
+// Enhanced custom Y-axis tick with gradient color
+const CustomYAxisTick = (rankTicks: ChartDataPoint[]) => ({ x, y, payload }: any) => {
+  const rank = rankTicks.find(tick => Math.abs(tick.value - payload.value) < 10);
   if (!rank) return null;
-  const getRankColor = (label: string) => {
-    if (label.includes('NIGHTMARE')) return '#8B5CF6';
-    if (label.includes('EMERALD')) return '#10B981';
-    if (label.includes('DIAMOND')) return '#3B82F6';
-    if (label.includes('PLATINUM')) return '#06B6D4';
-    if (label.includes('GOLD')) return '#F59E0B';
-    if (label.includes('SILVER')) return '#6B7280';
-    if (label.includes('BRONZE')) return '#CD7C32';
-    return '#9CA3AF';
-  };
+  // Find the base rank for gradient (e.g., DIAMOND from DIAMOND 2)
+  const base = Object.keys(RANK_LABEL_GRADIENTS).find(key => rank.label.toUpperCase().includes(key));
+  const gradId = base ? `rank-label-gradient-${base}` : undefined;
   return (
     <g transform={`translate(${x},${y})`}>
       <text
@@ -84,9 +88,9 @@ const CustomYAxisTick = ({ x, y, payload }: any) => {
         y={0}
         dy={4}
         textAnchor="end"
-        fill={getRankColor(rank.label)}
-        fontSize="10"
-        fontWeight="500"
+        fontSize="12"
+        fontWeight="bold"
+        fill={gradId ? `url(#${gradId})` : '#9CA3AF'}
       >
         {rank.label}
       </text>
@@ -227,6 +231,13 @@ const PlayerHistoryChart: React.FC<{ data: RPChangeEntry[] }> = ({ data }) => {
                 <stop key={i} offset={stop.offset} stopColor={stop.color} />
               ))}
             </linearGradient>
+            {/* Gradients for rank label text */}
+            {Object.entries(RANK_LABEL_GRADIENTS).map(([key, [from, to]]) => (
+              <linearGradient id={`rank-label-gradient-${key}`} key={key} x1="0" y1="0" x2="1" y2="0">
+                <stop offset="0%" stopColor={from} />
+                <stop offset="100%" stopColor={to} />
+              </linearGradient>
+            ))}
           </defs>
           {/* Background rank zones with gradients */}
           {usedZones.map(zone => (
@@ -255,8 +266,7 @@ const PlayerHistoryChart: React.FC<{ data: RPChangeEntry[] }> = ({ data }) => {
             domain={[yMin, yMax]}
             allowDataOverflow={true}
             ticks={rankTicks.map(tick => tick.value)}
-            tickFormatter={formatYAxisTick}
-            tick={{ fontSize: 10, fill: '#9CA3AF' }}
+            tick={CustomYAxisTick(rankTicks)}
             width={120}
           />
           <Tooltip
