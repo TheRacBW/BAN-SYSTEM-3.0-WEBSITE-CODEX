@@ -97,6 +97,20 @@ const LeaderboardEntryComponent: React.FC<LeaderboardEntryProps> = ({
 
   const rankTier = entry.rank_title.toLowerCase().split(' ')[0];
 
+  // Rank icon URLs for each tier
+  const rankIconUrls: Record<string, string> = {
+    'BRONZE': 'https://static.wikia.nocookie.net/robloxbedwars/images/5/5a/Bronze_Rank_Icon.png',
+    'SILVER': 'https://static.wikia.nocookie.net/robloxbedwars/images/6/64/Silver_Rank_Icon.png',
+    'GOLD': 'https://static.wikia.nocookie.net/robloxbedwars/images/9/92/Gold_Rank_Icon.png',
+    'PLATINUM': 'https://static.wikia.nocookie.net/robloxbedwars/images/0/08/Platinum_Rank_Icon.png',
+    'DIAMOND': 'https://static.wikia.nocookie.net/robloxbedwars/images/c/cb/Diamond_Rank_Icon.png',
+    'EMERALD': 'https://static.wikia.nocookie.net/robloxbedwars/images/0/06/Emerald_Rank_Icon.png',
+    'NIGHTMARE': 'https://static.wikia.nocookie.net/robloxbedwars/images/7/76/Nightmare_Rank_Icon.png',
+  };
+  // Normalize the rank title to get the tier
+  const normalizedTier = entry.rank_title ? entry.rank_title.split(' ')[0].toUpperCase() : '';
+  const rankIconUrl = rankIconUrls[normalizedTier];
+
   // Debug log for render
   console.log('[LeaderboardEntry] Render', entry.username, 'img src:', entry.profile_picture, 'userId:', entry.user_id, 'profileUrl:', profileUrl);
 
@@ -197,6 +211,9 @@ const LeaderboardEntryComponent: React.FC<LeaderboardEntryProps> = ({
               boxShadow: getRPBarColors(entry.rank_title).glow,
             }}
           >
+            {rankIconUrl && (
+              <img src={rankIconUrl} alt={normalizedTier + ' rank icon'} className="w-[22px] h-[22px] object-contain mr-1" style={{display: 'inline-block', verticalAlign: 'middle'}} />
+            )}
             <span className="text-white font-semibold text-sm drop-shadow">{entry.rank_title}</span>
             <span className="text-blue-200 text-xs font-bold ml-2">{entry.rp} RP</span>
           </div>
