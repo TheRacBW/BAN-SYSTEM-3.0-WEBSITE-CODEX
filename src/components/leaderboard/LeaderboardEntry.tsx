@@ -241,7 +241,15 @@ const LeaderboardEntryComponent: React.FC<LeaderboardEntryProps> = ({
             <span className={`text-xs font-medium ${posDelta > 0 ? 'text-green-400' : 'text-red-400'}`}
               style={{lineHeight: 1.2}}
               title={posDelta > 0 ? `Moved up ${posDelta} place${posDelta === 1 ? '' : 's'}` : `Dropped ${-posDelta} place${posDelta === -1 ? '' : 's'}`}>
-              {posDelta > 0 ? `↑ Gained ${posDelta} place${posDelta === 1 ? '' : 's'}` : `↓ Dropped ${-posDelta} place${-posDelta === 1 ? '' : 's'}`}
+              {posDelta > 0 ? (
+                <>
+                  <span style={{ fontWeight: 'bold', fontSize: '1.15em', verticalAlign: 'middle' }}>↑</span> Gained {posDelta} place{posDelta === 1 ? '' : 's'}
+                </>
+              ) : (
+                <>
+                  <span style={{ fontWeight: 'bold', fontSize: '1.15em', verticalAlign: 'middle' }}>↓</span> Dropped {-posDelta} place{-posDelta === 1 ? '' : 's'}
+                </>
+              )}
             </span>
           )}
         </div>
