@@ -869,11 +869,11 @@ const LeaderboardPage: React.FC = () => {
                       </div>
                     ) : (
                       <div className="flex flex-col gap-3 w-full">
-                        {filteredEntries.map((entry: import('../types/leaderboard').LeaderboardEntryWithChanges, index: number) => (
+                        {filteredEntries.map((entry: import('../types/leaderboard').LeaderboardEntryWithChanges) => (
                           <LeaderboardEntryComponent
                             key={entry.username}
                             entry={entry}
-                            index={index}
+                            index={entry.rank_position - 1}
                             recentChange={recentRPChanges[entry.username]}
                           />
                         ))}
