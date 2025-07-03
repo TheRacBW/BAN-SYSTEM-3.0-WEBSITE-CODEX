@@ -51,44 +51,44 @@ const LeaderboardEntryComponent: React.FC<LeaderboardEntryProps> = ({
     else if (entry.position_change < 0) animationClass = 'entry-position-declined';
   }
 
-  // RP Bar color logic
+  // RP Bar color logic (updated gradients)
   const getRPBarColors = (rankTitle: string) => {
     const tier = rankTitle.toUpperCase().split(' ')[0];
     const colorMappings: Record<string, { gradient: string; background: string; glow: string }> = {
       'NIGHTMARE': {
-        gradient: 'linear-gradient(90deg, #9C27B0 0%, #E91E63 50%, #673AB7 100%)',
-        background: 'rgba(156, 39, 176, 0.1)',
-        glow: '0 0 15px rgba(156, 39, 176, 0.6)'
+        gradient: 'linear-gradient(90deg, #9333ea 0%, #581c87 100%)',
+        background: 'rgba(147, 51, 234, 0.1)',
+        glow: '0 0 15px rgba(147, 51, 234, 0.6)'
       },
       'EMERALD': {
-        gradient: 'linear-gradient(90deg, #4CAF50 0%, #8BC34A 50%, #2E7D32 100%)',
-        background: 'rgba(76, 175, 80, 0.1)',
-        glow: '0 0 15px rgba(76, 175, 80, 0.6)'
+        gradient: 'linear-gradient(90deg, #10b981 0%, #065f46 100%)',
+        background: 'rgba(16, 185, 129, 0.1)',
+        glow: '0 0 15px rgba(16, 185, 129, 0.6)'
       },
       'DIAMOND': {
-        gradient: 'linear-gradient(90deg, #2196F3 0%, #03DAC6 50%, #1976D2 100%)',
-        background: 'rgba(33, 150, 243, 0.1)',
-        glow: '0 0 15px rgba(33, 150, 243, 0.6)'
+        gradient: 'linear-gradient(90deg, #3b82f6 0%, #1e40af 100%)',
+        background: 'rgba(59, 130, 246, 0.1)',
+        glow: '0 0 15px rgba(59, 130, 246, 0.6)'
       },
       'PLATINUM': {
-        gradient: 'linear-gradient(90deg, #00BCD4 0%, #4DD0E1 50%, #0097A7 100%)',
-        background: 'rgba(0, 188, 212, 0.1)',
-        glow: '0 0 15px rgba(0, 188, 212, 0.6)'
+        gradient: 'linear-gradient(90deg, #22d3ee 0%, #155e75 100%)',
+        background: 'rgba(34, 211, 238, 0.1)',
+        glow: '0 0 15px rgba(34, 211, 238, 0.6)'
       },
       'GOLD': {
-        gradient: 'linear-gradient(90deg, #FFD700 0%, #FFA500 50%, #FF8F00 100%)',
-        background: 'rgba(255, 215, 0, 0.1)',
-        glow: '0 0 15px rgba(255, 215, 0, 0.6)'
+        gradient: 'linear-gradient(90deg, #eab308 0%, #78350f 100%)',
+        background: 'rgba(234, 179, 8, 0.1)',
+        glow: '0 0 15px rgba(234, 179, 8, 0.6)'
       },
       'SILVER': {
-        gradient: 'linear-gradient(90deg, #C0C0C0 0%, #E8E8E8 50%, #9E9E9E 100%)',
-        background: 'rgba(192, 192, 192, 0.1)',
-        glow: '0 0 15px rgba(192, 192, 192, 0.6)'
+        gradient: 'linear-gradient(90deg, #9ca3af 0%, #374151 100%)',
+        background: 'rgba(156, 163, 175, 0.1)',
+        glow: '0 0 15px rgba(156, 163, 175, 0.6)'
       },
       'BRONZE': {
-        gradient: 'linear-gradient(90deg, #CD7F32 0%, #FF6B35 50%, #BF360C 100%)',
-        background: 'rgba(205, 127, 50, 0.1)',
-        glow: '0 0 15px rgba(205, 127, 50, 0.6)'
+        gradient: 'linear-gradient(90deg, #a45b25 0%, #5c2e10 100%)',
+        background: 'rgba(164, 91, 37, 0.1)',
+        glow: '0 0 15px rgba(164, 91, 37, 0.6)'
       }
     };
     const colors = colorMappings[tier] || colorMappings['BRONZE'];
@@ -101,101 +101,98 @@ const LeaderboardEntryComponent: React.FC<LeaderboardEntryProps> = ({
   console.log('[LeaderboardEntry] Render', entry.username, 'img src:', entry.profile_picture, 'userId:', entry.user_id, 'profileUrl:', profileUrl);
 
   return (
-    <div className={`leaderboard-entry relative flex items-center justify-between p-4 bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-750 transition-all duration-300 ease-in-out rounded-xl shadow-sm hover:shadow-lg fade-in-row ${animationClass}`}
-      style={{ minHeight: 72 }}
-      data-rank={rankTier}>
-      {/* Position */}
-      <div className="flex items-center space-x-4">
-        <div className="flex items-center justify-center w-8 h-8 rounded-full font-bold text-base bg-gray-200 dark:bg-gray-600 text-gray-700 dark:text-gray-300 shadow-sm">{entry.rank_position}</div>
-        {/* Profile Picture */}
-        <div className="relative group" tabIndex={0} aria-label={`Roblox profile for ${entry.username}`}
-          data-tooltip-id={`profile-tooltip-${entry.username}`}
-          data-tooltip-content={`@${entry.username} \n View Roblox Profile`}>
-          {entry.profile_picture ? (
-            <img
-              src={entry.profile_picture}
-              alt={`${entry.username}'s profile`}
-              className="w-12 h-12 rounded-full border-2 border-gray-200 dark:border-gray-600 object-cover transition-all duration-200 group-hover:shadow-lg group-hover:border-blue-400 group-hover:ring-2 group-hover:ring-blue-200"
-              onError={handleProfileError}
-              loading="lazy"
-              style={{ boxShadow: entry.user_id ? '0 0 0 2px #3b82f6' : undefined }}
-            />
-          ) : (
-            <div className="avatar-shimmer w-12 h-12 rounded-full bg-gray-200 dark:bg-gray-700 animate-shimmer" />
-          )}
-          <Tooltip id={`profile-tooltip-${entry.username}`} place="top" />
-        </div>
-        {/* Username and Rank */}
-        <div className="flex flex-col min-w-0">
+    <div
+      className={`leaderboard-entry flex items-center gap-6 p-4 bg-[#151e2e] rounded-2xl shadow-md mb-3 transition-all duration-300 group hover:shadow-xl border border-transparent hover:border-blue-500`}
+      style={{ minHeight: 88 }}
+      data-rank={rankTier}
+    >
+      {/* Avatar + Level Badge */}
+      <div className="relative flex-shrink-0">
+        {entry.profile_picture ? (
+          <img
+            src={entry.profile_picture}
+            alt={`${entry.username}'s profile`}
+            className="w-16 h-16 rounded-full border-2 border-[#222c3c] shadow-md object-cover bg-[#1e293b]"
+            onError={handleProfileError}
+            loading="lazy"
+          />
+        ) : (
+          <div className="w-16 h-16 rounded-full bg-gray-700 animate-pulse" />
+        )}
+        {/* Level badge (rank position) */}
+        <span className="absolute -bottom-1 -right-1 bg-[#222c3c] text-white text-xs font-bold rounded-full px-2 py-0.5 border-2 border-[#151e2e] shadow-md">
+          {entry.rank_position}
+        </span>
+      </div>
+
+      {/* Username, Rank Badge, and Roblox Link */}
+      <div className="flex flex-col min-w-0 flex-1">
+        <div className="flex items-center gap-2">
           {canOpenProfile ? (
             <a
               href={profileUrl!}
               target="_blank"
               rel="noopener noreferrer"
-              className="font-semibold text-gray-900 dark:text-white hover:text-blue-600 dark:hover:text-blue-400 transition-colors truncate text-base flex items-center gap-1 group"
-              style={{ maxWidth: 120 }}
+              className="text-white font-semibold text-lg hover:text-blue-400 transition-colors flex items-center gap-1 truncate max-w-[160px]"
               title={`View ${entry.username}'s Roblox profile`}
             >
               {entry.username}
-              <ExternalLink size={12} className="opacity-0 group-hover:opacity-100 transition-opacity" />
+              <ExternalLink size={14} className="opacity-0 group-hover:opacity-100 transition-opacity" />
             </a>
           ) : (
-            <span
-              className="font-semibold text-gray-900 dark:text-white truncate text-base flex items-center gap-1"
-              style={{ maxWidth: 120 }}
-              title="Profile not available"
-            >
-              {entry.username}
-            </span>
+            <span className="text-white font-semibold text-lg truncate max-w-[160px]">{entry.username}</span>
           )}
-          <div className="flex items-center space-x-2 mt-0.5">
+        </div>
+        <div className="flex items-center gap-2 mt-1">
+          {/* Rank Badge (rounded rectangle, darker, more opaque, text 100% visible) */}
+          <div
+            className="flex items-center gap-2 px-4 py-2 rounded-xl shadow relative"
+            style={{
+              background: getRPBarColors(entry.rank_title).gradient,
+              boxShadow: getRPBarColors(entry.rank_title).glow,
+            }}
+          >
             <RankBadge rankTitle={entry.rank_title} rp={entry.rp} size="small" />
-            <span className="text-xs text-gray-500 dark:text-gray-400 truncate">{entry.rank_title}</span>
+            <span className="text-white font-semibold text-sm drop-shadow">{getRankDisplayName(calculatedRank.tier, calculatedRank.level)}</span>
+            <span className="text-blue-200 text-xs font-bold ml-2">{entry.rp} RP</span>
           </div>
         </div>
       </div>
-      {/* RP and Progress */}
-      <div className="flex items-center space-x-4 min-w-0">
-        <div className="text-right min-w-[60px]">
-          <div className="font-bold text-lg text-gray-900 dark:text-white leading-tight">{formatRP(entry.rp)}</div>
-          <div className="text-xs text-gray-500 dark:text-gray-400">Total RP</div>
+
+      {/* RP Change (pill) */}
+      <div className="flex flex-col items-end min-w-[80px]">
+        {entry.rp_change !== 0 && (
+          <span
+            className={`px-3 py-1 rounded-full font-bold text-xs mb-1 shadow-md ${entry.rp_change > 0 ? 'bg-green-600 text-white' : 'bg-red-600 text-white'}`}
+          >
+            {entry.rp_change > 0 ? `+${entry.rp_change}` : entry.rp_change} RP
+            {entry.position_change !== 0 && (
+              <span className="ml-1">{entry.position_change > 0 ? '↑' : '↓'}{Math.abs(entry.position_change)}</span>
+            )}
+          </span>
+        )}
+        {/* Total RP */}
+        <span className="text-white font-bold text-2xl leading-tight">{formatRP(entry.rp)}</span>
+        <span className="text-gray-400 text-xs">Total RP</span>
+      </div>
+
+      {/* Progress Bar */}
+      <div className="flex flex-col justify-center w-40 min-w-[140px] ml-4">
+        <div className="flex justify-between text-xs text-gray-400 mb-1">
+          <span>{progressValue}</span>
+          <span>{progressMax}</span>
         </div>
-        {/* Progress Bar */}
-        <div className="w-28">
-          <div className="flex justify-between text-xs text-gray-500 dark:text-gray-400 mb-1">
-            <span>{progressValue}</span>
-            <span>{progressMax}</span>
-          </div>
-          <div className="w-full bg-gray-100 dark:bg-gray-700 rounded-full h-2 border border-gray-300 dark:border-gray-600 relative overflow-hidden">
-            <div
-              className="h-2 rounded-full transition-all duration-300"
-              style={{
-                width: `${progressPercent}%`,
-                background: getRPBarColors(entry.rank_title).gradient,
-                boxShadow: getRPBarColors(entry.rank_title).glow
-              }}
-            />
-          </div>
+        <div className="w-full h-2 bg-[#222c3c] rounded-full overflow-hidden relative">
+          <div
+            className="h-2 rounded-full animate-gradient-x transition-all duration-700"
+            style={{
+              width: `${progressPercent}%`,
+              background: getRPBarColors(entry.rank_title).gradient,
+              boxShadow: getRPBarColors(entry.rank_title).glow,
+            }}
+          />
         </div>
       </div>
-      {/* RP Change Indicator */}
-      {entry.rp_change !== 0 && (
-        <div className={`rp-change absolute top-2 right-2 px-2 py-1 rounded-full text-xs font-semibold ${entry.rp_change > 0 ? 'gain' : 'loss'}`}
-          style={{ boxShadow: '0 2px 8px rgba(34,197,94,0.08)' }}>
-          {entry.rp_change > 0 ? '+' : ''}{entry.rp_change} RP
-          {entry.position_change !== 0 && (
-            <span className="position-change ml-1">
-              ({entry.position_change > 0 ? '↑' : '↓'}{Math.abs(entry.position_change)})
-            </span>
-          )}
-        </div>
-      )}
-      {/* Rank Title Change Indicator */}
-      {entry.rank_title_change && (
-        <div className="absolute bottom-2 right-2 px-2 py-1 rounded-full text-xs font-semibold bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300">
-          {entry.rank_title_change}
-        </div>
-      )}
     </div>
   );
 };
