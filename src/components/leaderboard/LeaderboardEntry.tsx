@@ -209,13 +209,6 @@ const LeaderboardEntryComponent: React.FC<LeaderboardEntryProps> = ({
           ) : (
             <span className="text-white font-semibold text-lg truncate max-w-[160px]">{entry.username}</span>
           )}
-          {/* --- Position Change Indicator as plain text, color-coded, on same line --- */}
-          {showPosChange && (
-            <span className={`ml-2 text-xs font-medium ${posDelta > 0 ? 'text-green-400' : 'text-red-400'}`}
-              title={posDelta > 0 ? `Moved up ${posDelta} place${posDelta === 1 ? '' : 's'}` : `Dropped ${-posDelta} place${posDelta === -1 ? '' : 's'}`}>
-              {posDelta > 0 ? `↑ Gained ${posDelta} place${posDelta === 1 ? '' : 's'}` : `↓ Dropped ${-posDelta} place${-posDelta === 1 ? '' : 's'}`}
-            </span>
-          )}
         </div>
         <div className="flex items-center gap-2 mt-1">
           {/* Rank Badge (rounded rectangle, darker, more opaque, text 100% visible) */}
@@ -234,17 +227,29 @@ const LeaderboardEntryComponent: React.FC<LeaderboardEntryProps> = ({
           </div>
         </div>
       </div>
-
-      {/* --- RP Change Indicator to the left of Total RP --- */}
-      <div className="flex flex-col items-end justify-between h-full ml-auto">
-        <div className="flex items-center gap-2">
-          {/* RP Change Indicator */}
+      {/* --- RP Change and Position Change Indicators, stacked vertically, right of rank badge --- */}
+      {(showRPChange || showPosChange) && (
+        <div className="flex flex-col items-start justify-center ml-4 min-w-[80px]">
           {showRPChange && (
-            <span className={`inline-block text-xs font-bold rounded-full px-3 py-1 mr-2 ${rpDelta > 0 ? 'bg-green-700 text-white' : 'bg-red-700 text-white'}`}
+            <span className={`mb-1 px-4 py-1 rounded-md font-bold text-sm shadow ${rpDelta > 0 ? 'bg-green-800 text-white' : 'bg-red-800 text-white'}`}
+              style={{ borderRadius: '8px', minWidth: '60px', textAlign: 'center', backgroundColor: rpDelta > 0 ? '#17643b' : '#7a2323' }}
               title={rpDelta > 0 ? `Gained ${rpDelta} RP` : `Lost ${-rpDelta} RP`}>
               {rpDelta > 0 ? `+${rpDelta} RP` : `${rpDelta} RP`}
             </span>
           )}
+          {showPosChange && (
+            <span className={`text-xs font-medium ${posDelta > 0 ? 'text-green-400' : 'text-red-400'}`}
+              style={{lineHeight: 1.2}}
+              title={posDelta > 0 ? `Moved up ${posDelta} place${posDelta === 1 ? '' : 's'}` : `Dropped ${-posDelta} place${posDelta === -1 ? '' : 's'}`}>
+              {posDelta > 0 ? `↑ Gained ${posDelta} place${posDelta === 1 ? '' : 's'}` : `↓ Dropped ${-posDelta} place${-posDelta === 1 ? '' : 's'}`}
+            </span>
+          )}
+        </div>
+      )}
+      {/* --- End indicators --- */}
+      {/* --- RP/Progress bar area (unchanged) --- */}
+      <div className="flex flex-col items-end justify-between h-full ml-auto">
+        <div className="flex items-center gap-2">
           {/* Total RP and progress bar (existing code) */}
           <div className="flex flex-col items-end">
             <span className="text-2xl font-bold text-white leading-none">{formatRP(entry.rp)}</span>
