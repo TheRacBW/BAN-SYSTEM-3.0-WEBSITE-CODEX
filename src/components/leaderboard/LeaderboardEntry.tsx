@@ -170,8 +170,7 @@ const LeaderboardEntryComponent: React.FC<LeaderboardEntryProps> = ({
               boxShadow: getRPBarColors(entry.rank_title).glow,
             }}
           >
-            <RankBadge rankTitle={entry.rank_title} rp={entry.rp} size="small" />
-            <span className="text-white font-semibold text-sm drop-shadow">{getRankDisplayName(calculatedRank.tier, calculatedRank.level)}</span>
+            <span className="text-white font-semibold text-sm drop-shadow">{entry.rank_title}</span>
             <span className="text-blue-200 text-xs font-bold ml-2">{entry.rp} RP</span>
           </div>
         </div>
