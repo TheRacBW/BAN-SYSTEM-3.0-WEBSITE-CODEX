@@ -1,5 +1,5 @@
 import React from 'react';
-import type { PlayerHistoryModalProps } from '../../types/leaderboard';
+import type { PlayerHistoryModalProps, RPChangeEntry } from '../../types/leaderboard';
 import { usePlayerHistory } from '../../hooks/usePlayerHistory';
 import PlayerStatsCard from './PlayerStatsCard';
 import PlayerHistoryChart from './PlayerHistoryChart';
@@ -10,10 +10,61 @@ const PlayerHistoryModal: React.FC<PlayerHistoryModalProps> = ({ username, isVis
 
   if (!isVisible) return null;
 
+  // --- Advanced, hierarchy-aware RP calculation ---
+  const RANK_ORDER = [
+    'BRONZE 1', 'BRONZE 2', 'BRONZE 3', 'BRONZE 4',
+    'SILVER 1', 'SILVER 2', 'SILVER 3', 'SILVER 4',
+    'GOLD 1', 'GOLD 2', 'GOLD 3', 'GOLD 4',
+    'PLATINUM 1', 'PLATINUM 2', 'PLATINUM 3', 'PLATINUM 4',
+    'DIAMOND 1', 'DIAMOND 2', 'DIAMOND 3',
+    'EMERALD', 'NIGHTMARE'
+  ];
+  function getRankIndex(rank: string) {
+    return RANK_ORDER.findIndex(r => r.toUpperCase() === rank.toUpperCase());
+  }
+  function calculateTrueTotalRPGained(data: RPChangeEntry[]) {
+    let total = 0;
+    for (let i = 1; i < data.length; i++) {
+      const prev = data[i - 1];
+      const curr = data[i];
+      const prevIdx = getRankIndex(prev.new_calculated_rank);
+      const currIdx = getRankIndex(curr.new_calculated_rank);
+
+      if (curr.new_calculated_rank === 'NIGHTMARE' && prev.new_calculated_rank === 'EMERALD') {
+        // Only add (100 - Emerald RP) + Nightmare RP
+        total += (100 - prev.new_rp) + curr.new_rp;
+      } else if (currIdx > prevIdx) {
+        // Promotion: sum carry-over for all crossed ranks
+        let carry = 0;
+        let rp = prev.new_rp;
+        for (let j = prevIdx; j < currIdx; j++) {
+          carry += 99 - rp;
+          rp = 0;
+        }
+        carry += curr.new_rp;
+        total += carry;
+      } else if (currIdx < prevIdx) {
+        // Demotion: sum loss for all crossed ranks
+        let carry = 0;
+        let rp = prev.new_rp;
+        for (let j = prevIdx; j > currIdx; j--) {
+          carry -= rp;
+          rp = 99;
+        }
+        carry += curr.new_rp - 99;
+        total += carry;
+      } else {
+        // Same rank
+        total += curr.new_rp - prev.new_rp;
+      }
+    }
+    return total;
+  }
+
   // Calculate info for the modern info box
   let totalRPGained = 0, highestRP = 0, highestRank = '', currentRank = '', promotions = 0, joinedDate = '';
   if (data && data.length > 0) {
-    totalRPGained = (data[data.length - 1]?.new_rp ?? 0) - (data[0]?.previous_rp ?? 0);
+    totalRPGained = calculateTrueTotalRPGained(data);
     const highestEntry = data.reduce((max, entry) => (entry.new_rp > max.new_rp ? entry : max), data[0]);
     highestRP = highestEntry?.new_rp ?? 0;
     highestRank = highestEntry?.new_calculated_rank ?? '';
