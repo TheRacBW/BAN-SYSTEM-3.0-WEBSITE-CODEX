@@ -22,9 +22,10 @@ const LeaderboardEntryComponent: React.FC<LeaderboardEntryProps> = ({
   const rankInfo = calculatedRank ? getRankTierInfo(calculatedRank.tier) : null;
 
   // Progress bar logic
+  const isEmerald = entry.rank_title?.toLowerCase().includes('emerald');
   const isNightmare = entry.rank_title?.toLowerCase().includes('nightmare');
-  const progressMax = isNightmare ? 900 : 99;
-  const progressValue = isNightmare ? entry.rp : calculatedRank.displayRP;
+  const progressMax = isEmerald ? 100 : (isNightmare ? 900 : 99);
+  const progressValue = isEmerald ? entry.rp : (isNightmare ? entry.rp : calculatedRank.displayRP);
   const progressPercent = Math.min((progressValue / progressMax) * 100, 100);
 
   // Format RP
