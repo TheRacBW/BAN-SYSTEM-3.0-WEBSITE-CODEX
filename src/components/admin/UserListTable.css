@@ -78,4 +78,22 @@
   font-size: 0.9rem;
   opacity: 1;
   pointer-events: none;
+}
+
+/* Force vertical scrollbar always visible and style it for clarity */
+.user-list-scrollbar {
+  overflow-y: scroll !important;
+  scrollbar-width: thin; /* Firefox */
+  scrollbar-color: #3b82f6 #23293a; /* Firefox */
+}
+.user-list-scrollbar::-webkit-scrollbar {
+  width: 10px;
+}
+.user-list-scrollbar::-webkit-scrollbar-thumb {
+  background: #3b82f6;
+  border-radius: 8px;
+}
+.user-list-scrollbar::-webkit-scrollbar-track {
+  background: #23293a;
+  border-radius: 8px;
 } 
