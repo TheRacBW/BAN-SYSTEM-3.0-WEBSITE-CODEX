@@ -854,7 +854,14 @@ const LeaderboardPage: React.FC = () => {
                 key={entry.username}
                 entry={entry}
                 index={entry.rank_position - 1}
-                recentChange={recentRPChanges[entry.username]}
+                recentChange={{
+                  username: entry.username,
+                  rp_change: entry.rp_change || 0,
+                  rank_change: entry.position_change || 0,
+                  change_timestamp: entry.inserted_at || new Date().toISOString(),
+                  previous_rp: entry.previous_rp || entry.rp,
+                  new_rp: entry.rp
+                }}
               />
             ))}
           </div>
