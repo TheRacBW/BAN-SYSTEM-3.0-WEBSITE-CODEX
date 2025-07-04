@@ -8,6 +8,7 @@ import KitCard from '../components/KitCard';
 import AdSettingsPanel from '../components/AdSettingsPanel';
 import RobloxCookiePanel from '../components/RobloxCookiePanel';
 import UserManagementPanel from '../components/admin/UserManagementPanel';
+import RestrictedUsersManager from '../components/admin/RestrictedUsersManager';
 
 interface AdminStats {
   totalUsers: number;
@@ -264,6 +265,26 @@ const AdminPage = () => {
       <div className="space-y-8">
         <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
           <UserManagementPanel />
+          <div className="my-8">
+            <div className="bg-base-200 rounded-2xl shadow-lg p-6 flex flex-col md:flex-row gap-6 items-center justify-center">
+              <div className="flex flex-col items-center flex-1">
+                <span className="text-3xl mb-2">🕵️‍♂️</span>
+                <span className="font-bold">0 = New</span>
+                <span className="text-gray-400 text-sm text-center">Limited access, manual approval required.</span>
+              </div>
+              <div className="flex flex-col items-center flex-1">
+                <span className="text-3xl mb-2">🤝</span>
+                <span className="font-bold">1 = Trusted</span>
+                <span className="text-gray-400 text-sm text-center">Can submit and edit content, auto-approval enabled.</span>
+              </div>
+              <div className="flex flex-col items-center flex-1">
+                <span className="text-3xl mb-2">🛡️</span>
+                <span className="font-bold">2 = Moderator</span>
+                <span className="text-gray-400 text-sm text-center">Can moderate users and submissions.</span>
+              </div>
+            </div>
+          </div>
+          <RestrictedUsersManager />
         </div>
 
         <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6">

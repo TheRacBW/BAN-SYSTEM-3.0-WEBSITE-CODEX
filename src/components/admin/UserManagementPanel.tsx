@@ -1,7 +1,6 @@
 import React, { useState } from "react";
 import UserListTable from "./UserListTable";
 import UserPrivilegeEditor from "./UserPrivilegeEditor";
-import RestrictedUsersManager from "./RestrictedUsersManager";
 import TrustLevelManager from "./TrustLevelManager";
 import BulkUserActions from "./BulkUserActions";
 import { useAuth } from "../../context/AuthContext";
@@ -33,7 +32,6 @@ const UserManagementPanel: React.FC = () => {
         onUpdated={() => setRefresh(r => r + 1)}
       />
       <TrustLevelManager />
-      <RestrictedUsersManager />
     </div>
   );
 };

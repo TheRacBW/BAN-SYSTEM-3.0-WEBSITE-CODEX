@@ -33,14 +33,18 @@ const RestrictedUsersManager: React.FC = () => {
 
   const handleAdd = async () => {
     if (!robloxId) return;
-    await supabase.from("restricted_user_ids").insert({
+    const user = await supabase.auth.getUser();
+    const addedBy = user.data?.user?.id || '';
+    const { data, error } = await supabase.from("restricted_user_ids").insert({
       roblox_user_id: robloxId,
       reason,
-      added_by: supabase.auth.user()?.id,
-    });
-    setRobloxId("");
-    setReason("");
-    fetchRestricted();
+      added_by: addedBy,
+    }).select().single();
+    if (!error && data) {
+      setRestricted([data, ...restricted]);
+      setRobloxId("");
+      setReason("");
+    }
   };
 
   const handleRemove = async (id: number) => {
@@ -79,24 +83,23 @@ const RestrictedUsersManager: React.FC = () => {
   };
 
   return (
-    <div className="modern-card shadow-lg rounded-xl p-6 bg-base-200 mt-10 mb-8">
+    <div className="modern-card shadow-lg rounded-2xl p-6 bg-base-200 dark:bg-base-300 text-base-content border border-base-400 mt-10 mb-8">
       <h3 className="text-lg font-bold mb-1">Restricted Roblox User IDs</h3>
       <div className="text-sm text-gray-400 mb-4">Prevent certain Roblox accounts from being tracked. Add, remove, or import/export restricted IDs. These users will be blocked from all tracking features.</div>
       <div className="flex flex-col md:flex-row md:items-center gap-2 mb-4">
         <input
-          className="input input-bordered flex-1"
+          className="input input-bordered flex-1 bg-base-100 dark:bg-base-300 text-base-content placeholder:text-base-content"
           placeholder="Roblox User ID"
           value={robloxId}
           onChange={e => setRobloxId(e.target.value)}
         />
         <input
-          className="input input-bordered flex-1"
+          className="input input-bordered flex-1 bg-base-100 dark:bg-base-300 text-base-content placeholder:text-base-content"
           placeholder="Reason"
           value={reason}
           onChange={e => setReason(e.target.value)}
         />
         <button className="btn btn-primary" onClick={handleAdd}>Add</button>
-        <input type="file" accept=".csv" className="ml-2" onChange={handleImport} disabled={importing} />
         <button className="btn btn-secondary ml-2" onClick={handleExport}>Export CSV</button>
       </div>
       <div className="overflow-x-auto" style={{ maxHeight: 300, overflowY: 'auto' }}>

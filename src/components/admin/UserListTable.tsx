@@ -83,27 +83,27 @@ const UserListTable: React.FC<Props> = ({ onEditUser, bulkSelection, setBulkSele
   };
 
   return (
-    <div className="modern-card shadow-lg rounded-xl p-6 bg-base-200 mb-8">
+    <div className="modern-card-table bg-base-200 dark:bg-base-300 rounded-2xl shadow-lg p-6 mb-8">
       <div className="flex items-center mb-4 gap-2">
         <input
-          className="input input-bordered flex-1"
+          className="input input-bordered flex-1 bg-base-100 dark:bg-base-300 text-base-content placeholder:text-base-content"
           placeholder="Search username/email"
           value={search}
           onChange={e => setSearch(e.target.value)}
         />
-        <select value={sort} onChange={e => setSort(e.target.value as any)} className="select select-bordered">
+        <select value={sort} onChange={e => setSort(e.target.value as any)} className="select select-bordered modern-select bg-base-100 dark:bg-base-300 text-base-content">
           <option value="created_at">Registration Date</option>
           <option value="last_login">Last Login</option>
           <option value="trust_level">Trust Level</option>
         </select>
-        <select value={order} onChange={e => setOrder(e.target.value as any)} className="select select-bordered">
+        <select value={order} onChange={e => setOrder(e.target.value as any)} className="select select-bordered modern-select bg-base-100 dark:bg-base-300 text-base-content">
           <option value="desc">Desc</option>
           <option value="asc">Asc</option>
         </select>
         <select
           value={trustFilter}
           onChange={e => setTrustFilter(e.target.value === "" ? "" : Number(e.target.value))}
-          className="select select-bordered"
+          className="select select-bordered modern-select bg-base-100 dark:bg-base-300 text-base-content"
         >
           <option value="">All Trust Levels</option>
           {TRUST_LEVELS.map(tl => (
@@ -119,69 +119,54 @@ const UserListTable: React.FC<Props> = ({ onEditUser, bulkSelection, setBulkSele
         </span>
       </div>
       <div className={`overflow-x-auto transition-slide ${slideDirection ? `slide-${slideDirection}` : 'slide-in'}${isFading ? '' : ' slide-in'}`}>
-        <table className="table w-full modern-table">
-          <thead>
-            <tr>
-              <th></th>
-              <th>Username</th>
-              <th>Email</th>
-              <th>Admin</th>
-              <th>Trust</th>
-              <th>Registered</th>
-              <th>Edit</th>
-            </tr>
-          </thead>
-          <tbody>
-            {loading ? (
-              <tr><td colSpan={7}>Loading...</td></tr>
-            ) : users.length === 0 ? (
-              <tr><td colSpan={7}>No users found.</td></tr>
-            ) : (
-              users.map(u => (
-                <tr key={u.id} className="hover:bg-base-300 transition-colors">
-                  <td>
-                    <input
-                      type="checkbox"
-                      checked={bulkSelection.includes(u.id)}
-                      onChange={() => toggleSelect(u.id)}
-                    />
-                  </td>
-                  <td>{u.username}</td>
-                  <td>{u.email}</td>
-                  <td>{u.is_admin ? <FaCheck color="#22c55e" /> : <FaTimes color="#ef4444" />}</td>
-                  <td>
-                    <span className={`badge badge-${["neutral", "info", "success"][u.trust_level]}`}>
-                      {["New", "Trusted", "Moderator"][u.trust_level]}
-                    </span>
-                  </td>
-                  <td>{new Date(u.created_at).toLocaleDateString()}</td>
-                  <td>
-                    <button className="btn btn-xs btn-primary rounded-lg shadow" onClick={() => onEditUser(u.id)}>
-                      Edit
-                    </button>
-                  </td>
-                </tr>
-              ))
-            )}
-          </tbody>
-        </table>
-      </div>
-      <div className="flex justify-between items-center mt-4">
-        <button
-          className="btn btn-outline btn-accent flex items-center gap-1"
-          disabled={page === 1}
-          onClick={() => handlePageChange("left")}
-        >
-          <FaChevronLeft /> Prev
-        </button>
-        <span className="text-sm opacity-70">Page {page} / {Math.ceil(total / PAGE_SIZE)}</span>
-        <button
-          className="btn btn-outline btn-accent flex items-center gap-1"
-          disabled={page * PAGE_SIZE >= total}
-          onClick={() => handlePageChange("right")}
-        >
-          Next <FaChevronRight />
-        </button>
+        <div className="overflow-x-auto" style={{ maxHeight: 500, overflowY: 'auto' }}>
+          <table className="table w-full modern-table">
+            <thead>
+              <tr>
+                <th></th>
+                <th>Username</th>
+                <th>Email</th>
+                <th>Admin</th>
+                <th>Trust</th>
+                <th>Registered</th>
+                <th>Edit</th>
+              </tr>
+            </thead>
+            <tbody>
+              {loading ? (
+                <tr><td colSpan={7}>Loading...</td></tr>
+              ) : users.length === 0 ? (
+                <tr><td colSpan={7}>No users found.</td></tr>
+              ) : (
+                users.map(u => (
+                  <tr key={u.id} className="hover:bg-base-300 transition-colors">
+                    <td>
+                      <input
+                        type="checkbox"
+                        checked={bulkSelection.includes(u.id)}
+                        onChange={() => toggleSelect(u.id)}
+                      />
+                    </td>
+                    <td>{u.username}</td>
+                    <td>{u.email}</td>
+                    <td>{u.is_admin ? <FaCheck color="#22c55e" /> : <FaTimes color="#ef4444" />}</td>
+                    <td>
+                      <span className={`badge badge-${["neutral", "info", "success"][u.trust_level]}`}>
+                        {["New", "Trusted", "Moderator"][u.trust_level]}
+                      </span>
+                    </td>
+                    <td>{new Date(u.created_at).toLocaleDateString()}</td>
+                    <td>
+                      <button className="btn btn-xs btn-primary rounded-lg shadow" onClick={() => onEditUser(u.id)}>
+                        Edit
+                      </button>
+                    </td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
+        </div>
       </div>
     </div>
   );
