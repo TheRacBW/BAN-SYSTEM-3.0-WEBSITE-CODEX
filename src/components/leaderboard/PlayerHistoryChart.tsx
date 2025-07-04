@@ -114,6 +114,17 @@ type ChartDataPoint = {
   change_timestamp: string;
 };
 
+// Map rank names to their main color (use your gradient's first color for each)
+const FLAT_LINE_COLORS: Record<string, string> = {
+  NIGHTMARE: "#8B5CF6", // purple
+  EMERALD: "#10B981",   // green
+  DIAMOND: "#3B82F6",   // blue
+  PLATINUM: "#06B6D4",  // cyan
+  GOLD: "#F59E0B",      // gold
+  SILVER: "#6B7280",    // gray
+  BRONZE: "#CD7C32",    // bronze
+};
+
 const PlayerHistoryChart: React.FC<{ data: RPChangeEntry[]; stats?: any }> = ({ data, stats }) => {
   if (!data || data.length === 0) return null;
 
@@ -240,6 +251,10 @@ const PlayerHistoryChart: React.FC<{ data: RPChangeEntry[]; stats?: any }> = ({ 
     return closestRank ? closestRank.label : '';
   };
 
+  // Get the rank for the flat line (use displayRank of the first point)
+  const flatLineRank = chartData[0]?.displayRank?.toUpperCase();
+  const flatLineColor = FLAT_LINE_COLORS[flatLineRank] || "#3B82F6";
+
   return (
     <div className="w-full h-72 bg-gray-800 rounded-lg mt-2 relative">
       <ResponsiveContainer width="100%" height="100%">
@@ -318,10 +333,10 @@ const PlayerHistoryChart: React.FC<{ data: RPChangeEntry[]; stats?: any }> = ({ 
           <Line
             type="monotone"
             dataKey="ladderScore"
-            stroke={allSameY ? "#3B82F6" : "url(#rank-gradient)"}
+            stroke={allSameY ? flatLineColor : "url(#rank-gradient)"}
             strokeWidth={3}
             dot={{ fill: 'transparent', stroke: 'transparent', r: 6 }}
-            activeDot={{ r: 8, stroke: '#fff', strokeWidth: 2, fill: '#3B82F6' }}
+            activeDot={{ r: 8, stroke: '#fff', strokeWidth: 2, fill: flatLineColor }}
             isAnimationActive={!allSameY}
           />
         </LineChart>
