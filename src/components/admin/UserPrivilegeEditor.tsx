@@ -50,30 +50,30 @@ const UserPrivilegeEditor: React.FC<Props> = ({ userId, onClose, onUpdated }) =>
   if (!userId) return null;
 
   return (
-    <div className="modal modal-open">
-      <div className="modal-box">
-        <h3 className="font-bold text-lg">Edit User Privileges</h3>
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+      <div className="bg-white dark:bg-gray-800 rounded-lg p-6 max-w-md w-full mx-4">
+        <h3 className="text-xl font-bold mb-4">Edit User Privileges</h3>
         {loading ? (
           <div>Loading...</div>
         ) : user ? (
           <>
             <div className="mb-2">Username: <b>{user.username}</b></div>
             <div className="mb-2">Email: {user.email}</div>
-            <div className="mb-2">
-              <label>
+            <div className="mb-4">
+              <label className="flex items-center gap-2">
                 <input type="checkbox" checked={isAdmin} onChange={e => setIsAdmin(e.target.checked)} />
-                <span className="ml-2">Admin</span>
+                <span>Admin</span>
               </label>
             </div>
-            <div className="mb-2">
-              <label>Trust Level:</label>
-              <select className="select select-bordered ml-2" value={trustLevel} onChange={e => setTrustLevel(Number(e.target.value) as TrustLevel)}>
+            <div className="mb-4">
+              <label className="block mb-1">Trust Level:</label>
+              <select className="w-full p-2 border rounded dark:bg-gray-700 dark:border-gray-600" value={trustLevel} onChange={e => setTrustLevel(Number(e.target.value) as TrustLevel)}>
                 <option value={0}>New</option>
                 <option value={1}>Trusted</option>
                 <option value={2}>Moderator</option>
               </select>
             </div>
-            <div className="modal-action">
+            <div className="flex justify-end gap-2 mt-6">
               <button className="btn btn-primary" onClick={handleSave}>Save</button>
               <button className="btn" onClick={onClose}>Cancel</button>
             </div>

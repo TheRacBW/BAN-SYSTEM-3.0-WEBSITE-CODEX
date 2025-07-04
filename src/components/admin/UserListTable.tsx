@@ -119,7 +119,7 @@ const UserListTable: React.FC<Props> = ({ onEditUser, bulkSelection, setBulkSele
         </span>
       </div>
       <div className={`overflow-x-auto transition-slide ${slideDirection ? `slide-${slideDirection}` : 'slide-in'}${isFading ? '' : ' slide-in'}`}>
-        <div className="overflow-x-auto" style={{ maxHeight: 500, overflowY: 'auto' }}>
+        <div className="overflow-x-auto" style={{ maxHeight: '500px', overflowY: 'auto' }}>
           <table className="table w-full modern-table">
             <thead>
               <tr>
