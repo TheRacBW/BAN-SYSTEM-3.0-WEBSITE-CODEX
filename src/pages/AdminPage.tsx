@@ -7,6 +7,7 @@ import { Kit, KitType } from '../types';
 import KitCard from '../components/KitCard';
 import AdSettingsPanel from '../components/AdSettingsPanel';
 import RobloxCookiePanel from '../components/RobloxCookiePanel';
+import UserManagementPanel from '../components/admin/UserManagementPanel';
 
 interface AdminStats {
   totalUsers: number;
@@ -209,7 +210,7 @@ const AdminPage = () => {
   }
 
   return (
-    <div className="max-w-7xl mx-auto px-4">
+    <div className="container mx-auto py-8">
       <div className="flex items-center justify-between mb-8">
         <h1 className="text-3xl font-bold">Admin Dashboard</h1>
         <div className="flex items-center gap-2">
@@ -262,7 +263,7 @@ const AdminPage = () => {
 
       <div className="space-y-8">
         <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
-          <RobloxCookiePanel />
+          <UserManagementPanel />
         </div>
 
         <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
