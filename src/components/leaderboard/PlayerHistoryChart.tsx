@@ -312,7 +312,8 @@ const PlayerHistoryChart: React.FC<{ data: RPChangeEntry[]; stats?: any }> = ({ 
             dataKey="ladderScore"
             stroke="url(#rank-gradient)"
             strokeWidth={3}
-            dot={{ fill: '#3B82F6', r: 4, stroke: '#fff', strokeWidth: 2 }}
+            dot={{ fill: 'transparent', stroke: 'transparent', r: 6 }}
+            activeDot={{ r: 8, stroke: '#fff', strokeWidth: 2, fill: '#3B82F6' }}
             isAnimationActive={true}
           />
         </LineChart>
