@@ -147,16 +147,24 @@ const PlayerHistoryChart: React.FC<{ data: RPChangeEntry[]; stats?: any }> = ({ 
   // Sort by timestamp
   chartData.sort((a, b) => a.timestamp - b.timestamp);
 
+  // Defensive check for allSameY: only true if at least two points
+  const allSameY = chartData.length > 1 && chartData.every(pt => pt.ladderScore === chartData[0].ladderScore);
+
   // Calculate min/max for Y-axis
   const minLadder = Math.min(...chartData.map(e => e.ladderScore));
   const maxLadder = Math.max(...chartData.map(e => e.ladderScore));
   let yMin = minLadder;
   let yMax = maxLadder;
-  const minRange = Math.max(20, (maxLadder || 1) * 0.05);
-  if (maxLadder - minLadder < minRange) {
-    const mid = (maxLadder + minLadder) / 2;
-    yMin = mid - minRange / 2;
-    yMax = mid + minRange / 2;
+  if (allSameY) {
+    yMin = minLadder - 5;
+    yMax = maxLadder + 5;
+  } else {
+    const minRange = Math.max(20, (maxLadder || 1) * 0.05);
+    if (maxLadder - minLadder < minRange) {
+      const mid = (maxLadder + minLadder) / 2;
+      yMin = mid - minRange / 2;
+      yMax = mid + minRange / 2;
+    }
   }
 
   // Find all unique rank zones in the data
@@ -310,11 +318,11 @@ const PlayerHistoryChart: React.FC<{ data: RPChangeEntry[]; stats?: any }> = ({ 
           <Line
             type="monotone"
             dataKey="ladderScore"
-            stroke="url(#rank-gradient)"
+            stroke={allSameY ? "#3B82F6" : "url(#rank-gradient)"}
             strokeWidth={3}
             dot={{ fill: 'transparent', stroke: 'transparent', r: 6 }}
             activeDot={{ r: 8, stroke: '#fff', strokeWidth: 2, fill: '#3B82F6' }}
-            isAnimationActive={true}
+            isAnimationActive={!allSameY}
           />
         </LineChart>
       </ResponsiveContainer>
