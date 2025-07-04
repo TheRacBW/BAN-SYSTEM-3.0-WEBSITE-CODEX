@@ -79,17 +79,18 @@ const RestrictedUsersManager: React.FC = () => {
   };
 
   return (
-    <div className="mt-8">
-      <h3 className="text-lg font-bold mb-2">Restricted Roblox User IDs</h3>
-      <div className="flex mb-2">
+    <div className="modern-card shadow-lg rounded-xl p-6 bg-base-200 mt-10 mb-8">
+      <h3 className="text-lg font-bold mb-1">Restricted Roblox User IDs</h3>
+      <div className="text-sm text-gray-400 mb-4">Prevent certain Roblox accounts from being tracked. Add, remove, or import/export restricted IDs. These users will be blocked from all tracking features.</div>
+      <div className="flex flex-col md:flex-row md:items-center gap-2 mb-4">
         <input
-          className="input input-bordered mr-2"
+          className="input input-bordered flex-1"
           placeholder="Roblox User ID"
           value={robloxId}
           onChange={e => setRobloxId(e.target.value)}
         />
         <input
-          className="input input-bordered mr-2"
+          className="input input-bordered flex-1"
           placeholder="Reason"
           value={reason}
           onChange={e => setReason(e.target.value)}
@@ -98,10 +99,8 @@ const RestrictedUsersManager: React.FC = () => {
         <input type="file" accept=".csv" className="ml-2" onChange={handleImport} disabled={importing} />
         <button className="btn btn-secondary ml-2" onClick={handleExport}>Export CSV</button>
       </div>
-      {loading ? (
-        <div>Loading...</div>
-      ) : (
-        <table className="table w-full">
+      <div className="overflow-x-auto" style={{ maxHeight: 300, overflowY: 'auto' }}>
+        <table className="table w-full modern-table">
           <thead>
             <tr>
               <th>Roblox User ID</th>
@@ -112,20 +111,26 @@ const RestrictedUsersManager: React.FC = () => {
             </tr>
           </thead>
           <tbody>
-            {restricted.map(r => (
-              <tr key={r.id}>
-                <td>{r.roblox_user_id}</td>
-                <td>{r.reason}</td>
-                <td>{r.users?.username || r.added_by}</td>
-                <td>{new Date(r.created_at).toLocaleString()}</td>
-                <td>
-                  <button className="btn btn-xs btn-error" onClick={() => handleRemove(r.id)}>Remove</button>
-                </td>
-              </tr>
-            ))}
+            {loading ? (
+              <tr><td colSpan={5}>Loading...</td></tr>
+            ) : restricted.length === 0 ? (
+              <tr><td colSpan={5}>No restricted users.</td></tr>
+            ) : (
+              restricted.map(r => (
+                <tr key={r.id}>
+                  <td>{r.roblox_user_id}</td>
+                  <td>{r.reason}</td>
+                  <td>{r.users?.username || r.added_by}</td>
+                  <td>{new Date(r.created_at).toLocaleString()}</td>
+                  <td>
+                    <button className="btn btn-xs btn-error" onClick={() => handleRemove(r.id)}>Remove</button>
+                  </td>
+                </tr>
+              ))
+            )}
           </tbody>
         </table>
-      )}
+      </div>
     </div>
   );
 };

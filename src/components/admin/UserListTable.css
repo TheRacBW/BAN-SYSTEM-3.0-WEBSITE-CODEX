@@ -1,0 +1,81 @@
+/* Slide transition for table */
+.transition-slide {
+  transition: opacity 0.35s cubic-bezier(0.4,0,0.2,1), transform 0.35s cubic-bezier(0.4,0,0.2,1);
+}
+.slide-left {
+  opacity: 0;
+  transform: translateX(-60px);
+  pointer-events: none;
+}
+.slide-right {
+  opacity: 0;
+  transform: translateX(60px);
+  pointer-events: none;
+}
+.slide-in {
+  opacity: 1;
+  transform: translateX(0);
+}
+
+/* Modern card/table styles */
+.modern-card {
+  background: var(--tw-prose-bg, #23293a);
+  box-shadow: 0 4px 24px 0 rgba(0,0,0,0.12);
+  border-radius: 1rem;
+  padding: 2rem;
+}
+
+.modern-table {
+  border-collapse: separate;
+  border-spacing: 0;
+  width: 100%;
+}
+.modern-table th, .modern-table td {
+  padding: 0.75rem 1rem;
+  text-align: left;
+}
+.modern-table thead tr {
+  background: #1e2235;
+  color: #fff;
+}
+.modern-table tbody tr:nth-child(even) {
+  background: #23293a;
+}
+.modern-table tbody tr:nth-child(odd) {
+  background: #20243a;
+}
+.modern-table tbody tr:hover {
+  background: #2a314a;
+}
+
+.btn {
+  border-radius: 0.5rem;
+  font-weight: 500;
+  transition: background 0.2s, color 0.2s;
+}
+
+.input, .select {
+  border-radius: 0.5rem;
+  padding: 0.5rem 1rem;
+}
+
+.tooltip[data-tip] {
+  position: relative;
+  cursor: pointer;
+}
+.tooltip[data-tip]:hover:after {
+  content: attr(data-tip);
+  position: absolute;
+  left: 50%;
+  bottom: 125%;
+  transform: translateX(-50%);
+  background: #23293a;
+  color: #fff;
+  padding: 0.5rem 1rem;
+  border-radius: 0.5rem;
+  white-space: nowrap;
+  z-index: 10;
+  font-size: 0.9rem;
+  opacity: 1;
+  pointer-events: none;
+} 

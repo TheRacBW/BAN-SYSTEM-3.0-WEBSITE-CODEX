@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { supabase } from "../../lib/supabase";
-import { FaCheck, FaTimes } from "react-icons/fa";
+import { FaCheck, FaTimes, FaChevronLeft, FaChevronRight, FaInfoCircle } from "react-icons/fa";
+import './UserListTable.css'; // For custom transitions and modern styles
 
 interface User {
   id: string;
@@ -21,6 +22,12 @@ interface Props {
 
 const PAGE_SIZE = 5;
 
+const TRUST_LEVELS = [
+  { value: 0, label: "New", desc: "Lowest. Limited access, manual approval required." },
+  { value: 1, label: "Trusted", desc: "Can submit and edit content, auto-approval enabled." },
+  { value: 2, label: "Moderator", desc: "Highest. Can moderate users and submissions." },
+];
+
 const UserListTable: React.FC<Props> = ({ onEditUser, bulkSelection, setBulkSelection, refresh }) => {
   const [users, setUsers] = useState<User[]>([]);
   const [loading, setLoading] = useState(true);
@@ -29,6 +36,9 @@ const UserListTable: React.FC<Props> = ({ onEditUser, bulkSelection, setBulkSele
   const [search, setSearch] = useState("");
   const [sort, setSort] = useState<"created_at" | "last_login" | "trust_level">("created_at");
   const [order, setOrder] = useState<"asc" | "desc">("desc");
+  const [trustFilter, setTrustFilter] = useState<number | "">("");
+  const [slideDirection, setSlideDirection] = useState<"left" | "right" | null>(null);
+  const [isFading, setIsFading] = useState(false);
 
   useEffect(() => {
     setLoading(true);
@@ -41,6 +51,9 @@ const UserListTable: React.FC<Props> = ({ onEditUser, bulkSelection, setBulkSele
     if (search) {
       query = query.ilike("username", `%${search}%`).or(`email.ilike.%${search}%`);
     }
+    if (trustFilter !== "") {
+      query = query.eq("trust_level", trustFilter);
+    }
 
     query.then(({ data, count, error }) => {
       setLoading(false);
@@ -48,7 +61,7 @@ const UserListTable: React.FC<Props> = ({ onEditUser, bulkSelection, setBulkSele
       setUsers(data || []);
       setTotal(count || 0);
     });
-  }, [page, search, sort, order, refresh]);
+  }, [page, search, sort, order, trustFilter, refresh]);
 
   const toggleSelect = (id: string) => {
     setBulkSelection(
@@ -58,16 +71,27 @@ const UserListTable: React.FC<Props> = ({ onEditUser, bulkSelection, setBulkSele
     );
   };
 
+  // Slide transition logic
+  const handlePageChange = (dir: "left" | "right") => {
+    setSlideDirection(dir);
+    setIsFading(true);
+    setTimeout(() => {
+      setPage(p => dir === "left" ? p - 1 : p + 1);
+      setSlideDirection(null);
+      setTimeout(() => setIsFading(false), 350); // match CSS duration
+    }, 350); // match CSS duration
+  };
+
   return (
-    <div>
-      <div className="flex mb-2">
+    <div className="modern-card shadow-lg rounded-xl p-6 bg-base-200 mb-8">
+      <div className="flex items-center mb-4 gap-2">
         <input
-          className="input input-bordered mr-2"
+          className="input input-bordered flex-1"
           placeholder="Search username/email"
           value={search}
           onChange={e => setSearch(e.target.value)}
         />
-        <select value={sort} onChange={e => setSort(e.target.value as any)} className="select select-bordered mr-2">
+        <select value={sort} onChange={e => setSort(e.target.value as any)} className="select select-bordered">
           <option value="created_at">Registration Date</option>
           <option value="last_login">Last Login</option>
           <option value="trust_level">Trust Level</option>
@@ -76,57 +100,88 @@ const UserListTable: React.FC<Props> = ({ onEditUser, bulkSelection, setBulkSele
           <option value="desc">Desc</option>
           <option value="asc">Asc</option>
         </select>
+        <select
+          value={trustFilter}
+          onChange={e => setTrustFilter(e.target.value === "" ? "" : Number(e.target.value))}
+          className="select select-bordered"
+        >
+          <option value="">All Trust Levels</option>
+          {TRUST_LEVELS.map(tl => (
+            <option key={tl.value} value={tl.value}>{tl.label}</option>
+          ))}
+        </select>
+        <span className="tooltip ml-2" data-tip="Trust Level: 0=New (lowest), 2=Moderator (highest)"><FaInfoCircle color="#3b82f6" /></span>
       </div>
-      <table className="table w-full">
-        <thead>
-          <tr>
-            <th></th>
-            <th>Username</th>
-            <th>Email</th>
-            <th>Admin</th>
-            <th>Trust</th>
-            <th>Registered</th>
-            <th>Edit</th>
-          </tr>
-        </thead>
-        <tbody>
-          {loading ? (
-            <tr><td colSpan={7}>Loading...</td></tr>
-          ) : users.length === 0 ? (
-            <tr><td colSpan={7}>No users found.</td></tr>
-          ) : (
-            users.map(u => (
-              <tr key={u.id}>
-                <td>
-                  <input
-                    type="checkbox"
-                    checked={bulkSelection.includes(u.id)}
-                    onChange={() => toggleSelect(u.id)}
-                  />
-                </td>
-                <td>{u.username}</td>
-                <td>{u.email}</td>
-                <td>{u.is_admin ? <FaCheck className="text-green-500" /> : <FaTimes className="text-red-500" />}</td>
-                <td>
-                  <span className={`badge badge-${["neutral", "info", "success"][u.trust_level]}`}>
-                    {["New", "Trusted", "Moderator"][u.trust_level]}
-                  </span>
-                </td>
-                <td>{new Date(u.created_at).toLocaleDateString()}</td>
-                <td>
-                  <button className="btn btn-xs btn-primary" onClick={() => onEditUser(u.id)}>
-                    Edit
-                  </button>
-                </td>
-              </tr>
-            ))
-          )}
-        </tbody>
-      </table>
-      <div className="flex justify-between mt-2">
-        <button className="btn btn-sm" disabled={page === 1} onClick={() => setPage(p => p - 1)}>Prev</button>
-        <span>Page {page} / {Math.ceil(total / PAGE_SIZE)}</span>
-        <button className="btn btn-sm" disabled={page * PAGE_SIZE >= total} onClick={() => setPage(p => p + 1)}>Next</button>
+      <div className="mb-2 flex items-center gap-4">
+        <FaInfoCircle color="#3b82f6" />
+        <span>
+          <b>Trust Level Guide:</b> 0 = New (lowest), 1 = Trusted, 2 = Moderator (highest). Moderator has the most permissions.
+        </span>
+      </div>
+      <div className={`overflow-x-auto transition-slide ${slideDirection ? `slide-${slideDirection}` : 'slide-in'}${isFading ? '' : ' slide-in'}`}>
+        <table className="table w-full modern-table">
+          <thead>
+            <tr>
+              <th></th>
+              <th>Username</th>
+              <th>Email</th>
+              <th>Admin</th>
+              <th>Trust</th>
+              <th>Registered</th>
+              <th>Edit</th>
+            </tr>
+          </thead>
+          <tbody>
+            {loading ? (
+              <tr><td colSpan={7}>Loading...</td></tr>
+            ) : users.length === 0 ? (
+              <tr><td colSpan={7}>No users found.</td></tr>
+            ) : (
+              users.map(u => (
+                <tr key={u.id} className="hover:bg-base-300 transition-colors">
+                  <td>
+                    <input
+                      type="checkbox"
+                      checked={bulkSelection.includes(u.id)}
+                      onChange={() => toggleSelect(u.id)}
+                    />
+                  </td>
+                  <td>{u.username}</td>
+                  <td>{u.email}</td>
+                  <td>{u.is_admin ? <FaCheck color="#22c55e" /> : <FaTimes color="#ef4444" />}</td>
+                  <td>
+                    <span className={`badge badge-${["neutral", "info", "success"][u.trust_level]}`}>
+                      {["New", "Trusted", "Moderator"][u.trust_level]}
+                    </span>
+                  </td>
+                  <td>{new Date(u.created_at).toLocaleDateString()}</td>
+                  <td>
+                    <button className="btn btn-xs btn-primary rounded-lg shadow" onClick={() => onEditUser(u.id)}>
+                      Edit
+                    </button>
+                  </td>
+                </tr>
+              ))
+            )}
+          </tbody>
+        </table>
+      </div>
+      <div className="flex justify-between items-center mt-4">
+        <button
+          className="btn btn-outline btn-accent flex items-center gap-1"
+          disabled={page === 1}
+          onClick={() => handlePageChange("left")}
+        >
+          <FaChevronLeft /> Prev
+        </button>
+        <span className="text-sm opacity-70">Page {page} / {Math.ceil(total / PAGE_SIZE)}</span>
+        <button
+          className="btn btn-outline btn-accent flex items-center gap-1"
+          disabled={page * PAGE_SIZE >= total}
+          onClick={() => handlePageChange("right")}
+        >
+          Next <FaChevronRight />
+        </button>
       </div>
     </div>
   );
