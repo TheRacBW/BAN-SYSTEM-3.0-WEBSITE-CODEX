@@ -21,9 +21,7 @@ interface Props {
 }
 
 const TRUST_LEVELS = [
-  { value: 0, label: "New", desc: "Lowest. Limited access, manual approval required." },
-  { value: 1, label: "Trusted", desc: "Can submit and edit content, auto-approval enabled." },
-  { value: 2, label: "Moderator", desc: "Highest. Can moderate users and submissions." },
+  
 ];
 
 const UserListTable: React.FC<Props> = ({ onEditUser, bulkSelection, setBulkSelection, refresh }) => {
