@@ -83,27 +83,27 @@ const UserListTable: React.FC<Props> = ({ onEditUser, bulkSelection, setBulkSele
   };
 
   return (
-    <div className="modern-card-table bg-base-200 dark:bg-base-300 rounded-2xl shadow-lg p-6 mb-8">
+    <div className="rounded-xl shadow-lg p-8 mb-8" style={{ background: '#232b36' }}>
       <div className="flex items-center mb-4 gap-2">
         <input
-          className="input input-bordered flex-1 bg-base-100 dark:bg-base-300 text-base-content placeholder:text-base-content"
+          className="input input-bordered flex-1 rounded-md px-4 py-2 bg-[#323a45] text-gray-200 placeholder:text-gray-400 border border-[#3a4250] focus:outline-none focus:ring-2 focus:ring-blue-500"
           placeholder="Search username/email"
           value={search}
           onChange={e => setSearch(e.target.value)}
         />
-        <select value={sort} onChange={e => setSort(e.target.value as any)} className="select select-bordered modern-select bg-base-100 dark:bg-base-300 text-base-content">
+        <select value={sort} onChange={e => setSort(e.target.value as any)} className="select select-bordered modern-select rounded-md px-4 py-2 bg-[#323a45] text-gray-200 border border-[#3a4250] focus:outline-none focus:ring-2 focus:ring-blue-500">
           <option value="created_at">Registration Date</option>
           <option value="last_login">Last Login</option>
           <option value="trust_level">Trust Level</option>
         </select>
-        <select value={order} onChange={e => setOrder(e.target.value as any)} className="select select-bordered modern-select bg-base-100 dark:bg-base-300 text-base-content">
+        <select value={order} onChange={e => setOrder(e.target.value as any)} className="select select-bordered modern-select rounded-md px-4 py-2 bg-[#323a45] text-gray-200 border border-[#3a4250] focus:outline-none focus:ring-2 focus:ring-blue-500">
           <option value="desc">Desc</option>
           <option value="asc">Asc</option>
         </select>
         <select
           value={trustFilter}
           onChange={e => setTrustFilter(e.target.value === "" ? "" : Number(e.target.value))}
-          className="select select-bordered modern-select bg-base-100 dark:bg-base-300 text-base-content"
+          className="select select-bordered modern-select rounded-md px-4 py-2 bg-[#323a45] text-gray-200 border border-[#3a4250] focus:outline-none focus:ring-2 focus:ring-blue-500"
         >
           <option value="">All Trust Levels</option>
           {TRUST_LEVELS.map(tl => (

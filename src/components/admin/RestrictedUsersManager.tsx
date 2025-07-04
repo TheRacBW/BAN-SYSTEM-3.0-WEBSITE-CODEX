@@ -83,18 +83,18 @@ const RestrictedUsersManager: React.FC = () => {
   };
 
   return (
-    <div className="modern-card shadow-lg rounded-2xl p-6 bg-base-200 dark:bg-base-300 text-base-content border border-base-400 mt-10 mb-8">
+    <div className="rounded-xl shadow-lg p-8 mt-10 mb-8" style={{ background: '#232b36' }}>
       <h3 className="text-lg font-bold mb-1">Restricted Roblox User IDs</h3>
       <div className="text-sm text-gray-400 mb-4">Prevent certain Roblox accounts from being tracked. Add, remove, or import/export restricted IDs. These users will be blocked from all tracking features.</div>
       <div className="flex flex-col md:flex-row md:items-center gap-2 mb-4">
         <input
-          className="input input-bordered flex-1 bg-base-100 dark:bg-base-300 text-base-content placeholder:text-base-content"
+          className="input input-bordered flex-1 rounded-md px-4 py-2 bg-[#323a45] text-gray-200 placeholder:text-gray-400 border border-[#3a4250] focus:outline-none focus:ring-2 focus:ring-blue-500"
           placeholder="Roblox User ID"
           value={robloxId}
           onChange={e => setRobloxId(e.target.value)}
         />
         <input
-          className="input input-bordered flex-1 bg-base-100 dark:bg-base-300 text-base-content placeholder:text-base-content"
+          className="input input-bordered flex-1 rounded-md px-4 py-2 bg-[#323a45] text-gray-200 placeholder:text-gray-400 border border-[#3a4250] focus:outline-none focus:ring-2 focus:ring-blue-500"
           placeholder="Reason"
           value={reason}
           onChange={e => setReason(e.target.value)}
