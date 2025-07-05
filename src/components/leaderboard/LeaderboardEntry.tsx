@@ -224,25 +224,6 @@ const LeaderboardEntryComponent: React.FC<LeaderboardEntryProps> = ({
             ) : (
               <span className="text-white font-semibold text-lg truncate max-w-[160px]">{entry.username}</span>
             )}
-            {/* --- RP/Position Change Indicators --- */}
-            {(showRPChange || showPosChange) && (
-              <span className="flex items-center gap-1 ml-2 animate-fade-in">
-                {showRPChange && (
-                  <span className={`flex items-center text-xs font-bold px-2 py-0.5 rounded-full ${rpDelta > 0 ? 'bg-green-700/80 text-green-200' : 'bg-red-700/80 text-red-200'} shadow-sm animate-pop`}
-                    title={`RP Change: ${rpDelta > 0 ? '+' : ''}${rpDelta}`}>
-                    {rpDelta > 0 ? <ArrowUp size={14} className="mr-0.5" /> : <ArrowDown size={14} className="mr-0.5" />}
-                    {rpDelta > 0 ? '+' : ''}{rpDelta}
-                  </span>
-                )}
-                {showPosChange && (
-                  <span className={`flex items-center text-xs font-bold px-2 py-0.5 rounded-full ${posDelta < 0 ? 'bg-green-800/80 text-green-100' : 'bg-red-800/80 text-red-100'} shadow-sm animate-pop`}
-                    title={`Position Change: ${posDelta < 0 ? '+' : ''}${-posDelta}`}>
-                    {posDelta < 0 ? <ArrowUp size={13} className="mr-0.5" /> : <ArrowDown size={13} className="mr-0.5" />}
-                    {posDelta < 0 ? '+' : ''}{-posDelta}
-                  </span>
-                )}
-              </span>
-            )}
           </div>
           <div className="flex items-center gap-2 mt-1">
             {/* Rank Badge (rounded rectangle, darker, more opaque, text 100% visible) */}
@@ -261,6 +242,46 @@ const LeaderboardEntryComponent: React.FC<LeaderboardEntryProps> = ({
             </div>
           </div>
         </div>
+        {/* --- RP Change and Position Change Indicators, to the left of Total RP --- */}
+        <div className="flex flex-col items-end justify-between h-full ml-auto">
+          <div className="flex items-center gap-2">
+            {/* RP Change Indicator */}
+            {showRPChange && (
+              <span
+                className={`inline-block text-xs font-bold rounded-full px-3 py-1 mr-2 ${rpDelta > 0 ? 'bg-green-700 text-white' : 'bg-red-700 text-white'}`}
+                title={rpDelta > 0 ? `Gained ${rpDelta} RP` : `Lost ${-rpDelta} RP`}
+              >
+                {rpDelta > 0 ? `+${rpDelta} RP` : `${rpDelta} RP`}
+              </span>
+            )}
+            <div className="flex flex-col items-end">
+              <span className="text-2xl font-bold text-white leading-none">{formatRP(entry.rp)}</span>
+              <span className="text-xs text-gray-400">Total RP</span>
+              <div className="w-32 h-2 bg-gray-800 rounded-full mt-1">
+                <div
+                  className="h-2 rounded-full transition-all duration-500"
+                  style={{
+                    width: `${progressPercent}%`,
+                    background: getRPBarColors(entry.rank_title).gradient,
+                    boxShadow: getRPBarColors(entry.rank_title).glow
+                  }}
+                />
+              </div>
+              {/* Position Change Indicator as plain text, color-coded, below RP change */}
+              {showPosChange && (
+                <span
+                  className={`mt-1 text-xs font-medium ${posDelta > 0 ? 'text-green-400' : 'text-red-400'}`}
+                  title={posDelta > 0 ? `Moved up ${posDelta} place${posDelta === 1 ? '' : 's'}` : `Dropped ${-posDelta} place${posDelta === -1 ? '' : 's'}`}
+                >
+                  {posDelta > 0
+                    ? `↑ Gained ${posDelta} place${posDelta === 1 ? '' : 's'}`
+                    : `↓ Dropped ${-posDelta} place${-posDelta === 1 ? '' : 's'}`}
+                </span>
+              )}
+            </div>
+          </div>
+        </div>
+        {/* --- End indicators --- */}
         {/* --- RP/Progress bar area (unchanged) --- */}
         <div className="flex flex-col items-end justify-between h-full ml-auto">
           <div className="flex items-center gap-2">
