@@ -1,5 +1,5 @@
-import React, { useState, useEffect, useRef } from 'react';
-import { Search, RefreshCw, TrendingUp, TrendingDown, Trophy, Clock, Wifi, WifiOff, ExternalLink } from 'lucide-react';
+import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
+import { Search, RefreshCw, TrendingUp, TrendingDown, Trophy, Clock, Wifi, WifiOff, ExternalLink, Users, Zap } from 'lucide-react';
 import { useLeaderboard } from '../hooks/useLeaderboard';
 import { TabType } from '../types/leaderboard';
 import LeaderboardEntryComponent from '../components/leaderboard/LeaderboardEntry';
@@ -739,12 +739,25 @@ const LeaderboardPage: React.FC = () => {
     </div>
   );
 
-  // Fetch recent RP changes when entries change
+  // Fetch RP changes for all leaderboard entries
+  const fetchRPChanges = useCallback(async (entries: any[]) => {
+    try {
+      const usernames = entries.map(entry => entry.username);
+      console.log('[LeaderboardPage] Fetching RP changes for usernames:', usernames);
+      const changes = await getRecentRPChanges(usernames);
+      setRecentRPChanges(changes);
+      console.log('[LeaderboardPage] Fetched RP changes:', changes);
+    } catch (error) {
+      console.error('[LeaderboardPage] Error fetching RP changes:', error);
+    }
+  }, []);
+
+  // Fetch RP changes when entries change
   useEffect(() => {
-    if (!filteredEntries || filteredEntries.length === 0) return;
-    const usernames = filteredEntries.map(e => e.username);
-    getRecentRPChanges(usernames).then(setRecentRPChanges);
-  }, [filteredEntries.length]); // Only depend on array length, not the array itself
+    if (entries.length > 0) {
+      fetchRPChanges(entries);
+    }
+  }, [entries, fetchRPChanges]);
 
   // --- Currently Ranking State ---
   const [currentlyRanking, setCurrentlyRanking] = useState<any[]>([]);
@@ -894,21 +907,29 @@ const LeaderboardPage: React.FC = () => {
           </div>
         ) : (
           <div className="flex flex-col gap-3 w-full">
-            {filteredEntries.map((entry: import('../types/leaderboard').LeaderboardEntryWithChanges) => (
-              <LeaderboardEntryComponent
-                key={entry.username}
-                entry={entry}
-                index={entry.rank_position - 1}
-                recentChange={{
-                  username: entry.username,
-                  rp_change: entry.rp_change || 0,
-                  rank_change: entry.position_change || 0,
-                  change_timestamp: entry.inserted_at || new Date().toISOString(),
-                  previous_rp: entry.previous_rp || entry.rp,
-                  new_rp: entry.rp
-                }}
-              />
-            ))}
+            {filteredEntries.map((entry: import('../types/leaderboard').LeaderboardEntryWithChanges) => {
+              // Get real RP changes for this entry
+              const realChanges = recentRPChanges[entry.username];
+              
+              // Debug logging for change data
+              console.log('[LeaderboardPage] Entry data for', entry.username, ':', {
+                rp_change: entry.rp_change,
+                position_change: entry.position_change,
+                has_changes: entry.has_changes,
+                rp: entry.rp,
+                realChanges: realChanges,
+                hasRealChanges: !!realChanges
+              });
+              
+              return (
+                <LeaderboardEntryComponent
+                  key={entry.username}
+                  entry={entry}
+                  index={entry.rank_position - 1}
+                  recentChange={realChanges}
+                />
+              );
+            })}
           </div>
         )}
       </div>

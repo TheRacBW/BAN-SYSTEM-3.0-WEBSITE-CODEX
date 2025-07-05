@@ -393,26 +393,22 @@ class LeaderboardService {
    */
   async getCurrentLeaderboardWithChanges(): Promise<LeaderboardEntryWithChanges[]> {
     const current = await this.fetchLeaderboardData();
-    const previous = this.previousSnapshot;
-    const previousMap = new Map(previous.map(e => [e.username, e]));
+    
+    // Convert to LeaderboardEntryWithChanges format with default values
     const result: LeaderboardEntryWithChanges[] = current.map((entry, idx) => {
-      const prev = previousMap.get(entry.username);
-      const rp_change = prev ? entry.rp - prev.rp : 0;
-      const position_change = prev ? prev.rank_position - entry.rank_position : 0;
-      const rank_title_change = prev && prev.rank_title !== entry.rank_title ? `${prev.rank_title} → ${entry.rank_title}` : null;
-      const has_changes = !!(rp_change || position_change || rank_title_change);
       return {
         ...entry,
-        rp_change,
-        position_change,
-        rank_title_change,
-        has_changes,
-        previous_position: prev?.rank_position,
-        previous_rp: prev?.rp,
-        previous_rank_title: prev?.rank_title
+        rp_change: 0, // Will be populated from rp_changes table
+        position_change: 0, // Will be populated from rp_changes table
+        rank_title_change: null,
+        has_changes: false, // Will be determined by the actual changes
+        previous_position: undefined,
+        previous_rp: entry.rp,
+        previous_rank_title: undefined
       };
     });
-    // Save current as previous for next refresh
+    
+    // Save current as previous for next refresh (for backward compatibility)
     this.previousSnapshot = current;
     return result;
   }
@@ -504,14 +500,15 @@ export const leaderboardService = new LeaderboardService();
  */
 export const getRecentRPChanges = async (usernames: string[]): Promise<Record<string, RPChangeData>> => {
   if (!usernames.length) return {};
-  // Supabase does not support DISTINCT ON, so use a raw SQL RPC or fetch all and filter in JS
-  // For now, fetch all recent changes for these users and filter in JS
+  
+  console.log('[getRecentRPChanges] Fetching changes for', usernames.length, 'usernames');
+  
+  // Fetch the most recent change for each username from rp_changes table
   const { data, error } = await supabase
     .from('rp_changes')
     .select('username, rp_change, rank_change, change_timestamp, previous_rp, new_rp')
     .in('username', usernames)
     .gte('change_timestamp', new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString())
-    .order('username', { ascending: true })
     .order('change_timestamp', { ascending: false });
 
   if (error) {
@@ -519,13 +516,21 @@ export const getRecentRPChanges = async (usernames: string[]): Promise<Record<st
     return {};
   }
 
-  // Filter to only the most recent change per username
+  console.log('[getRecentRPChanges] Raw data from database:', data?.length || 0, 'records');
+  if (data && data.length > 0) {
+    console.log('[getRecentRPChanges] Sample data:', data.slice(0, 3));
+  }
+
+  // Group by username and take the most recent change for each
   const result: Record<string, RPChangeData> = {};
   for (const row of data || []) {
     if (!result[row.username]) {
       result[row.username] = row as RPChangeData;
     }
   }
+  
+  console.log('[getRecentRPChanges] Final result:', Object.keys(result).length, 'unique usernames');
+  console.log('[getRecentRPChanges] Changes found:', result);
   return result;
 };
 
