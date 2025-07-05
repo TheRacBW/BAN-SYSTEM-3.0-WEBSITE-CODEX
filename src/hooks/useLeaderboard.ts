@@ -66,7 +66,7 @@ export const useLeaderboard = () => {
     setError(null);
     try {
       const newEntries = await leaderboardService.getCurrentLeaderboardWithChanges();
-      setPreviousEntries(entries);
+      setPreviousEntries(prev => prev); // Use functional update to avoid dependency
       setEntries(newEntries);
       // Get last update time
       const stats = await leaderboardService.getLeaderboardStats();
@@ -77,7 +77,7 @@ export const useLeaderboard = () => {
       setIsLoading(false);
       setIsInitialLoading(false);
     }
-  }, [entries, isInitialLoading]);
+  }, [isInitialLoading]); // Remove entries dependency
 
   // Progressive loading: fetch leaderboard, then enrich avatars in background
   const fetchLeaderboardProgressive = useCallback(async () => {
@@ -303,13 +303,17 @@ export const useLeaderboard = () => {
   })();
 
   // Invalidate cache on refresh
+  const latestGainersTimeRange = useRef(gainersTimeRange);
+  const latestLosersTimeRange = useRef(losersTimeRange);
+  useEffect(() => { latestGainersTimeRange.current = gainersTimeRange; }, [gainersTimeRange]);
+  useEffect(() => { latestLosersTimeRange.current = losersTimeRange; }, [losersTimeRange]);
   const refresh = useCallback(() => {
     gainersCache.current = {};
     losersCache.current = {};
     fetchLeaderboard();
-    fetchGainers(gainersTimeRange);
-    fetchLosers(losersTimeRange);
-  }, [fetchLeaderboard, fetchGainers, fetchLosers, gainersTimeRange, losersTimeRange]);
+    fetchGainers(latestGainersTimeRange.current);
+    fetchLosers(latestLosersTimeRange.current);
+  }, [fetchLeaderboard, fetchGainers, fetchLosers]);
 
   // Smart refresh with cache
   const refreshLeaderboard = useCallback(async (silent = false) => {
@@ -317,20 +321,23 @@ export const useLeaderboard = () => {
       if (!silent) setIsRefreshing(true);
       // Keep showing current data while fetching new data
       const newEntries = await leaderboardService.getCurrentLeaderboardWithChanges();
-      // Only update if data actually changed
-      const hasChanges = JSON.stringify(entries) !== JSON.stringify(newEntries);
-      if (hasChanges) {
-        setPreviousEntries(entries);
-        setEntries(newEntries);
-        // Optionally: trigger animations for changes
-      }
+      // Only update if data actually changed - use functional update to avoid dependency
+      setEntries(prevEntries => {
+        const hasChanges = JSON.stringify(prevEntries) !== JSON.stringify(newEntries);
+        if (hasChanges) {
+          setPreviousEntries(prevEntries);
+          return newEntries;
+        }
+        return prevEntries;
+      });
+      // Optionally: trigger animations for changes
     } catch (error) {
       console.error('Refresh failed:', error);
     } finally {
       setIsRefreshing(false);
       setIsInitialLoading(false);
     }
-  }, [entries]);
+  }, []); // Remove entries dependency
 
   // Supabase trigger subscription for Lua script coordination
   useEffect(() => {

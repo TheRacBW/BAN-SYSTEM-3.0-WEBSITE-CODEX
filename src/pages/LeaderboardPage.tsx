@@ -26,17 +26,16 @@ const getDisplayPercentage = (player: any) => {
 };
 
 const LeaderboardPage: React.FC = () => {
-  // 🔍 DIAGNOSTIC: Track render count
-  const renderCount = useRef(0);
-  renderCount.current++;
+  // 🔍 DIAGNOSTIC: Track render count (disabled for performance)
+  // const renderCount = useRef(0);
+  // renderCount.current++;
+  // console.log(`🚨 LEADERBOARD RENDER #${renderCount.current} at ${new Date().toISOString()}`);
   
-  console.log(`🚨 LEADERBOARD RENDER #${renderCount.current} at ${new Date().toISOString()}`);
-  
-  // Track what's causing re-renders
-  useEffect(() => {
-    console.log('🔥 LEADERBOARD RE-RENDER TRIGGERED');
-    console.trace('Stack trace:');
-  });
+  // Track what's causing re-renders (disabled for performance)
+  // useEffect(() => {
+  //   console.log('🔥 LEADERBOARD RE-RENDER TRIGGERED');
+  //   console.trace('Stack trace:');
+  // });
 
   const {
     entries,
@@ -72,39 +71,39 @@ const LeaderboardPage: React.FC = () => {
   const [showRealtimeToast, setShowRealtimeToast] = useState(false);
   const [recentRPChanges, setRecentRPChanges] = useState<Record<string, import('../services/leaderboardService').RPChangeData>>({});
 
-  // 🔍 DIAGNOSTIC: Track search state changes
-  useEffect(() => {
-    console.log('🔍 SEARCH STATE CHANGED:', {
-      searchQuery,
-      activeTab,
-      isSearchActive: searchQuery.trim().length > 0 && (activeTab === 'gainers' || activeTab === 'losers'),
-      timestamp: new Date().toISOString()
-    });
-  }, [searchQuery, activeTab]);
+  // 🔍 DIAGNOSTIC: Track search state changes (disabled for performance)
+  // useEffect(() => {
+  //   console.log('🔍 SEARCH STATE CHANGED:', {
+  //     searchQuery,
+  //     activeTab,
+  //     isSearchActive: searchQuery.trim().length > 0 && (activeTab === 'gainers' || activeTab === 'losers'),
+  //     timestamp: new Date().toISOString()
+  //   });
+  // }, [searchQuery, activeTab]);
 
-  // 🔍 DIAGNOSTIC: Track data changes that might cause re-renders
-  useEffect(() => {
-    console.log('📊 DATA STATE CHANGED:', {
-      entriesCount: entries.length,
-      gainersCount: gainers.length,
-      losersCount: losers.length,
-      isRefreshing,
-      timestamp: new Date().toISOString()
-    });
-  }, [entries.length, gainers.length, losers.length, isRefreshing]);
+  // 🔍 DIAGNOSTIC: Track data changes that might cause re-renders (disabled for performance)
+  // useEffect(() => {
+  //   console.log('📊 DATA STATE CHANGED:', {
+  //     entriesCount: entries.length,
+  //     gainersCount: gainers.length,
+  //     losersCount: losers.length,
+  //     isRefreshing,
+  //     timestamp: new Date().toISOString()
+  //   });
+  // }, [entries.length, gainers.length, losers.length, isRefreshing]);
 
-  // 🔍 DIAGNOSTIC: Nuclear option - completely disable auto-refresh for testing
-  useEffect(() => {
-    console.log('🚫 AUTO-REFRESH COMPLETELY DISABLED FOR TESTING');
-    // Comment out all auto-refresh logic temporarily
-    /*
-    const interval = setInterval(() => {
-      console.log('🔄 Auto-refresh triggered');
-      // Your refresh logic
-    }, 300000);
-    return () => clearInterval(interval);
-    */
-  }, []);
+  // 🔍 DIAGNOSTIC: Nuclear option - completely disable auto-refresh for testing (disabled for performance)
+  // useEffect(() => {
+  //   console.log('🚫 AUTO-REFRESH COMPLETELY DISABLED FOR TESTING');
+  //   // Comment out all auto-refresh logic temporarily
+  //   /*
+  //   const interval = setInterval(() => {
+  //     console.log('🔄 Auto-refresh triggered');
+  //     // Your refresh logic
+  //   }, 300000);
+  //   return () => clearInterval(interval);
+  //   */
+  // }, []);
 
   // Auto-hide notification after 3 seconds
   useEffect(() => {
@@ -256,7 +255,7 @@ const LeaderboardPage: React.FC = () => {
       setPlayers(fullyEnriched);
     };
     enrich(gainers, setEnrichedGainers);
-  }, [gainers]);
+  }, [gainers.length]); // Only depend on array length, not the array itself
 
   useEffect(() => {
     const enrich = async (players: any[], setPlayers: (arr: any[]) => void) => {
@@ -293,7 +292,7 @@ const LeaderboardPage: React.FC = () => {
       setPlayers(fullyEnriched);
     };
     enrich(losers, setEnrichedLosers);
-  }, [losers]);
+  }, [losers.length]); // Only depend on array length, not the array itself
 
   // Show test component first
   if (showTest) {
@@ -722,7 +721,7 @@ const LeaderboardPage: React.FC = () => {
     return () => {
       subscription.unsubscribe();
     };
-  }, [refresh]);
+  }, []); // Remove refresh dependency since it's stable now
 
   // Improved skeleton loader for gainers/losers
   const SkeletonLoader = () => (
@@ -745,7 +744,7 @@ const LeaderboardPage: React.FC = () => {
     if (!filteredEntries || filteredEntries.length === 0) return;
     const usernames = filteredEntries.map(e => e.username);
     getRecentRPChanges(usernames).then(setRecentRPChanges);
-  }, [filteredEntries]);
+  }, [filteredEntries.length]); // Only depend on array length, not the array itself
 
   // --- Currently Ranking State ---
   const [currentlyRanking, setCurrentlyRanking] = useState<any[]>([]);
@@ -759,7 +758,7 @@ const LeaderboardPage: React.FC = () => {
         setIsLoadingCurrentlyRanking(false);
       });
     }
-  }, [activeTab, lastUpdate]);
+  }, [activeTab]); // Remove lastUpdate dependency to prevent unnecessary re-fetches
 
   // --- Avatar enrichment for currently ranking ---
   const [enrichedCurrentlyRanking, setEnrichedCurrentlyRanking] = useState<any[]>(currentlyRanking);
@@ -800,7 +799,7 @@ const LeaderboardPage: React.FC = () => {
       setPlayers(fullyEnriched);
     };
     enrich(currentlyRanking, setEnrichedCurrentlyRanking);
-  }, [currentlyRanking]);
+  }, [currentlyRanking.length]); // Only depend on array length, not the array itself
 
   // --- Render Currently Ranking Section ---
   const renderCurrentlyRankingSection = () => {
