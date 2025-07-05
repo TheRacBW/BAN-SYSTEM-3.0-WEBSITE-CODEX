@@ -281,27 +281,6 @@ const LeaderboardEntryComponent: React.FC<LeaderboardEntryProps> = ({
             </div>
           </div>
         </div>
-        {/* --- End indicators --- */}
-        {/* --- RP/Progress bar area (unchanged) --- */}
-        <div className="flex flex-col items-end justify-between h-full ml-auto">
-          <div className="flex items-center gap-2">
-            {/* Total RP and progress bar (existing code) */}
-            <div className="flex flex-col items-end">
-              <span className="text-2xl font-bold text-white leading-none">{formatRP(entry.rp)}</span>
-              <span className="text-xs text-gray-400">Total RP</span>
-              <div className="w-32 h-2 bg-gray-800 rounded-full mt-1">
-                <div
-                  className="h-2 rounded-full transition-all duration-500"
-                  style={{
-                    width: `${progressPercent}%`,
-                    background: getRPBarColors(entry.rank_title).gradient,
-                    boxShadow: getRPBarColors(entry.rank_title).glow
-                  }}
-                />
-              </div>
-            </div>
-          </div>
-        </div>
       </div>
       <PlayerHistoryModal
         username={entry.username}
