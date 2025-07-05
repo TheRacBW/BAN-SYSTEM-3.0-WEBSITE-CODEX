@@ -199,7 +199,9 @@ export const useLeaderboard = () => {
 
   // Fetch gainers/losers for a time range with caching
   const fetchGainers = useCallback(async (timeRange: string) => {
+    console.log('📈 FETCHING GAINERS for timeRange:', timeRange, 'at', new Date().toISOString());
     if (gainersCache.current[timeRange]) {
+      console.log('📈 GAINERS loaded from cache for timeRange:', timeRange);
       setGainers(gainersCache.current[timeRange]);
       // Set last update from cache if available
       if (gainersCache.current[timeRange].length > 0) {
@@ -223,7 +225,9 @@ export const useLeaderboard = () => {
   }, []);
 
   const fetchLosers = useCallback(async (timeRange: string) => {
+    console.log('📉 FETCHING LOSERS for timeRange:', timeRange, 'at', new Date().toISOString());
     if (losersCache.current[timeRange]) {
+      console.log('📉 LOSERS loaded from cache for timeRange:', timeRange);
       setLosers(losersCache.current[timeRange]);
       // Set last update from cache if available
       if (losersCache.current[timeRange].length > 0) {
@@ -248,20 +252,24 @@ export const useLeaderboard = () => {
 
   // Auto-refresh
   const startAutoRefresh = useCallback(() => {
+    console.log('🔄 STARTING AUTO-REFRESH at', new Date().toISOString());
     if (refreshInterval) clearInterval(refreshInterval);
     const interval = setInterval(() => {
+      console.log('🔄 AUTO-REFRESH TRIGGERED at', new Date().toISOString());
       setIsRefreshing(true);
       fetchLeaderboard().finally(() => setIsRefreshing(false));
     }, 300000); // 5 minutes
     setRefreshInterval(interval);
   }, [fetchLeaderboard, refreshInterval]);
   const stopAutoRefresh = useCallback(() => {
+    console.log('⏸️ STOPPING AUTO-REFRESH at', new Date().toISOString());
     if (refreshInterval) clearInterval(refreshInterval);
     setRefreshInterval(null);
   }, [refreshInterval]);
 
   // Initial fetch
   useEffect(() => {
+    console.log('🚀 INITIAL FETCH TRIGGERED at', new Date().toISOString());
     fetchLeaderboardProgressive();
     fetchGainers(gainersTimeRange);
     fetchLosers(losersTimeRange);
