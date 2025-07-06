@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { Navigate } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
-import { Shield, Users, Swords, Settings, Plus, X, Edit2 } from 'lucide-react';
+import { Shield, Users, Swords, Settings, Plus, X, Edit2, Database } from 'lucide-react';
 import { Kit, KitType } from '../types';
 import KitCard from '../components/KitCard';
 import AdSettingsPanel from '../components/AdSettingsPanel';
@@ -214,9 +214,18 @@ const AdminPage = () => {
     <div className="container mx-auto py-8">
       <div className="flex items-center justify-between mb-8">
         <h1 className="text-3xl font-bold">Admin Dashboard</h1>
-        <div className="flex items-center gap-2">
-          <Shield className="text-primary-600" size={24} />
-          <span className="text-sm text-gray-600 dark:text-gray-400">Admin Access</span>
+        <div className="flex items-center gap-4">
+          <a
+            href="/admin/migration"
+            className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+          >
+            <Database className="w-4 h-4" />
+            <span>RP Migration</span>
+          </a>
+          <div className="flex items-center gap-2">
+            <Shield className="text-primary-600" size={24} />
+            <span className="text-sm text-gray-600 dark:text-gray-400">Admin Access</span>
+          </div>
         </div>
       </div>
 

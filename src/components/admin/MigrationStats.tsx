@@ -1,0 +1,361 @@
+import React, { useState } from 'react';
+import { 
+  BarChart3, 
+  TrendingUp, 
+  Clock, 
+  CheckCircle, 
+  XCircle,
+  Database,
+  Users,
+  Zap,
+  Activity,
+  ChevronDown,
+  ChevronRight,
+  Target,
+  Gauge,
+  AlertTriangle
+} from 'lucide-react';
+import { UsernameChangeStatistics } from '../../lib/usernameChangeManager';
+
+interface MigrationStatsProps {
+  statistics: UsernameChangeStatistics | null;
+  isRunning: boolean;
+  className?: string;
+}
+
+const MigrationStats: React.FC<MigrationStatsProps> = ({
+  statistics,
+  isRunning,
+  className = ''
+}) => {
+  const [expanded, setExpanded] = useState(false);
+
+  // Mock data for demonstration (in real app, this would come from the migration manager)
+  const mockProcessingStats = {
+    totalRecords: 15420,
+    processedRecords: 12350,
+    updatedRecords: 11800,
+    fromCache: 8500,
+    fromApi: 3300,
+    failedRecords: 150,
+    successRate: 95.8,
+    avgProcessingTime: 2.3,
+    batchEfficiency: 87.5
+  };
+
+  // Calculate completion percentages for each table
+  const tableCompletion = {
+    'rp_changes': 100,
+    'rp_changes_optimized': 95,
+    'leaderboard': 100,
+    'username_change_log': 100
+  };
+
+  // Get status color
+  const getStatusColor = (percentage: number) => {
+    if (percentage >= 90) return 'text-green-600 bg-green-100';
+    if (percentage >= 70) return 'text-yellow-600 bg-yellow-100';
+    return 'text-red-600 bg-red-100';
+  };
+
+  // Get efficiency color
+  const getEfficiencyColor = (efficiency: number) => {
+    if (efficiency >= 85) return 'text-green-600';
+    if (efficiency >= 70) return 'text-yellow-600';
+    return 'text-red-600';
+  };
+
+  // Format number with commas
+  const formatNumber = (num: number) => {
+    return num.toLocaleString();
+  };
+
+  // Calculate estimated time remaining
+  const calculateEstimatedTime = () => {
+    if (!isRunning || mockProcessingStats.processedRecords === 0) return null;
+    
+    const remainingRecords = mockProcessingStats.totalRecords - mockProcessingStats.processedRecords;
+    const avgTimePerRecord = mockProcessingStats.avgProcessingTime / 1000; // seconds per record
+    const estimatedSeconds = remainingRecords * avgTimePerRecord;
+    
+    const hours = Math.floor(estimatedSeconds / 3600);
+    const minutes = Math.floor((estimatedSeconds % 3600) / 60);
+    
+    if (hours > 0) {
+      return `${hours}h ${minutes}m`;
+    }
+    return `${minutes}m`;
+  };
+
+  const estimatedTime = calculateEstimatedTime();
+
+  return (
+    <div className={`bg-white rounded-lg shadow-sm border border-gray-200 ${className}`}>
+      {/* Header */}
+      <div className="p-6 border-b border-gray-200">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center space-x-3">
+            <div className="p-2 bg-purple-100 rounded-lg">
+              <BarChart3 className="w-6 h-6 text-purple-600" />
+            </div>
+            <div>
+              <h2 className="text-lg font-semibold text-gray-900">Migration Statistics</h2>
+              <p className="text-sm text-gray-600">
+                {isRunning ? 'Live statistics from current migration' : 'Historical migration data'}
+              </p>
+            </div>
+          </div>
+          
+          <button
+            onClick={() => setExpanded(!expanded)}
+            className="flex items-center space-x-2 text-sm text-gray-600 hover:text-gray-700"
+          >
+            {expanded ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
+            <span>{expanded ? 'Hide' : 'Show'} Details</span>
+          </button>
+        </div>
+      </div>
+
+      {/* Quick Stats */}
+      <div className="p-6">
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
+          {/* Total Records */}
+          <div className="text-center">
+            <div className="flex items-center justify-center w-12 h-12 bg-blue-100 rounded-lg mx-auto mb-2">
+              <Database className="w-6 h-6 text-blue-600" />
+            </div>
+            <div className="text-2xl font-bold text-gray-900">
+              {formatNumber(mockProcessingStats.totalRecords)}
+            </div>
+            <div className="text-sm text-gray-500">Total Records</div>
+          </div>
+
+          {/* Processed Records */}
+          <div className="text-center">
+            <div className="flex items-center justify-center w-12 h-12 bg-green-100 rounded-lg mx-auto mb-2">
+              <CheckCircle className="w-6 h-6 text-green-600" />
+            </div>
+            <div className="text-2xl font-bold text-gray-900">
+              {formatNumber(mockProcessingStats.processedRecords)}
+            </div>
+            <div className="text-sm text-gray-500">Processed</div>
+          </div>
+
+          {/* Success Rate */}
+          <div className="text-center">
+            <div className="flex items-center justify-center w-12 h-12 bg-purple-100 rounded-lg mx-auto mb-2">
+              <Target className="w-6 h-6 text-purple-600" />
+            </div>
+            <div className="text-2xl font-bold text-gray-900">
+              {mockProcessingStats.successRate}%
+            </div>
+            <div className="text-sm text-gray-500">Success Rate</div>
+          </div>
+
+          {/* Processing Speed */}
+          <div className="text-center">
+            <div className="flex items-center justify-center w-12 h-12 bg-orange-100 rounded-lg mx-auto mb-2">
+              <Zap className="w-6 h-6 text-orange-600" />
+            </div>
+            <div className="text-2xl font-bold text-gray-900">
+              {mockProcessingStats.avgProcessingTime}s
+            </div>
+            <div className="text-sm text-gray-500">Avg Time/Batch</div>
+          </div>
+        </div>
+
+        {/* Progress Bar */}
+        <div className="mt-6">
+          <div className="flex items-center justify-between mb-2">
+            <span className="text-sm font-medium text-gray-700">Overall Progress</span>
+            <span className="text-sm text-gray-500">
+              {Math.round((mockProcessingStats.processedRecords / mockProcessingStats.totalRecords) * 100)}%
+            </span>
+          </div>
+          <div className="w-full bg-gray-200 rounded-full h-2">
+            <div 
+              className="bg-blue-600 h-2 rounded-full transition-all duration-300"
+              style={{ 
+                width: `${(mockProcessingStats.processedRecords / mockProcessingStats.totalRecords) * 100}%` 
+              }}
+            />
+          </div>
+        </div>
+
+        {/* Estimated Time */}
+        {isRunning && estimatedTime && (
+          <div className="mt-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+            <div className="flex items-center space-x-2">
+              <Clock className="w-4 h-4 text-blue-600" />
+              <span className="text-sm text-blue-700">
+                Estimated time remaining: <strong>{estimatedTime}</strong>
+              </span>
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* Detailed Stats (when expanded) */}
+      {expanded && (
+        <div className="border-t border-gray-200 p-6">
+          <div className="space-y-6">
+            {/* Table Completion */}
+            <div>
+              <h3 className="text-lg font-semibold text-gray-900 mb-4">Table Completion</h3>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {Object.entries(tableCompletion).map(([table, percentage]) => (
+                  <div key={table} className="border border-gray-200 rounded-lg p-4">
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="text-sm font-medium text-gray-700 capitalize">
+                        {table.replace(/_/g, ' ')}
+                      </span>
+                      <span className={`px-2 py-1 rounded-full text-xs font-medium ${getStatusColor(percentage)}`}>
+                        {percentage}%
+                      </span>
+                    </div>
+                    <div className="w-full bg-gray-200 rounded-full h-2">
+                      <div 
+                        className="bg-blue-600 h-2 rounded-full"
+                        style={{ width: `${percentage}%` }}
+                      />
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Processing Metrics */}
+            <div>
+              <h3 className="text-lg font-semibold text-gray-900 mb-4">Processing Metrics</h3>
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                <div className="bg-gray-50 rounded-lg p-4">
+                  <div className="flex items-center space-x-2 mb-2">
+                    <Database className="w-4 h-4 text-blue-600" />
+                    <span className="text-sm font-medium text-gray-700">Updated Records</span>
+                  </div>
+                  <div className="text-2xl font-bold text-gray-900">
+                    {formatNumber(mockProcessingStats.updatedRecords)}
+                  </div>
+                </div>
+
+                <div className="bg-gray-50 rounded-lg p-4">
+                  <div className="flex items-center space-x-2 mb-2">
+                    <Users className="w-4 h-4 text-green-600" />
+                    <span className="text-sm font-medium text-gray-700">From Cache</span>
+                  </div>
+                  <div className="text-2xl font-bold text-gray-900">
+                    {formatNumber(mockProcessingStats.fromCache)}
+                  </div>
+                </div>
+
+                <div className="bg-gray-50 rounded-lg p-4">
+                  <div className="flex items-center space-x-2 mb-2">
+                    <Activity className="w-4 h-4 text-purple-600" />
+                    <span className="text-sm font-medium text-gray-700">From API</span>
+                  </div>
+                  <div className="text-2xl font-bold text-gray-900">
+                    {formatNumber(mockProcessingStats.fromApi)}
+                  </div>
+                </div>
+
+                <div className="bg-gray-50 rounded-lg p-4">
+                  <div className="flex items-center space-x-2 mb-2">
+                    <XCircle className="w-4 h-4 text-red-600" />
+                    <span className="text-sm font-medium text-gray-700">Failed Records</span>
+                  </div>
+                  <div className="text-2xl font-bold text-gray-900">
+                    {formatNumber(mockProcessingStats.failedRecords)}
+                  </div>
+                </div>
+
+                <div className="bg-gray-50 rounded-lg p-4">
+                  <div className="flex items-center space-x-2 mb-2">
+                    <Gauge className="w-4 h-4 text-orange-600" />
+                    <span className="text-sm font-medium text-gray-700">Batch Efficiency</span>
+                  </div>
+                  <div className={`text-2xl font-bold ${getEfficiencyColor(mockProcessingStats.batchEfficiency)}`}>
+                    {mockProcessingStats.batchEfficiency}%
+                  </div>
+                </div>
+
+                <div className="bg-gray-50 rounded-lg p-4">
+                  <div className="flex items-center space-x-2 mb-2">
+                    <TrendingUp className="w-4 h-4 text-green-600" />
+                    <span className="text-sm font-medium text-gray-700">Success Rate</span>
+                  </div>
+                  <div className="text-2xl font-bold text-gray-900">
+                    {mockProcessingStats.successRate}%
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Username Change Statistics */}
+            {statistics && (
+              <div>
+                <h3 className="text-lg font-semibold text-gray-900 mb-4">Username Changes</h3>
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                  <div className="bg-blue-50 rounded-lg p-4">
+                    <div className="text-2xl font-bold text-blue-600">
+                      {statistics.totalDetected}
+                    </div>
+                    <div className="text-sm text-blue-600">Total Detected</div>
+                  </div>
+
+                  <div className="bg-green-50 rounded-lg p-4">
+                    <div className="text-2xl font-bold text-green-600">
+                      {statistics.totalMerged}
+                    </div>
+                    <div className="text-sm text-green-600">Successfully Merged</div>
+                  </div>
+
+                  <div className="bg-yellow-50 rounded-lg p-4">
+                    <div className="text-2xl font-bold text-yellow-600">
+                      {statistics.totalPending}
+                    </div>
+                    <div className="text-sm text-yellow-600">Pending Review</div>
+                  </div>
+
+                  <div className="bg-red-50 rounded-lg p-4">
+                    <div className="text-2xl font-bold text-red-600">
+                      {statistics.totalRejected}
+                    </div>
+                    <div className="text-sm text-red-600">Rejected</div>
+                  </div>
+                </div>
+
+                {statistics.averageConfidence > 0 && (
+                  <div className="mt-4 p-4 bg-gray-50 rounded-lg">
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm font-medium text-gray-700">Average Confidence</span>
+                      <span className="text-lg font-bold text-gray-900">
+                        {Math.round(statistics.averageConfidence * 100)}%
+                      </span>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Performance Warnings */}
+            {mockProcessingStats.successRate < 95 && (
+              <div className="p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
+                <div className="flex items-center space-x-2">
+                  <AlertTriangle className="w-5 h-5 text-yellow-600" />
+                  <div>
+                    <h4 className="text-sm font-medium text-yellow-800">Performance Warning</h4>
+                    <p className="text-sm text-yellow-700 mt-1">
+                      Success rate is below 95%. Consider reviewing failed operations.
+                    </p>
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
+export default MigrationStats; 

@@ -11,6 +11,7 @@ import CreateStrategyPage from './pages/CreateStrategyPage';
 import TrendingPage from './pages/TrendingPage';
 import DashboardPage from './pages/DashboardPage';
 import AdminPage from './pages/AdminPage';
+import AdminMigrationPage from './pages/AdminMigrationPage';
 import AuthPage from './pages/AuthPage';
 import SettingsPage from './pages/SettingsPage';
 import PlayersPage from './pages/PlayersPage';
@@ -33,6 +34,7 @@ function App() {
                     <Route path="/trending" element={<TrendingPage />} />
                     <Route path="/dashboard" element={<DashboardPage />} />
                     <Route path="/admin" element={<AdminPage />} />
+                    <Route path="/admin/migration" element={<AdminMigrationPage />} />
                     <Route path="/auth" element={<AuthPage />} />
                     <Route path="/settings" element={<SettingsPage />} />
                     <Route path="/players" element={<PlayersPage />} />
