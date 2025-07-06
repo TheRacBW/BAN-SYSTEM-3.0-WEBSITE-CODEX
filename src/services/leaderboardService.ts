@@ -3,6 +3,41 @@ import { robloxApi } from './robloxApi';
 import { calculateRankFromRP, getProgressToNextTier } from '../utils/rankingSystem';
 import { LeaderboardEntry, RPChange, LeaderboardEntryWithChanges, RPChangeWithTimeRange, TimeRange } from '../types/leaderboard';
 
+// --- User Identifier Helper ---
+/**
+ * Creates a user identifier that can be either "user_id:123" or "username:player"
+ * This allows grouping by user_id when available, falling back to username
+ */
+function getUserIdentifier(entry: { user_id?: number | null; username: string }): string {
+  if (entry.user_id && entry.user_id > 0) {
+    return `user_id:${entry.user_id}`;
+  }
+  return `username:${entry.username}`;
+}
+
+/**
+ * Extracts username from a user identifier
+ */
+function getUsernameFromIdentifier(identifier: string): string {
+  if (identifier.startsWith('user_id:')) {
+    // For user_id identifiers, we need to look up the username
+    // This is handled in the calling functions
+    return identifier.replace('user_id:', '');
+  }
+  return identifier.replace('username:', '');
+}
+
+/**
+ * Extracts user_id from a user identifier
+ */
+function getUserIdFromIdentifier(identifier: string): number | null {
+  if (identifier.startsWith('user_id:')) {
+    const userId = parseInt(identifier.replace('user_id:', ''));
+    return isNaN(userId) ? null : userId;
+  }
+  return null;
+}
+
 // --- Rank Sorting Utility ---
 function getRankSortValue(rankTitle: string, rp: number): number {
   console.log('Sorting rank_title from DB:', rankTitle); // Debug log
@@ -192,7 +227,7 @@ class LeaderboardService {
   }
 
   /**
-   * Fetch RP changes for the last 24 hours
+   * Fetch RP changes for the last 24 hours with user_id support
    */
   async fetchRPChanges(): Promise<RPChange[]> {
     try {
@@ -216,7 +251,7 @@ class LeaderboardService {
         return [];
       }
 
-      // Process RP changes
+      // Process RP changes with user_id support
       const rpChanges = this.processRPChanges(historyData);
       console.log('✅ Processed RP changes:', rpChanges.length);
       
@@ -228,24 +263,25 @@ class LeaderboardService {
   }
 
   /**
-   * Process RP changes from history data
+   * Process RP changes from history data with user_id support
    */
   private processRPChanges(historyData: any[]): RPChange[] {
     const changes: RPChange[] = [];
     const userChanges = new Map<string, any[]>();
 
-    // Group changes by username
+    // Group changes by user identifier (user_id when available, username as fallback)
     historyData.forEach(entry => {
       if (entry.username) {
-        if (!userChanges.has(entry.username)) {
-          userChanges.set(entry.username, []);
+        const identifier = getUserIdentifier(entry);
+        if (!userChanges.has(identifier)) {
+          userChanges.set(identifier, []);
         }
-        userChanges.get(entry.username)!.push(entry);
+        userChanges.get(identifier)!.push(entry);
       }
     });
 
     // Calculate changes for each user
-    userChanges.forEach((entries, username) => {
+    userChanges.forEach((entries, identifier) => {
       if (entries.length >= 2) {
         // Sort by timestamp
         entries.sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime());
@@ -257,7 +293,7 @@ class LeaderboardService {
         
         if (rpChange !== 0) {
           changes.push({
-            username,
+            username: newest.username, // Use the most recent username
             previous_rp: oldest.rp,
             new_rp: newest.rp,
             rp_change: rpChange,
@@ -491,12 +527,237 @@ class LeaderboardService {
       return new Map();
     }
   }
+
+  /**
+   * Get RP history for a user by username or user_id
+   */
+  async getUserRPHistory(identifier: string | number): Promise<RPChange[]> {
+    try {
+      console.log('🔍 Getting RP history for:', identifier);
+      
+      let query = supabase
+        .from('rp_changes')
+        .select('*')
+        .order('change_timestamp', { ascending: false })
+        .limit(100);
+
+      if (typeof identifier === 'number') {
+        // Search by user_id
+        query = query.eq('user_id', identifier);
+      } else {
+        // Search by username
+        query = query.eq('username', identifier);
+      }
+
+      const { data, error } = await query;
+
+      if (error) {
+        console.error('❌ Error fetching RP history:', error);
+        return [];
+      }
+
+      console.log('📈 RP history records found:', data?.length || 0);
+      return data || [];
+    } catch (error) {
+      console.error('💥 Error in getUserRPHistory:', error);
+      return [];
+    }
+  }
+
+  /**
+   * Calculate position changes with user_id support
+   */
+  async calculatePositionChanges(): Promise<Record<string, { position_change: number; rp_change: number }>> {
+    try {
+      console.log('🔄 Calculating position changes...');
+      
+      // Get current leaderboard
+      const current = await this.fetchLeaderboardData();
+      
+      // Get previous snapshot or fetch from history
+      let previous: LeaderboardEntry[] = [];
+      if (this.previousSnapshot.length > 0) {
+        previous = this.previousSnapshot;
+      } else {
+        // Fetch from leaderboard_history as fallback
+        const { data: historyData } = await supabase
+          .from('leaderboard_history')
+          .select('*')
+          .order('created_at', { ascending: false })
+          .limit(200);
+        
+        if (historyData && historyData.length > 0) {
+          previous = historyData.map((entry: any) => ({
+            username: entry.username,
+            rank_position: entry.rank_position,
+            rp: entry.rp,
+            user_id: entry.user_id,
+            rank_title: entry.rank_title || 'Unknown',
+            inserted_at: entry.created_at || new Date().toISOString(),
+            profile_picture: entry.profile_picture || null
+          }));
+        }
+      }
+
+      const changes: Record<string, { position_change: number; rp_change: number }> = {};
+
+      // Match users by user_id when available, fallback to username
+      current.forEach(currentEntry => {
+        const currentIdentifier = getUserIdentifier(currentEntry);
+        
+        // Find matching previous entry
+        let previousEntry = previous.find(prev => {
+          const prevIdentifier = getUserIdentifier(prev);
+          return prevIdentifier === currentIdentifier;
+        });
+
+        if (previousEntry) {
+          const positionChange = previousEntry.rank_position - currentEntry.rank_position;
+          const rpChange = currentEntry.rp - previousEntry.rp;
+          
+          changes[currentEntry.username] = {
+            position_change: positionChange,
+            rp_change: rpChange
+          };
+        }
+      });
+
+      console.log('✅ Position changes calculated for', Object.keys(changes).length, 'users');
+      return changes;
+    } catch (error) {
+      console.error('💥 Error calculating position changes:', error);
+      return {};
+    }
+  }
+
+  /**
+   * Track RP changes with user_id support
+   */
+  async trackRPChanges(changes: Array<{ username: string; user_id?: number; rp_change: number; previous_rp: number; new_rp: number }>): Promise<void> {
+    try {
+      console.log('📊 Tracking RP changes:', changes.length, 'records');
+      
+      if (changes.length === 0) return;
+
+      // Prepare data for insertion
+      const rpChangeRecords = changes.map(change => ({
+        username: change.username,
+        user_id: change.user_id || null,
+        rp_change: change.rp_change,
+        previous_rp: change.previous_rp,
+        new_rp: change.new_rp,
+        change_timestamp: new Date().toISOString()
+      }));
+
+      // Insert into rp_changes table
+      const { error: rpChangesError } = await supabase
+        .from('rp_changes')
+        .insert(rpChangeRecords);
+
+      if (rpChangesError) {
+        console.error('❌ Error inserting RP changes:', rpChangesError);
+        throw rpChangesError;
+      }
+
+      // Also insert into rp_changes_optimized for performance
+      const { error: optimizedError } = await supabase
+        .from('rp_changes_optimized')
+        .insert(rpChangeRecords);
+
+      if (optimizedError) {
+        console.error('❌ Error inserting optimized RP changes:', optimizedError);
+        // Don't throw here as the main table was updated successfully
+      }
+
+      console.log('✅ RP changes tracked successfully');
+    } catch (error) {
+      console.error('💥 Error tracking RP changes:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Trigger user ID backfill for a specific table
+   */
+  async triggerUserIdBackfill(table: 'rp_changes' | 'rp_changes_optimized', batchSize: number = 100, forceRefresh: boolean = false): Promise<any> {
+    try {
+      console.log('🔄 Triggering user ID backfill for table:', table);
+      
+      const { data, error } = await supabase.functions.invoke('backfill-user-ids', {
+        body: {
+          table,
+          batchSize,
+          forceRefresh
+        }
+      });
+
+      if (error) {
+        console.error('❌ Error triggering backfill:', error);
+        throw error;
+      }
+
+      console.log('✅ Backfill triggered successfully:', data);
+      return data;
+    } catch (error) {
+      console.error('💥 Error in triggerUserIdBackfill:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Detect username changes using the database function
+   */
+  async detectUsernameChanges(): Promise<any> {
+    try {
+      console.log('🔍 Detecting username changes...');
+      
+      // Call the detect_username_changes function
+      const { data, error } = await supabase
+        .rpc('detect_username_changes');
+
+      if (error) {
+        console.error('❌ Error detecting username changes:', error);
+        throw error;
+      }
+
+      console.log('✅ Username changes detected:', data);
+      return data;
+    } catch (error) {
+      console.error('💥 Error in detectUsernameChanges:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Merge username changes using the database function
+   */
+  async mergeUsernameChanges(): Promise<any> {
+    try {
+      console.log('🔄 Merging username changes...');
+      
+      // Call the merge_username_change function
+      const { data, error } = await supabase
+        .rpc('merge_username_change');
+
+      if (error) {
+        console.error('❌ Error merging username changes:', error);
+        throw error;
+      }
+
+      console.log('✅ Username changes merged:', data);
+      return data;
+    } catch (error) {
+      console.error('💥 Error in mergeUsernameChanges:', error);
+      throw error;
+    }
+  }
 }
 
 export const leaderboardService = new LeaderboardService();
 
 /**
  * Batch fetch the most recent RP change for each leaderboard player from rp_changes (last 24h)
+ * Updated to support user_id-based tracking
  */
 export const getRecentRPChanges = async (usernames: string[]): Promise<Record<string, RPChangeData>> => {
   if (!usernames.length) return {};
@@ -506,7 +767,7 @@ export const getRecentRPChanges = async (usernames: string[]): Promise<Record<st
   // Fetch the most recent change for each username from rp_changes table
   const { data, error } = await supabase
     .from('rp_changes')
-    .select('username, rp_change, rank_change, change_timestamp, previous_rp, new_rp')
+    .select('username, user_id, rp_change, rank_change, change_timestamp, previous_rp, new_rp')
     .in('username', usernames)
     .gte('change_timestamp', new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString())
     .order('change_timestamp', { ascending: false });
@@ -536,6 +797,7 @@ export const getRecentRPChanges = async (usernames: string[]): Promise<Record<st
 
 /**
  * Get players who are currently ranking (had RP change since the last leaderboard update)
+ * Updated to support user_id-based tracking
  */
 export async function getCurrentlyRankingPlayers(): Promise<LeaderboardEntry[]> {
   // 1. Get the most recent leaderboard update time
@@ -554,7 +816,7 @@ export async function getCurrentlyRankingPlayers(): Promise<LeaderboardEntry[]> 
   // 2. Get all RP changes since that time (only where rp_change != 0)
   const { data: changes, error: changesError } = await supabase
     .from('rp_changes')
-    .select('username, change_timestamp, rp_change')
+    .select('username, user_id, change_timestamp, rp_change')
     .gte('change_timestamp', lastUpdate)
     .neq('rp_change', 0);
   if (changesError) {
@@ -562,6 +824,7 @@ export async function getCurrentlyRankingPlayers(): Promise<LeaderboardEntry[]> 
     return [];
   }
   if (!changes || changes.length === 0) return [];
+  
   // 3. Get unique usernames and most recent change_timestamp for each
   const userMap = new Map<string, string>();
   changes.forEach((c: any) => {
@@ -571,6 +834,7 @@ export async function getCurrentlyRankingPlayers(): Promise<LeaderboardEntry[]> 
   });
   const usernames = Array.from(userMap.keys());
   if (usernames.length === 0) return [];
+  
   // 4. Join with leaderboard for current info, only top 200
   const { data: leaderboard, error: leaderboardJoinError } = await supabase
     .from('leaderboard')
@@ -582,11 +846,13 @@ export async function getCurrentlyRankingPlayers(): Promise<LeaderboardEntry[]> 
     return [];
   }
   if (!leaderboard || leaderboard.length === 0) return [];
+  
   // 5. Attach last active timestamp
   const enriched = leaderboard.map((entry: any) => ({
     ...entry,
     last_active: userMap.get(entry.username) || null
   }));
+  
   // 6. Sort by rank_position ascending
   enriched.sort((a, b) => a.rank_position - b.rank_position);
   return enriched;
