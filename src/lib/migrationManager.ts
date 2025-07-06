@@ -63,6 +63,8 @@ export interface MigrationOptions {
  * Handles step-by-step execution with real-time progress tracking
  */
 export class RPMigrationManager {
+  private static instanceCount = 0;
+  private instanceId: number;
   private state: MigrationState;
   private callbacks: MigrationCallbacks;
   private options: Required<MigrationOptions>;
@@ -70,6 +72,12 @@ export class RPMigrationManager {
   private abortController?: AbortController;
 
   constructor(callbacks: MigrationCallbacks = {}, options: MigrationOptions = {}) {
+    this.instanceId = ++RPMigrationManager.instanceCount;
+    if (this.instanceId > 1) {
+      // Warn if more than one instance is created
+      // eslint-disable-next-line no-console
+      console.warn(`[RPMigrationManager] WARNING: More than one instance created! instanceId=${this.instanceId}`);
+    }
     this.callbacks = callbacks;
     this.options = {
       batchSize: options.batchSize || 100,
@@ -78,7 +86,6 @@ export class RPMigrationManager {
       retryDelay: options.retryDelay || 1000,
       enableLogging: options.enableLogging !== false
     };
-
     this.state = {
       currentStep: '',
       completedSteps: [],
@@ -88,6 +95,8 @@ export class RPMigrationManager {
       processedRecords: 0,
       successRate: 0
     };
+    this.isRunning = false;
+    this.log(`[DEBUG][Instance ${this.instanceId}] Constructor: isRunning = ${this.isRunning}`);
   }
 
   /**
@@ -96,7 +105,7 @@ export class RPMigrationManager {
   private log(message: string, level: 'info' | 'warning' | 'error' = 'info'): void {
     if (this.options.enableLogging) {
       const timestamp = new Date().toISOString();
-      const logMessage = `[${timestamp}] [${level.toUpperCase()}] ${message}`;
+      const logMessage = `[${timestamp}] [${level.toUpperCase()}][Instance ${this.instanceId}] ${message}`;
       console.log(logMessage);
       this.callbacks.onLog?.(message, level);
     }
@@ -254,17 +263,15 @@ export class RPMigrationManager {
    * Run a specific migration step
    */
   async runStep(stepId: string): Promise<any> {
-    if (this.isRunning) {
-      throw new Error('Migration is already running');
+    this.log(`[DEBUG][Instance ${this.instanceId}] runStep: isRunning before step = ${this.isRunning}`);
+    if (this.abortController?.signal.aborted) {
+      throw new Error('Migration was aborted');
     }
-
     this.isRunning = true;
     this.abortController = new AbortController();
-
     try {
       this.log(`Starting step: ${stepId}`);
       this.state.currentStep = stepId;
-
       let result: any;
 
       switch (stepId) {
@@ -372,6 +379,7 @@ export class RPMigrationManager {
       throw error;
     } finally {
       this.isRunning = false;
+      this.log(`[DEBUG][Instance ${this.instanceId}] runStep: isRunning set to false in finally`);
     }
   }
 
@@ -379,11 +387,12 @@ export class RPMigrationManager {
    * Run the complete migration process
    */
   async runFullMigration(): Promise<void> {
+    this.log(`[DEBUG][Instance ${this.instanceId}] runFullMigration: isRunning before check = ${this.isRunning}`);
     if (this.isRunning) {
       throw new Error('Migration is already running');
     }
-
     this.isRunning = true;
+    this.log(`[DEBUG][Instance ${this.instanceId}] runFullMigration: isRunning set to true`);
     this.state.startTime = new Date();
     this.log('🚀 Starting full migration process');
 
@@ -424,6 +433,7 @@ export class RPMigrationManager {
       throw error;
     } finally {
       this.isRunning = false;
+      this.log(`[DEBUG][Instance ${this.instanceId}] runFullMigration: isRunning set to false in finally`);
     }
   }
 
@@ -479,6 +489,7 @@ export class RPMigrationManager {
       this.log('Migration aborted by user');
     }
     this.isRunning = false;
+    this.log(`[DEBUG][Instance ${this.instanceId}] abort: isRunning set to false`);
   }
 
   /**
@@ -492,6 +503,7 @@ export class RPMigrationManager {
    * Reset migration state
    */
   reset(): void {
+    this.abort(); // Always abort before resetting
     this.state = {
       currentStep: '',
       completedSteps: [],
@@ -501,7 +513,9 @@ export class RPMigrationManager {
       processedRecords: 0,
       successRate: 0
     };
+    this.isRunning = false;
     this.log('Migration state reset');
+    this.log(`[DEBUG][Instance ${this.instanceId}] reset: isRunning = ${this.isRunning}`);
   }
 
   /**
