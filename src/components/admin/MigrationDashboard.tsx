@@ -16,8 +16,8 @@ import {
   Shield,
   Target
 } from 'lucide-react';
-import { migrationCoordinator, MigrationCoordinatorState } from '../../../lib/migrationCoordinator';
-import { UsernameChangeData, UsernameChangeStatistics } from '../../../lib/usernameChangeManager';
+import { migrationCoordinator, MigrationCoordinatorState } from '../../lib/migrationCoordinator';
+import { UsernameChangeData, UsernameChangeStatistics } from '../../lib/usernameChangeManager';
 import MigrationProgress from './MigrationProgress';
 import MigrationStats from './MigrationStats';
 import UsernameChangeCard from './UsernameChangeCard';
@@ -298,7 +298,7 @@ const MigrationDashboard: React.FC<MigrationDashboardProps> = ({ className = '' 
             <div>
               <p className="text-sm font-medium text-gray-600">Processing</p>
               <p className="text-2xl font-bold text-green-600">
-                {coordinatorState.statistics?.totalProcessed || 0}
+                {coordinatorState.statistics?.totalMerged || 0}
               </p>
             </div>
             <div className="p-3 bg-green-100 rounded-lg">
