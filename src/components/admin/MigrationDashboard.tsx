@@ -200,10 +200,10 @@ const MigrationDashboard: React.FC<MigrationDashboardProps> = ({ className = '' 
   // Get status color
   const getStatusColor = (status: string) => {
     switch (status) {
-      case 'merged': return 'text-green-600 bg-green-100';
-      case 'pending': return 'text-yellow-600 bg-yellow-100';
-      case 'rejected': return 'text-red-600 bg-red-100';
-      default: return 'text-gray-600 bg-gray-100';
+      case 'merged': return 'text-green-600 dark:text-green-400 bg-green-100 dark:bg-green-900/30';
+      case 'pending': return 'text-yellow-600 dark:text-yellow-400 bg-yellow-100 dark:bg-yellow-900/30';
+      case 'rejected': return 'text-red-600 dark:text-red-400 bg-red-100 dark:bg-red-900/30';
+      default: return 'text-gray-600 dark:text-gray-400 bg-gray-100 dark:bg-gray-700';
     }
   };
 
@@ -226,22 +226,22 @@ const MigrationDashboard: React.FC<MigrationDashboardProps> = ({ className = '' 
   return (
     <div className={`space-y-6 ${className}`}>
       {/* Header */}
-      <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+      <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-6">
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-2xl font-bold text-gray-900">RP Migration Dashboard</h1>
-            <p className="text-gray-600 mt-1">Manage the migration from username-based to user_id-based tracking</p>
+            <h1 className="text-2xl font-bold text-gray-900 dark:text-white">RP Migration Dashboard</h1>
+            <p className="text-gray-600 dark:text-gray-400 mt-1">Manage the migration from username-based to user_id-based tracking</p>
           </div>
           <div className="flex items-center space-x-4">
             <div className="flex items-center space-x-2">
               <HealthIcon className={`w-5 h-5 ${healthStatus.color}`} />
-              <span className="text-sm text-gray-600">
+              <span className="text-sm text-gray-600 dark:text-gray-400">
                 System {healthStatus.status}
               </span>
             </div>
             <button
               onClick={checkSystemHealth}
-              className="p-2 text-gray-400 hover:text-gray-600 transition-colors"
+              className="p-2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-colors"
             >
               <RefreshCw className="w-4 h-4" />
             </button>
@@ -252,22 +252,22 @@ const MigrationDashboard: React.FC<MigrationDashboardProps> = ({ className = '' 
       {/* Overview Cards */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
         {/* Migration Progress */}
-        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+        <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-6">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm font-medium text-gray-600">Migration Progress</p>
-              <p className="text-2xl font-bold text-blue-600">
+              <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Migration Progress</p>
+              <p className="text-2xl font-bold text-blue-600 dark:text-blue-400">
                 {Math.round(coordinatorState.overallProgress)}%
               </p>
             </div>
-            <div className="p-3 bg-blue-100 rounded-lg">
-              <Target className="w-6 h-6 text-blue-600" />
+            <div className="p-3 bg-blue-100 dark:bg-blue-900/30 rounded-lg">
+              <Target className="w-6 h-6 text-blue-600 dark:text-blue-400" />
             </div>
           </div>
           <div className="mt-4">
-            <div className="w-full bg-gray-200 rounded-full h-2">
+            <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2">
               <div 
-                className="bg-blue-600 h-2 rounded-full transition-all duration-300"
+                className="bg-blue-600 dark:bg-blue-500 h-2 rounded-full transition-all duration-300"
                 style={{ width: `${coordinatorState.overallProgress}%` }}
               />
             </div>
@@ -275,37 +275,37 @@ const MigrationDashboard: React.FC<MigrationDashboardProps> = ({ className = '' 
         </div>
 
         {/* Username Changes */}
-        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+        <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-6">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm font-medium text-gray-600">Username Changes</p>
-              <p className="text-2xl font-bold text-purple-600">
+              <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Username Changes</p>
+              <p className="text-2xl font-bold text-purple-600 dark:text-purple-400">
                 {coordinatorState.usernameChanges.length}
               </p>
             </div>
-            <div className="p-3 bg-purple-100 rounded-lg">
-              <Users className="w-6 h-6 text-purple-600" />
+            <div className="p-3 bg-purple-100 dark:bg-purple-900/30 rounded-lg">
+              <Users className="w-6 h-6 text-purple-600 dark:text-purple-400" />
             </div>
           </div>
-          <div className="mt-2 text-sm text-gray-500">
+          <div className="mt-2 text-sm text-gray-500 dark:text-gray-400">
             {coordinatorState.statistics?.totalMerged || 0} merged
           </div>
         </div>
 
         {/* Processing Stats */}
-        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+        <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-6">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm font-medium text-gray-600">Processing</p>
-              <p className="text-2xl font-bold text-green-600">
+              <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Processing</p>
+              <p className="text-2xl font-bold text-green-600 dark:text-green-400">
                 {coordinatorState.statistics?.totalMerged || 0}
               </p>
             </div>
-            <div className="p-3 bg-green-100 rounded-lg">
-              <TrendingUp className="w-6 h-6 text-green-600" />
+            <div className="p-3 bg-green-100 dark:bg-green-900/30 rounded-lg">
+              <TrendingUp className="w-6 h-6 text-green-600 dark:text-green-400" />
             </div>
           </div>
-          <div className="mt-2 text-sm text-gray-500">
+          <div className="mt-2 text-sm text-gray-500 dark:text-gray-400">
             {coordinatorState.statistics?.averageConfidence ? 
               `${Math.round(coordinatorState.statistics.averageConfidence * 100)}% confidence` : 
               'No data'
@@ -314,27 +314,27 @@ const MigrationDashboard: React.FC<MigrationDashboardProps> = ({ className = '' 
         </div>
 
         {/* System Status */}
-        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+        <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-6">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm font-medium text-gray-600">System Status</p>
-              <p className="text-2xl font-bold text-gray-900">
+              <p className="text-sm font-medium text-gray-600 dark:text-gray-400">System Status</p>
+              <p className="text-2xl font-bold text-gray-900 dark:text-white">
                 {coordinatorState.isRunning ? 'Running' : 'Idle'}
               </p>
             </div>
-            <div className="p-3 bg-gray-100 rounded-lg">
-              <Database className="w-6 h-6 text-gray-600" />
+            <div className="p-3 bg-gray-100 dark:bg-gray-700 rounded-lg">
+              <Database className="w-6 h-6 text-gray-600 dark:text-gray-400" />
             </div>
           </div>
-          <div className="mt-2 text-sm text-gray-500">
+          <div className="mt-2 text-sm text-gray-500 dark:text-gray-400">
             {coordinatorState.currentStep || 'No active step'}
           </div>
         </div>
       </div>
 
       {/* Quick Actions */}
-      <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-        <h2 className="text-lg font-semibold text-gray-900 mb-4">Quick Actions</h2>
+      <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-6">
+        <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">Quick Actions</h2>
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
           <button
             onClick={handleStartMigration}
@@ -382,11 +382,11 @@ const MigrationDashboard: React.FC<MigrationDashboardProps> = ({ className = '' 
 
       {/* Username Changes Section */}
       {coordinatorState.usernameChanges.length > 0 && (
-        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+        <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-6">
           <div className="flex items-center justify-between mb-4">
-            <h2 className="text-lg font-semibold text-gray-900">Username Changes</h2>
+            <h2 className="text-lg font-semibold text-gray-900 dark:text-white">Username Changes</h2>
             <div className="flex items-center space-x-4">
-              <span className="text-sm text-gray-600">
+              <span className="text-sm text-gray-600 dark:text-gray-400">
                 {selectedChanges.size} of {coordinatorState.usernameChanges.length} selected
               </span>
               {selectedChanges.size > 0 && (
@@ -442,26 +442,26 @@ const MigrationDashboard: React.FC<MigrationDashboardProps> = ({ className = '' 
       />
 
       {/* Recent Activity */}
-      <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-        <h2 className="text-lg font-semibold text-gray-900 mb-4">Recent Activity</h2>
+      <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-6">
+        <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">Recent Activity</h2>
         <div className="space-y-3">
           {recentActivity.map((activity) => (
-            <div key={activity.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+            <div key={activity.id} className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-700 rounded-lg">
               <div className="flex items-center space-x-3">
                 <div className={`px-2 py-1 rounded-full text-xs font-medium ${getStatusColor(activity.status)}`}>
                   {activity.status}
                 </div>
                 <div>
-                  <p className="text-sm font-medium text-gray-900">
+                  <p className="text-sm font-medium text-gray-900 dark:text-white">
                     {activity.old_username} → {activity.new_username}
                   </p>
-                  <p className="text-xs text-gray-500">
+                  <p className="text-xs text-gray-500 dark:text-gray-400">
                     {new Date(activity.created_at).toLocaleString()}
                   </p>
                 </div>
               </div>
               {activity.merged_by && (
-                <span className="text-xs text-gray-500">by {activity.merged_by}</span>
+                <span className="text-xs text-gray-500 dark:text-gray-400">by {activity.merged_by}</span>
               )}
             </div>
           ))}
@@ -470,8 +470,8 @@ const MigrationDashboard: React.FC<MigrationDashboardProps> = ({ className = '' 
 
       {/* Advanced Section */}
       {showAdvanced && (
-        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-          <h2 className="text-lg font-semibold text-gray-900 mb-4">Advanced Controls</h2>
+        <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-6">
+          <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">Advanced Controls</h2>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <button
               onClick={() => migrationCoordinator.abort()}
