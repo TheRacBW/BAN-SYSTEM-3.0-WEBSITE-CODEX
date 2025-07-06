@@ -69,43 +69,8 @@ const UsernameChangeCard: React.FC<UsernameChangeCardProps> = ({
     }
   };
 
-  // Format evidence for display
-  const formatEvidence = () => {
-    const evidence = [];
-    
-    if (change.evidence.rp_difference !== undefined) {
-      evidence.push({
-        label: 'RP Difference',
-        value: change.evidence.rp_difference,
-        icon: TrendingUp,
-        color: change.evidence.rp_difference < 100 ? 'text-green-600' : 'text-yellow-600'
-      });
-    }
-    
-    if (change.evidence.rank_difference !== undefined) {
-      evidence.push({
-        label: 'Rank Difference',
-        value: change.evidence.rank_difference,
-        icon: TrendingUp,
-        color: change.evidence.rank_difference < 2 ? 'text-green-600' : 'text-yellow-600'
-      });
-    }
-    
-    if (change.evidence.timing) {
-      evidence.push({
-        label: 'Timing',
-        value: change.evidence.timing,
-        icon: Clock,
-        color: 'text-blue-600'
-      });
-    }
-    
-    return evidence;
-  };
-
-  const evidence = formatEvidence();
-  const confidenceColor = getConfidenceColor(change.confidence_score);
-  const confidenceLabel = getConfidenceLabel(change.confidence_score);
+  const confidenceColor = getConfidenceColor(change.confidence_score || 0);
+  const confidenceLabel = getConfidenceLabel(change.confidence_score || 0);
 
   return (
     <div className={`border rounded-lg p-4 transition-all duration-200 ${
@@ -130,7 +95,7 @@ const UsernameChangeCard: React.FC<UsernameChangeCardProps> = ({
         
         <div className="flex items-center space-x-2">
           <span className={`px-2 py-1 rounded-full text-xs font-medium ${confidenceColor}`}>
-            {confidenceLabel} ({Math.round(change.confidence_score * 100)}%)
+            {confidenceLabel} ({Math.round((change.confidence_score || 0) * 100)}%)
           </span>
           
           <button
@@ -151,12 +116,10 @@ const UsernameChangeCard: React.FC<UsernameChangeCardProps> = ({
       {/* Status */}
       <div className="flex items-center space-x-2 mb-3">
         <span className={`px-2 py-1 rounded-full text-xs font-medium ${
-          change.status === 'merged' ? 'text-green-600 bg-green-100' :
-          change.status === 'pending' ? 'text-yellow-600 bg-yellow-100' :
-          change.status === 'rejected' ? 'text-red-600 bg-red-100' :
-          'text-gray-600 bg-gray-100'
+          change.verified ? 'text-green-600 bg-green-100' :
+          'text-yellow-600 bg-yellow-100'
         }`}>
-          {change.status.charAt(0).toUpperCase() + change.status.slice(1)}
+          {change.verified ? 'Verified' : 'Pending'}
         </span>
         
         {change.merged_at && (
@@ -167,34 +130,29 @@ const UsernameChangeCard: React.FC<UsernameChangeCardProps> = ({
       </div>
 
       {/* Evidence (when expanded) */}
-      {expanded && evidence.length > 0 && (
+      {expanded && change.notes && (
         <div className="mb-4 p-3 bg-gray-50 rounded-lg">
           <div className="flex items-center space-x-2 mb-2">
             <Info className="w-4 h-4 text-gray-500" />
-            <span className="text-sm font-medium text-gray-700">Evidence</span>
+            <span className="text-sm font-medium text-gray-700">Notes</span>
           </div>
           
           <div className="space-y-2">
-            {evidence.map((item, index) => {
-              const Icon = item.icon;
-              return (
-                <div key={index} className="flex items-center justify-between text-sm">
-                  <div className="flex items-center space-x-2">
-                    <Icon className={`w-4 h-4 ${item.color}`} />
-                    <span className="text-gray-600">{item.label}:</span>
-                  </div>
-                  <span className={`font-medium ${item.color}`}>
-                    {typeof item.value === 'number' ? item.value : item.value}
-                  </span>
-                </div>
-              );
-            })}
+            <div className="flex items-center justify-between text-sm">
+              <div className="flex items-center space-x-2">
+                <Info className="w-4 h-4 text-blue-500" />
+                <span className="text-gray-600">Notes:</span>
+              </div>
+              <span className="font-medium text-blue-600">
+                {change.notes}
+              </span>
+            </div>
           </div>
         </div>
       )}
 
       {/* Action Buttons */}
-      {change.status === 'pending' && (
+      {change.verified === false && (
         <div className="flex items-center space-x-2">
           <button
             onClick={handleMerge}
@@ -224,28 +182,28 @@ const UsernameChangeCard: React.FC<UsernameChangeCardProps> = ({
       )}
 
       {/* Merged/Rejected Status */}
-      {change.status !== 'pending' && (
+      {change.verified !== null && (
         <div className="flex items-center space-x-2 text-sm">
-          {change.status === 'merged' ? (
+          {change.verified ? (
             <>
               <CheckCircle className="w-4 h-4 text-green-600" />
-              <span className="text-green-600">Successfully merged</span>
+              <span className="text-green-600">Successfully verified</span>
             </>
-          ) : change.status === 'rejected' ? (
+          ) : (
             <>
               <XCircle className="w-4 h-4 text-red-600" />
               <span className="text-red-600">Rejected</span>
             </>
-          ) : null}
+          )}
           
-          {change.merged_by && (
-            <span className="text-gray-500">by {change.merged_by}</span>
+          {change.notes && (
+            <span className="text-gray-500">- {change.notes}</span>
           )}
         </div>
       )}
 
       {/* Warning for low confidence */}
-      {change.confidence_score < 0.6 && (
+      {(change.confidence_score || 0) < 0.6 && (
         <div className="mt-3 p-2 bg-yellow-50 border border-yellow-200 rounded-lg">
           <div className="flex items-center space-x-2">
             <AlertTriangle className="w-4 h-4 text-yellow-600" />

@@ -3,21 +3,15 @@ import { leaderboardService } from '../services/leaderboardService';
 
 // TypeScript interfaces for username change management
 export interface UsernameChangeData {
+  id: string;
   old_username: string;
   new_username: string;
   user_id: number;
-  confidence_score: number;
-  evidence: {
-    rp_difference?: number;
-    rank_difference?: number;
-    timing?: string;
-    last_seen_old?: string;
-    first_seen_new?: string;
-  };
-  status: 'pending' | 'verified' | 'merged' | 'rejected';
-  created_at: string;
+  records_updated: number;
+  confidence_score?: number;
   merged_at?: string;
-  merged_by?: string;
+  verified: boolean;
+  notes?: string;
 }
 
 export interface UsernameChangeStatistics {
@@ -42,7 +36,7 @@ export interface BulkMergeResult {
 }
 
 export interface UsernameChangeFilters {
-  status?: 'pending' | 'verified' | 'merged' | 'rejected';
+  verified?: boolean;
   minConfidence?: number;
   maxConfidence?: number;
   dateFrom?: string;
@@ -72,19 +66,15 @@ export class UsernameChangeManager {
 
       // Transform the result into UsernameChangeData format
       const changes: UsernameChangeData[] = result.map((change: any) => ({
+        id: change.id || crypto.randomUUID(),
         old_username: change.old_username,
         new_username: change.new_username,
         user_id: change.user_id,
+        records_updated: change.records_updated || 0,
         confidence_score: change.confidence_score || 0,
-        evidence: {
-          rp_difference: change.rp_difference,
-          rank_difference: change.rank_difference,
-          timing: change.timing,
-          last_seen_old: change.last_seen_old,
-          first_seen_new: change.first_seen_new
-        },
-        status: 'pending',
-        created_at: new Date().toISOString()
+        merged_at: change.merged_at,
+        verified: change.verified || false,
+        notes: change.notes
       }));
 
       console.log(`✅ Detected ${changes.length} username changes`);
@@ -102,14 +92,32 @@ export class UsernameChangeManager {
     try {
       console.log('📋 Fetching unverified username changes...');
       
+      // First check if the table exists
+      const { data: tableExists, error: tableCheckError } = await supabase
+        .from('information_schema.tables')
+        .select('table_name')
+        .eq('table_schema', 'public')
+        .eq('table_name', 'username_change_log')
+        .limit(1);
+
+      if (tableCheckError) {
+        console.warn('⚠️ Could not check if username_change_log table exists:', tableCheckError);
+      }
+
+      // If table doesn't exist, return empty array
+      if (!tableExists || tableExists.length === 0) {
+        console.log('ℹ️ username_change_log table does not exist yet, returning empty array');
+        return [];
+      }
+      
       let query = supabase
         .from('username_change_log')
         .select('*')
         .order('created_at', { ascending: false });
 
       // Apply filters
-      if (filters.status) {
-        query = query.eq('status', filters.status);
+      if (filters.verified !== undefined) {
+        query = query.eq('verified', filters.verified);
       }
       
       if (filters.minConfidence !== undefined) {
@@ -140,14 +148,16 @@ export class UsernameChangeManager {
 
       if (error) {
         console.error('❌ Error fetching unverified changes:', error);
-        throw error;
+        // Return empty array instead of throwing
+        return [];
       }
 
       console.log(`✅ Found ${data?.length || 0} unverified changes`);
       return data || [];
     } catch (error) {
       console.error('❌ Error in getUnverifiedChanges:', error);
-      throw error;
+      // Return empty array instead of throwing
+      return [];
     }
   }
 
@@ -176,21 +186,37 @@ export class UsernameChangeManager {
         throw error;
       }
 
-      // Update the status in username_change_log table
-      const { error: updateError } = await supabase
-        .from('username_change_log')
-        .update({
-          status: 'merged',
-          merged_at: new Date().toISOString(),
-          merged_by: mergedBy
-        })
-        .eq('old_username', oldUsername)
-        .eq('new_username', newUsername)
-        .eq('user_id', userId);
+      // Check if username_change_log table exists before trying to update it
+      const { data: tableExists, error: tableCheckError } = await supabase
+        .from('information_schema.tables')
+        .select('table_name')
+        .eq('table_schema', 'public')
+        .eq('table_name', 'username_change_log')
+        .limit(1);
 
-      if (updateError) {
-        console.error('❌ Error updating change log:', updateError);
-        // Don't throw here as the merge was successful
+      if (tableCheckError) {
+        console.warn('⚠️ Could not check if username_change_log table exists:', tableCheckError);
+      }
+
+      // Only update the log if the table exists
+      if (tableExists && tableExists.length > 0) {
+        const { error: updateError } = await supabase
+          .from('username_change_log')
+          .update({
+            verified: true,
+            merged_at: new Date().toISOString(),
+            notes: `Merged by ${mergedBy}`
+          })
+          .eq('old_username', oldUsername)
+          .eq('new_username', newUsername)
+          .eq('user_id', userId);
+
+        if (updateError) {
+          console.error('❌ Error updating change log:', updateError);
+          // Don't throw here as the merge was successful
+        }
+      } else {
+        console.log('ℹ️ username_change_log table does not exist yet, skipping log update');
       }
 
       console.log(`✅ Successfully merged username change: ${oldUsername} → ${newUsername}`);
@@ -260,15 +286,46 @@ export class UsernameChangeManager {
     try {
       console.log('📊 Fetching username change statistics...');
       
-      // Get total counts by status
+      // First check if the table exists
+      const { data: tableExists, error: tableCheckError } = await supabase
+        .from('information_schema.tables')
+        .select('table_name')
+        .eq('table_schema', 'public')
+        .eq('table_name', 'username_change_log')
+        .limit(1);
+
+      if (tableCheckError) {
+        console.warn('⚠️ Could not check if username_change_log table exists:', tableCheckError);
+      }
+
+      // If table doesn't exist, return empty statistics
+      if (!tableExists || tableExists.length === 0) {
+        console.log('ℹ️ username_change_log table does not exist yet, returning empty statistics');
+        return {
+          totalDetected: 0,
+          totalMerged: 0,
+          totalPending: 0,
+          totalRejected: 0,
+          averageConfidence: 0
+        };
+      }
+      
+      // Get total counts by verification status
       const { data: statusCounts, error: statusError } = await supabase
         .from('username_change_log')
-        .select('status, confidence_score, created_at, merged_at')
-        .order('created_at', { ascending: false });
+        .select('verified, confidence_score, merged_at')
+        .order('merged_at', { ascending: false });
 
       if (statusError) {
         console.error('❌ Error fetching status counts:', statusError);
-        throw statusError;
+        // Return empty statistics instead of throwing
+        return {
+          totalDetected: 0,
+          totalMerged: 0,
+          totalPending: 0,
+          totalRejected: 0,
+          averageConfidence: 0
+        };
       }
 
       const stats: UsernameChangeStatistics = {
@@ -286,19 +343,13 @@ export class UsernameChangeManager {
 
       if (statusCounts) {
         for (const record of statusCounts) {
-          switch (record.status) {
-            case 'pending':
-              stats.totalPending++;
-              break;
-            case 'merged':
-              stats.totalMerged++;
-              if (record.merged_at && (!lastMergeDate || record.merged_at > lastMergeDate)) {
-                lastMergeDate = record.merged_at;
-              }
-              break;
-            case 'rejected':
-              stats.totalRejected++;
-              break;
+          if (record.verified) {
+            stats.totalMerged++;
+            if (record.merged_at && (!lastMergeDate || record.merged_at > lastMergeDate)) {
+              lastMergeDate = record.merged_at;
+            }
+          } else {
+            stats.totalPending++;
           }
 
           if (record.confidence_score) {
@@ -306,8 +357,8 @@ export class UsernameChangeManager {
             confidenceCount++;
           }
 
-          if (record.created_at && (!lastDetectionDate || record.created_at > lastDetectionDate)) {
-            lastDetectionDate = record.created_at;
+          if (record.merged_at && (!lastDetectionDate || record.merged_at > lastDetectionDate)) {
+            lastDetectionDate = record.merged_at;
           }
         }
 
@@ -321,7 +372,14 @@ export class UsernameChangeManager {
       return stats;
     } catch (error) {
       console.error('❌ Error in getChangeStatistics:', error);
-      throw error;
+      // Return empty statistics instead of throwing
+      return {
+        totalDetected: 0,
+        totalMerged: 0,
+        totalPending: 0,
+        totalRejected: 0,
+        averageConfidence: 0
+      };
     }
   }
 
@@ -333,7 +391,7 @@ export class UsernameChangeManager {
       console.log(`🔍 Verifying username change: ${change.old_username} → ${change.new_username}`);
       
       const reasons: string[] = [];
-      let confidence = change.confidence_score;
+      let confidence = change.confidence_score || 0;
 
       // Check if the old username exists in our data
       const { data: oldUserData } = await supabase
@@ -374,8 +432,8 @@ export class UsernameChangeManager {
       }
 
       // Check timing evidence
-      if (change.evidence.timing) {
-        reasons.push(`Timing evidence: ${change.evidence.timing}`);
+      if (change.notes) {
+        reasons.push(`Additional notes: ${change.notes}`);
         confidence += 0.1;
       }
 
@@ -406,20 +464,37 @@ export class UsernameChangeManager {
     try {
       console.log(`❌ Rejecting username change: ${oldUsername} → ${newUsername}`);
       
-      const { error } = await supabase
-        .from('username_change_log')
-        .update({
-          status: 'rejected',
-          merged_at: new Date().toISOString(),
-          merged_by: 'system'
-        })
-        .eq('old_username', oldUsername)
-        .eq('new_username', newUsername)
-        .eq('user_id', userId);
+      // Check if username_change_log table exists before trying to update it
+      const { data: tableExists, error: tableCheckError } = await supabase
+        .from('information_schema.tables')
+        .select('table_name')
+        .eq('table_schema', 'public')
+        .eq('table_name', 'username_change_log')
+        .limit(1);
 
-      if (error) {
-        console.error('❌ Error rejecting username change:', error);
-        throw error;
+      if (tableCheckError) {
+        console.warn('⚠️ Could not check if username_change_log table exists:', tableCheckError);
+      }
+
+      // Only update the log if the table exists
+      if (tableExists && tableExists.length > 0) {
+        const { error } = await supabase
+          .from('username_change_log')
+          .update({
+            verified: false,
+            merged_at: new Date().toISOString(),
+            notes: `Rejected: ${reason}`
+          })
+          .eq('old_username', oldUsername)
+          .eq('new_username', newUsername)
+          .eq('user_id', userId);
+
+        if (error) {
+          console.error('❌ Error rejecting username change:', error);
+          throw error;
+        }
+      } else {
+        console.log('ℹ️ username_change_log table does not exist yet, skipping log update');
       }
 
       console.log(`✅ Successfully rejected username change: ${oldUsername} → ${newUsername}`);
@@ -436,6 +511,24 @@ export class UsernameChangeManager {
   async getChangeDetails(oldUsername: string, newUsername: string): Promise<UsernameChangeData | null> {
     try {
       console.log(`📋 Getting details for username change: ${oldUsername} → ${newUsername}`);
+      
+      // Check if username_change_log table exists before trying to query it
+      const { data: tableExists, error: tableCheckError } = await supabase
+        .from('information_schema.tables')
+        .select('table_name')
+        .eq('table_schema', 'public')
+        .eq('table_name', 'username_change_log')
+        .limit(1);
+
+      if (tableCheckError) {
+        console.warn('⚠️ Could not check if username_change_log table exists:', tableCheckError);
+      }
+
+      // If table doesn't exist, return null
+      if (!tableExists || tableExists.length === 0) {
+        console.log('ℹ️ username_change_log table does not exist yet, returning null');
+        return null;
+      }
       
       const { data, error } = await supabase
         .from('username_change_log')
