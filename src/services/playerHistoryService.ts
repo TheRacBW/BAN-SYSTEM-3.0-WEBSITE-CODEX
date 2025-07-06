@@ -6,8 +6,7 @@ export const fetchPlayerHistory = async (username: string): Promise<RPChangeEntr
     .from('rp_changes')
     .select('*')
     .eq('username', username)
-    .order('change_timestamp', { ascending: true })
-    .limit(100);
+    .order('change_timestamp', { ascending: true });
 
   if (error) throw error;
   return data || [];
