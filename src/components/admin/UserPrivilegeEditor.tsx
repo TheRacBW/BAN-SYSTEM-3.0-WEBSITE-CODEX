@@ -44,6 +44,9 @@ const UserPrivilegeEditor: React.FC<Props> = ({ userId, onClose, onUpdated }) =>
     if (!error) {
       onUpdated();
       onClose();
+    } else {
+      console.error('Error updating user privileges:', error);
+      alert('Failed to update user privileges. Please try again.');
     }
   };
 

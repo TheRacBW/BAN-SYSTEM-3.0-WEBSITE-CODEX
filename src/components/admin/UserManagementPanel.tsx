@@ -11,6 +11,11 @@ const UserManagementPanel: React.FC = () => {
   const [bulkSelection, setBulkSelection] = useState<string[]>([]);
   const [refresh, setRefresh] = useState(0);
 
+  const handleUserUpdated = () => {
+    setRefresh(r => r + 1);
+    setSelectedUser(null); // Close the editor
+  };
+
   if (!isAdmin) return <div>Access denied.</div>;
 
   return (
@@ -29,7 +34,7 @@ const UserManagementPanel: React.FC = () => {
       <UserPrivilegeEditor
         userId={selectedUser}
         onClose={() => setSelectedUser(null)}
-        onUpdated={() => setRefresh(r => r + 1)}
+        onUpdated={handleUserUpdated}
       />
       <TrustLevelManager />
     </div>

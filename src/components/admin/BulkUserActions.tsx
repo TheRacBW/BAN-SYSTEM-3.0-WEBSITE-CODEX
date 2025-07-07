@@ -15,17 +15,27 @@ const BulkUserActions: React.FC<Props> = ({ selectedUserIds, onActionComplete })
   const handleBulkTrust = async () => {
     if (!window.confirm("Change trust level for selected users?")) return;
     setLoading(true);
-    await supabase.from("users").update({ trust_level: trustLevel }).in("id", selectedUserIds);
+    const { error } = await supabase.from("users").update({ trust_level: trustLevel }).in("id", selectedUserIds);
     setLoading(false);
-    onActionComplete();
+    if (error) {
+      console.error('Error updating trust levels:', error);
+      alert('Failed to update trust levels. Please try again.');
+    } else {
+      onActionComplete();
+    }
   };
 
   const handleBulkAdmin = async (makeAdmin: boolean) => {
     if (!window.confirm(`${makeAdmin ? "Grant" : "Revoke"} admin for selected users?`)) return;
     setLoading(true);
-    await supabase.from("users").update({ is_admin: makeAdmin }).in("id", selectedUserIds);
+    const { error } = await supabase.from("users").update({ is_admin: makeAdmin }).in("id", selectedUserIds);
     setLoading(false);
-    onActionComplete();
+    if (error) {
+      console.error('Error updating admin status:', error);
+      alert('Failed to update admin status. Please try again.');
+    } else {
+      onActionComplete();
+    }
   };
 
   if (selectedUserIds.length === 0) return null;

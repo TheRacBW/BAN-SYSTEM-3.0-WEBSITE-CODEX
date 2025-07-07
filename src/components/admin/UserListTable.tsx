@@ -21,7 +21,9 @@ interface Props {
 }
 
 const TRUST_LEVELS = [
-  
+  { value: 0, label: "New" },
+  { value: 1, label: "Trusted" },
+  { value: 2, label: "Moderator" }
 ];
 
 const UserListTable: React.FC<Props> = ({ onEditUser, bulkSelection, setBulkSelection, refresh }) => {

@@ -26,12 +26,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       
       // Add timeout to prevent hanging
       const timeoutPromise = new Promise((_, reject) => 
-        setTimeout(() => reject(new Error('Query timeout')), 5000)
+        setTimeout(() => reject(new Error('Query timeout')), 10000)
       );
       
       const queryPromise = supabase
         .from('users')
-        .select('is_admin')
+        .select('is_admin, trust_level')
         .eq('id', user.id)
         .single();
 
@@ -53,6 +53,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setAdminCheckComplete(true);
     } catch (error) {
       console.error('Error checking user profile:', error);
+      // On error, assume not admin but don't block the app
       setIsAdmin(false);
       setAdminCheckComplete(true);
     }
