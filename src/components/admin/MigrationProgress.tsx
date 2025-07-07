@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   CheckCircle, 
   XCircle, 
@@ -16,6 +16,7 @@ import {
   Eye,
   Settings
 } from 'lucide-react';
+import { migrationCoordinator } from '../../lib/migrationCoordinator';
 
 interface MigrationProgressProps {
   isRunning: boolean;
@@ -34,57 +35,111 @@ const MigrationProgress: React.FC<MigrationProgressProps> = ({
 }) => {
   const [expanded, setExpanded] = useState(false);
   const [showErrorDetails, setShowErrorDetails] = useState(false);
+  const [migrationState, setMigrationState] = useState<any>(null);
 
-  // Migration steps configuration
+  // Get real migration state
+  useEffect(() => {
+    const updateMigrationState = () => {
+      const state = migrationCoordinator.getMigrationState();
+      setMigrationState(state);
+    };
+
+    // Update immediately
+    updateMigrationState();
+
+    // Update periodically when running
+    const interval = isRunning ? setInterval(updateMigrationState, 1000) : null;
+
+    return () => {
+      if (interval) clearInterval(interval);
+    };
+  }, [isRunning]);
+
+  // Migration steps configuration with real status
   const migrationSteps = [
     {
       id: 'database-setup',
       title: 'Database Setup',
       description: 'Verify user_id columns and helper functions',
       icon: Database,
-      status: 'completed' as const
+      getStatus: () => {
+        if (migrationState?.completedSteps?.includes('database-setup')) return 'completed';
+        if (currentStep === 'database-setup' && isRunning) return 'running';
+        if (migrationState?.failedSteps?.includes('database-setup')) return 'failed';
+        return 'pending';
+      }
     },
     {
       id: 'backfill-rp-changes',
       title: 'Backfill rp_changes Table',
       description: 'Update existing records with user_id values',
       icon: Database,
-      status: currentStep === 'backfill-rp-changes' ? (isRunning ? 'running' : 'pending') : 'pending'
+      getStatus: () => {
+        if (migrationState?.completedSteps?.includes('backfill-rp-changes')) return 'completed';
+        if (currentStep === 'backfill-rp-changes' && isRunning) return 'running';
+        if (migrationState?.failedSteps?.includes('backfill-rp-changes')) return 'failed';
+        return 'pending';
+      }
     },
     {
       id: 'backfill-rp-changes-optimized',
       title: 'Backfill rp_changes_optimized Table',
       description: 'Update optimized table with user_id values',
       icon: Database,
-      status: currentStep === 'backfill-rp-changes-optimized' ? (isRunning ? 'running' : 'pending') : 'pending'
+      getStatus: () => {
+        if (migrationState?.completedSteps?.includes('backfill-rp-changes-optimized')) return 'completed';
+        if (currentStep === 'backfill-rp-changes-optimized' && isRunning) return 'running';
+        if (migrationState?.failedSteps?.includes('backfill-rp-changes-optimized')) return 'failed';
+        return 'pending';
+      }
     },
     {
       id: 'detect-username-changes',
       title: 'Detect Username Changes',
       description: 'Identify users who have changed their usernames',
       icon: Users,
-      status: currentStep === 'detect-username-changes' ? (isRunning ? 'running' : 'pending') : 'pending'
+      getStatus: () => {
+        if (migrationState?.completedSteps?.includes('detect-username-changes')) return 'completed';
+        if (currentStep === 'detect-username-changes' && isRunning) return 'running';
+        if (migrationState?.failedSteps?.includes('detect-username-changes')) return 'failed';
+        return 'pending';
+      }
     },
     {
       id: 'review-username-changes',
       title: 'Review Username Changes',
       description: 'Manually review and merge detected changes',
       icon: Eye,
-      status: currentStep === 'review-username-changes' ? (isRunning ? 'running' : 'pending') : 'pending'
+      getStatus: () => {
+        if (migrationState?.completedSteps?.includes('review-username-changes')) return 'completed';
+        if (currentStep === 'review-username-changes' && isRunning) return 'running';
+        if (migrationState?.failedSteps?.includes('review-username-changes')) return 'failed';
+        return 'pending';
+      }
     },
     {
       id: 'update-leaderboard',
       title: 'Update Leaderboard Table',
       description: 'Backfill leaderboard table with user_id values',
       icon: Database,
-      status: currentStep === 'update-leaderboard' ? (isRunning ? 'running' : 'pending') : 'pending'
+      getStatus: () => {
+        if (migrationState?.completedSteps?.includes('update-leaderboard')) return 'completed';
+        if (currentStep === 'update-leaderboard' && isRunning) return 'running';
+        if (migrationState?.failedSteps?.includes('update-leaderboard')) return 'failed';
+        return 'pending';
+      }
     },
     {
       id: 'verify-migration',
       title: 'Verify Migration Completeness',
       description: 'Run final verification checks',
       icon: CheckCircle,
-      status: currentStep === 'verify-migration' ? (isRunning ? 'running' : 'pending') : 'pending'
+      getStatus: () => {
+        if (migrationState?.completedSteps?.includes('verify-migration')) return 'completed';
+        if (currentStep === 'verify-migration' && isRunning) return 'running';
+        if (migrationState?.failedSteps?.includes('verify-migration')) return 'failed';
+        return 'pending';
+      }
     }
   ];
 
@@ -107,7 +162,7 @@ const MigrationProgress: React.FC<MigrationProgressProps> = ({
     if (stepId === currentStep && isRunning) {
       return Math.min(overallProgress, 95); // Don't show 100% until completed
     }
-    if (migrationSteps.find(s => s.id === stepId)?.status === 'completed') {
+    if (migrationSteps.find(s => s.id === stepId)?.getStatus() === 'completed') {
       return 100;
     }
     return 0;
@@ -118,7 +173,7 @@ const MigrationProgress: React.FC<MigrationProgressProps> = ({
     const step = migrationSteps.find(s => s.id === stepId);
     if (!step) return 'pending';
     
-    if (step.status === 'completed') return 'completed';
+    if (step.getStatus() === 'completed') return 'completed';
     if (stepId === currentStep && isRunning) return 'running';
     if (stepId === currentStep && !isRunning && lastError) return 'failed';
     return 'pending';

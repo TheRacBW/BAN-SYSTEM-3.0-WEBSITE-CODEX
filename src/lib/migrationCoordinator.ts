@@ -352,6 +352,13 @@ export class MigrationCoordinator {
   getLastError(): string | null {
     return this.state.lastError;
   }
+
+  /**
+   * Update callbacks after initialization
+   */
+  setCallbacks(callbacks: MigrationCoordinatorCallbacks): void {
+    this.callbacks = callbacks;
+  }
 }
 
 // Export singleton instance for easy access

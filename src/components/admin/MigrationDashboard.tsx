@@ -63,8 +63,6 @@ const MigrationDashboard: React.FC<MigrationDashboardProps> = ({ className = '' 
 
   // Initialize coordinator with callbacks
   useEffect(() => {
-    migrationCoordinator.reset();
-    
     // Set up callbacks
     const callbacks = {
       onStateChanged: handleStateChange,
@@ -75,63 +73,61 @@ const MigrationDashboard: React.FC<MigrationDashboardProps> = ({ className = '' 
       }
     };
 
-    // Initialize coordinator (this would be done in a real implementation)
-    // For now, we'll simulate the state
-    setCoordinatorState({
-      isRunning: false,
-      currentStep: '',
-      overallProgress: 0,
-      usernameChanges: [],
-      statistics: null,
-      lastError: null
-    });
-
+    // Initialize the migration coordinator with callbacks
+    migrationCoordinator.setCallbacks(callbacks);
+    
+    // Load initial state
+    setCoordinatorState(migrationCoordinator.getState());
+    
     // Load initial data
     loadRecentActivity();
     checkSystemHealth();
+    refreshStatistics();
   }, [handleStateChange, handleUsernameChangesDetected, handleStatisticsUpdated]);
 
   // Load recent activity from username_change_log
   const loadRecentActivity = async () => {
     try {
-      // This would be a real database query
-      const mockActivity = [
-        {
-          id: 1,
-          old_username: 'player1',
-          new_username: 'player1_new',
-          status: 'merged',
-          created_at: new Date(Date.now() - 1000 * 60 * 30).toISOString(),
-          merged_by: 'admin'
-        },
-        {
-          id: 2,
-          old_username: 'player2',
-          new_username: 'player2_updated',
-          status: 'pending',
-          created_at: new Date(Date.now() - 1000 * 60 * 60).toISOString(),
-          merged_by: null
-        }
-      ];
-      setRecentActivity(mockActivity);
+      // Get real recent activity from the coordinator
+      const changes = await migrationCoordinator.getUsernameChanges();
+      setRecentActivity(changes.map(change => ({
+        id: change.id,
+        old_username: change.old_username,
+        new_username: change.new_username,
+        status: change.verified ? 'verified' : 'pending',
+        created_at: change.merged_at || new Date().toISOString(),
+        merged_by: change.notes?.includes('Merged by') ? 'admin' : null
+      })));
     } catch (error) {
       console.error('Failed to load recent activity:', error);
+      setRecentActivity([]);
     }
   };
 
   // Check system health
   const checkSystemHealth = async () => {
     try {
-      // This would check various system components
+      // Check if the migration system is ready
+      const migrationState = migrationCoordinator.getMigrationState();
       const health = {
-        databaseReady: true,
-        edgeFunctionReady: true,
-        migrationReady: true,
+        databaseReady: true, // We'll assume this is true for now
+        edgeFunctionReady: !migrationCoordinator.isRunning(), // If not running, edge function is ready
+        migrationReady: !migrationCoordinator.isRunning(),
         lastCheck: new Date()
       };
       setSystemHealth(health);
     } catch (error) {
       console.error('Failed to check system health:', error);
+    }
+  };
+
+  // Refresh statistics
+  const refreshStatistics = async () => {
+    try {
+      const stats = await migrationCoordinator.refreshStatistics();
+      setCoordinatorState(prev => ({ ...prev, statistics: stats }));
+    } catch (error) {
+      console.error('Failed to refresh statistics:', error);
     }
   };
 
