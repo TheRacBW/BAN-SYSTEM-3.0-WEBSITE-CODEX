@@ -265,7 +265,7 @@ const LeaderboardPage: React.FC = () => {
       setPlayers(fullyEnriched);
     };
     enrich(gainers, setEnrichedGainers);
-  }, [gainers.length]); // Only depend on array length, not the array itself
+  }, [gainers]); // Depend on the full array, not just length
 
   useEffect(() => {
     const enrich = async (players: any[], setPlayers: (arr: any[]) => void) => {
@@ -302,7 +302,7 @@ const LeaderboardPage: React.FC = () => {
       setPlayers(fullyEnriched);
     };
     enrich(losers, setEnrichedLosers);
-  }, [losers.length]); // Only depend on array length, not the array itself
+  }, [losers]); // Depend on the full array, not just length
 
   // Show test component first
   if (showTest) {
@@ -376,10 +376,31 @@ const LeaderboardPage: React.FC = () => {
     
     const newPlayers = filteredGainers.filter(categorizeGainer).filter(p => categorizeGainer(p) === 'new');
     const establishedPlayers = filteredGainers.filter(categorizeGainer).filter(p => categorizeGainer(p) === 'established');
+    // Remove duplicates by username helper
+    const uniqueByUsername = (arr: any[]): any[] => {
+      const seen = new Set<string>();
+      return arr.filter((item: any) => {
+        if (seen.has(item.username)) return false;
+        seen.add(item.username);
+        return true;
+      });
+    };
+    // Sort by RP gained (descending) for established, by recency for new
+    const sortedEstablished = uniqueByUsername([...establishedPlayers].sort((a: any, b: any) => b.rp_change - a.rp_change));
+    const sortedNew = uniqueByUsername([...newPlayers].sort((a: any, b: any) => {
+      // Sort by change_timestamp desc, then rp_change desc
+      const tA = new Date(a.change_timestamp).getTime();
+      const tB = new Date(b.change_timestamp).getTime();
+      if (tB !== tA) return tB - tA;
+      return b.rp_change - a.rp_change;
+    }));
+    // Show top 10
+    const visibleEstablished = sortedEstablished.slice(0, 10);
+    const visibleNew = sortedNew.slice(0, 10);
     return (
       <div className="space-y-6">
         {/* Established Players */}
-        {establishedPlayers.length > 0 && (
+        {sortedEstablished.length > 0 && (
           <div>
             <div className="flex items-center space-x-3 mb-4">
               <div className="w-1 h-6 bg-gradient-to-b from-green-400 to-emerald-500 rounded-full"></div>
@@ -393,29 +414,39 @@ const LeaderboardPage: React.FC = () => {
             <div className="max-h-[420px] overflow-y-auto scrollbar-thin scrollbar-thumb-gray-300 dark:scrollbar-thumb-gray-600 scrollbar-track-gray-100 dark:scrollbar-track-gray-800 rounded-xl border border-gray-200/50 dark:border-gray-700/50 scrollable-section shadow-sm hover:shadow-md transition-shadow duration-200">
               <div className="space-y-3 p-3">
                 <TransitionGroup className="space-y-3">
-                  {establishedPlayers.map((player, index) => (
-                    <CSSTransition key={player.username} timeout={300} classNames="fade-slide">
-                      <ModernGainerBar
-                        player={{ ...player, getTransitionText: () => getTransitionText(player, true) }}
-                        rank={index + 1}
-                        isNewPlayer={false}
-                      />
-                    </CSSTransition>
-                  ))}
+                  {visibleEstablished.map((player) => {
+                    const trueRank = sortedEstablished.findIndex(p => p.username === player.username) + 1;
+                    return (
+                      <CSSTransition key={player.username} timeout={300} classNames="fade-slide">
+                        <ModernGainerBar
+                          player={{ ...player, getTransitionText: () => getTransitionText(player, true) }}
+                          rank={trueRank}
+                          isNewPlayer={false}
+                        />
+                      </CSSTransition>
+                    );
+                  })}
                 </TransitionGroup>
               </div>
             </div>
-            {establishedPlayers.length > 6 && (
+            {establishedPlayers.length > 10 && (
               <div className="text-center mt-2">
                 <span className="text-xs text-gray-500 dark:text-gray-400 bg-gray-100 dark:bg-gray-800 px-2 py-1 rounded-full">
-                  Showing 6 of {establishedPlayers.length} players
+                  Showing 10 of {establishedPlayers.length} players
+                </span>
+              </div>
+            )}
+            {visibleEstablished.length < 10 && (
+              <div className="text-center mt-2">
+                <span className="text-xs text-yellow-600 dark:text-yellow-400 bg-yellow-100 dark:bg-yellow-900/30 px-2 py-1 rounded-full">
+                  Only {visibleEstablished.length} established gainers in this time period.
                 </span>
               </div>
             )}
           </div>
         )}
         {/* New to Leaderboard */}
-        {newPlayers.length > 0 && (
+        {sortedNew.length > 0 && (
           <div>
             <div className="flex items-center space-x-3 mb-4">
               <div className="w-1 h-6 bg-gradient-to-b from-emerald-400 to-cyan-500 rounded-full"></div>
@@ -429,22 +460,32 @@ const LeaderboardPage: React.FC = () => {
             <div className="max-h-[420px] overflow-y-auto scrollbar-thin scrollbar-thumb-gray-300 dark:scrollbar-thumb-gray-600 scrollbar-track-gray-100 dark:scrollbar-track-gray-800 rounded-xl border border-gray-200/50 dark:border-gray-700/50 scrollable-section shadow-sm hover:shadow-md transition-shadow duration-200">
               <div className="space-y-3 p-3">
                 <TransitionGroup className="space-y-3">
-                  {newPlayers.map((player, index) => (
-                    <CSSTransition key={player.username} timeout={300} classNames="fade-slide">
-                      <ModernGainerBar
-                        player={{ ...player, getTransitionText: () => getTransitionText(player, true) }}
-                        rank={establishedPlayers.length + index + 1}
-                        isNewPlayer={true}
-                      />
-                    </CSSTransition>
-                  ))}
+                  {visibleNew.map((player) => {
+                    const trueRank = sortedNew.findIndex(p => p.username === player.username) + 1;
+                    return (
+                      <CSSTransition key={player.username} timeout={300} classNames="fade-slide">
+                        <ModernGainerBar
+                          player={{ ...player, getTransitionText: () => getTransitionText(player, true) }}
+                          rank={trueRank}
+                          isNewPlayer={true}
+                        />
+                      </CSSTransition>
+                    );
+                  })}
                 </TransitionGroup>
               </div>
             </div>
-            {newPlayers.length > 6 && (
+            {newPlayers.length > 10 && (
               <div className="text-center mt-2">
                 <span className="text-xs text-gray-500 dark:text-gray-400 bg-gray-100 dark:bg-gray-800 px-2 py-1 rounded-full">
-                  Showing 6 of {newPlayers.length} players
+                  Showing 10 of {newPlayers.length} players
+                </span>
+              </div>
+            )}
+            {visibleNew.length < 10 && (
+              <div className="text-center mt-2">
+                <span className="text-xs text-yellow-600 dark:text-yellow-400 bg-yellow-100 dark:bg-yellow-900/30 px-2 py-1 rounded-full">
+                  Only {visibleNew.length} new players joined in this time period.
                 </span>
               </div>
             )}
@@ -475,10 +516,31 @@ const LeaderboardPage: React.FC = () => {
     
     const droppedPlayers = filteredLosers.filter(categorizeLoser).filter(p => categorizeLoser(p) === 'dropped');
     const establishedLosers = filteredLosers.filter(categorizeLoser).filter(p => categorizeLoser(p) === 'established');
+    // Remove duplicates by username helper
+    const uniqueByUsername = (arr: any[]): any[] => {
+      const seen = new Set<string>();
+      return arr.filter((item: any) => {
+        if (seen.has(item.username)) return false;
+        seen.add(item.username);
+        return true;
+      });
+    };
+    // Sort by RP lost (ascending) for established, by recency for dropped
+    const sortedEstablished = uniqueByUsername([...establishedLosers].sort((a: any, b: any) => a.rp_change - b.rp_change));
+    const sortedDropped = uniqueByUsername([...droppedPlayers].sort((a: any, b: any) => {
+      // Sort by change_timestamp desc, then rp_change asc
+      const tA = new Date(a.change_timestamp).getTime();
+      const tB = new Date(b.change_timestamp).getTime();
+      if (tB !== tA) return tB - tA;
+      return a.rp_change - b.rp_change;
+    }));
+    // Show top 10
+    const visibleEstablished = sortedEstablished.slice(0, 10);
+    const visibleDropped = sortedDropped.slice(0, 10);
     return (
       <div className="space-y-6">
         {/* Established Players */}
-        {establishedLosers.length > 0 && (
+        {sortedEstablished.length > 0 && (
           <div>
             <div className="flex items-center space-x-3 mb-4">
               <div className="w-1 h-6 bg-gradient-to-b from-red-400 to-pink-500 rounded-full"></div>
@@ -492,28 +554,38 @@ const LeaderboardPage: React.FC = () => {
             <div className="max-h-[420px] overflow-y-auto scrollbar-thin scrollbar-thumb-gray-300 dark:scrollbar-thumb-gray-600 scrollbar-track-gray-100 dark:scrollbar-track-gray-800 rounded-xl border border-gray-200/50 dark:border-gray-700/50 scrollable-section shadow-sm hover:shadow-md transition-shadow duration-200">
               <div className="space-y-3 p-3">
                 <TransitionGroup className="space-y-3">
-                  {establishedLosers.map((player, index) => (
-                    <CSSTransition key={player.username} timeout={300} classNames="fade-slide">
-                      <ModernLoserBar
-                        player={{ ...player, getTransitionText: () => getTransitionText(player, false) }}
-                        rank={index + 1}
-                      />
-                    </CSSTransition>
-                  ))}
+                  {visibleEstablished.map((player) => {
+                    const trueRank = sortedEstablished.findIndex(p => p.username === player.username) + 1;
+                    return (
+                      <CSSTransition key={player.username} timeout={300} classNames="fade-slide">
+                        <ModernLoserBar
+                          player={{ ...player, getTransitionText: () => getTransitionText(player, false) }}
+                          rank={trueRank}
+                        />
+                      </CSSTransition>
+                    );
+                  })}
                 </TransitionGroup>
               </div>
             </div>
-            {establishedLosers.length > 6 && (
+            {establishedLosers.length > 10 && (
               <div className="text-center mt-2">
                 <span className="text-xs text-gray-500 dark:text-gray-400 bg-gray-100 dark:bg-gray-800 px-2 py-1 rounded-full">
-                  Showing 6 of {establishedLosers.length} players
+                  Showing 10 of {establishedLosers.length} players
+                </span>
+              </div>
+            )}
+            {visibleEstablished.length < 10 && (
+              <div className="text-center mt-2">
+                <span className="text-xs text-yellow-600 dark:text-yellow-400 bg-yellow-100 dark:bg-yellow-900/30 px-2 py-1 rounded-full">
+                  Only {visibleEstablished.length} established losers in this time period.
                 </span>
               </div>
             )}
           </div>
         )}
         {/* Dropped from Top 200 */}
-        {droppedPlayers.length > 0 && (
+        {sortedDropped.length > 0 && (
           <div>
             <div className="flex items-center space-x-3 mb-4">
               <div className="w-1 h-6 bg-gradient-to-b from-orange-400 to-red-500 rounded-full"></div>
@@ -527,21 +599,31 @@ const LeaderboardPage: React.FC = () => {
             <div className="max-h-[420px] overflow-y-auto scrollbar-thin scrollbar-thumb-gray-300 dark:scrollbar-thumb-gray-600 scrollbar-track-gray-100 dark:scrollbar-track-gray-800 rounded-xl border border-gray-200/50 dark:border-gray-700/50 scrollable-section shadow-sm hover:shadow-md transition-shadow duration-200">
               <div className="space-y-3 p-3">
                 <TransitionGroup className="space-y-3">
-                  {droppedPlayers.map((player, index) => (
-                    <CSSTransition key={player.username} timeout={300} classNames="fade-slide">
-                      <ModernLoserBar
-                        player={{ ...player, getTransitionText: () => getTransitionText(player, false) }}
-                        rank={establishedLosers.length + index + 1}
-                      />
-                    </CSSTransition>
-                  ))}
+                  {visibleDropped.map((player) => {
+                    const trueRank = sortedDropped.findIndex(p => p.username === player.username) + 1;
+                    return (
+                      <CSSTransition key={player.username} timeout={300} classNames="fade-slide">
+                        <ModernLoserBar
+                          player={{ ...player, getTransitionText: () => getTransitionText(player, false) }}
+                          rank={trueRank}
+                        />
+                      </CSSTransition>
+                    );
+                  })}
                 </TransitionGroup>
               </div>
             </div>
-            {droppedPlayers.length > 6 && (
+            {droppedPlayers.length > 10 && (
               <div className="text-center mt-2">
                 <span className="text-xs text-gray-500 dark:text-gray-400 bg-gray-100 dark:bg-gray-800 px-2 py-1 rounded-full">
-                  Showing 6 of {droppedPlayers.length} players
+                  Showing 10 of {droppedPlayers.length} players
+                </span>
+              </div>
+            )}
+            {visibleDropped.length < 10 && (
+              <div className="text-center mt-2">
+                <span className="text-xs text-yellow-600 dark:text-yellow-400 bg-yellow-100 dark:bg-yellow-900/30 px-2 py-1 rounded-full">
+                  Only {visibleDropped.length} players dropped from leaderboard in this time period.
                 </span>
               </div>
             )}
