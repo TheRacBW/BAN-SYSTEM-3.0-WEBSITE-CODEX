@@ -87,7 +87,7 @@ function toRankChangeDirection(val: any): 'up' | 'down' | 'same' {
 }
 
 // Time filter helper
-function getTimeFilter(range: '6h' | '12h' | '1d' | '2d') {
+export function getTimeFilter(range: '6h' | '12h' | '1d' | '2d') {
   const hours = { '6h': 6, '12h': 12, '1d': 24, '2d': 48 }[range];
   return new Date(Date.now() - hours * 60 * 60 * 1000).toISOString();
 }

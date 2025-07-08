@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { leaderboardService } from '../services/leaderboardService';
+import { leaderboardService, getTimeFilter } from '../services/leaderboardService';
 // import { robloxApi } from '../services/robloxApi'; // No longer needed for user ID lookup
 import { lookupRobloxUserIds } from '../lib/robloxUserLookup';
 import {
@@ -19,6 +19,11 @@ import {
   setupCacheInvalidationListener,
   getCacheAge
 } from '../utils/leaderboardCache';
+import {
+  getCachedGainersLosers,
+  setCachedGainersLosers,
+  setupGainersLosersCacheInvalidation
+} from '../utils/gainersLosersCache';
 
 const DEFAULT_TIME_RANGE: TimeRange = '12h';
 const ROBLOX_THUMBNAIL_PROXY = 'https://theracsproxy.theraccoonmolester.workers.dev/v1/users/avatar-headshot';
@@ -219,53 +224,69 @@ export const useLeaderboard = () => {
   };
 
   // Fetch gainers/losers for a time range with caching
-  const fetchGainers = useCallback(async (timeRange: string) => {
-    console.log('📈 FETCHING GAINERS for timeRange:', timeRange, 'at', new Date().toISOString());
-    if (gainersCache.current[timeRange]) {
-      console.log('📈 GAINERS loaded from cache for timeRange:', timeRange);
-      setGainers(gainersCache.current[timeRange]);
-      // Set last update from cache if available
-      if (gainersCache.current[timeRange].length > 0) {
-        setLastInsightsUpdate(gainersCache.current[timeRange][0].change_timestamp);
-      }
-      return;
-    }
-    setIsLoadingGainers(true);
+  const fetchGainers = useCallback(async (timeRange: string, forceRefresh = false) => {
     try {
-      const data = await leaderboardService.getRPGainers(timeRange);
-      gainersCache.current[timeRange] = data;
+      if (!forceRefresh) {
+        const cachedData = getCachedGainersLosers('gainers', timeRange);
+        if (cachedData) {
+          setGainers(cachedData);
+          if (cachedData.length > 0) {
+            setLastInsightsUpdate(cachedData[0].change_timestamp);
+          }
+          return cachedData;
+        }
+      }
+      setIsLoadingGainers(true);
+      const { data, error } = await supabase
+        .from('leaderboard_insights')
+        .select('*')
+        .in('category', ['gainer_established', 'gainer_new'])
+        .gte('change_timestamp', getTimeFilter(timeRange as TimeRange))
+        .order('rp_change', { ascending: false });
+      if (error) throw error;
+      setCachedGainersLosers('gainers', timeRange, data || []);
       setGainers(data || []);
       if (data && data.length > 0) {
         setLastInsightsUpdate(data[0].change_timestamp);
       }
+      return data || [];
     } catch (err) {
       setGainers([]);
+      throw err;
     } finally {
       setIsLoadingGainers(false);
     }
   }, []);
 
-  const fetchLosers = useCallback(async (timeRange: string) => {
-    console.log('📉 FETCHING LOSERS for timeRange:', timeRange, 'at', new Date().toISOString());
-    if (losersCache.current[timeRange]) {
-      console.log('📉 LOSERS loaded from cache for timeRange:', timeRange);
-      setLosers(losersCache.current[timeRange]);
-      // Set last update from cache if available
-      if (losersCache.current[timeRange].length > 0) {
-        setLastInsightsUpdate(losersCache.current[timeRange][0].change_timestamp);
-      }
-      return;
-    }
-    setIsLoadingLosers(true);
+  const fetchLosers = useCallback(async (timeRange: string, forceRefresh = false) => {
     try {
-      const data = await leaderboardService.getRPLosers(timeRange);
-      losersCache.current[timeRange] = data;
+      if (!forceRefresh) {
+        const cachedData = getCachedGainersLosers('losers', timeRange);
+        if (cachedData) {
+          setLosers(cachedData);
+          if (cachedData.length > 0) {
+            setLastInsightsUpdate(cachedData[0].change_timestamp);
+          }
+          return cachedData;
+        }
+      }
+      setIsLoadingLosers(true);
+      const { data, error } = await supabase
+        .from('leaderboard_insights')
+        .select('*')
+        .in('category', ['loser_ranked', 'loser_dropped'])
+        .gte('change_timestamp', getTimeFilter(timeRange as TimeRange))
+        .order('rp_change', { ascending: true });
+      if (error) throw error;
+      setCachedGainersLosers('losers', timeRange, data || []);
       setLosers(data || []);
       if (data && data.length > 0) {
         setLastInsightsUpdate(data[0].change_timestamp);
       }
+      return data || [];
     } catch (err) {
       setLosers([]);
+      throw err;
     } finally {
       setIsLoadingLosers(false);
     }
@@ -374,6 +395,30 @@ export const useLeaderboard = () => {
       window.removeEventListener('leaderboard_data_updated', handleCacheInvalidation);
     };
   }, [fetchLeaderboard]);
+
+  // Setup cache invalidation listener for gainers/losers
+  useEffect(() => {
+    const channel = setupGainersLosersCacheInvalidation(supabase);
+    const handleCacheCleared = () => {
+      console.log('📡 Gainers/losers cache cleared, will fetch fresh data on next request');
+      // Note: Don't fetch immediately, let user interactions trigger fetches
+    };
+    window.addEventListener('gainers_losers_cache_cleared', handleCacheCleared);
+    return () => {
+      channel.unsubscribe();
+      window.removeEventListener('gainers_losers_cache_cleared', handleCacheCleared);
+    };
+  }, []);
+
+  const handleGainersTimeRangeChange = (newTimeRange: string) => {
+    setGainersTimeRange(newTimeRange as TimeRange);
+    fetchGainers(newTimeRange, false); // false = allow cache
+  };
+
+  const handleLosersTimeRangeChange = (newTimeRange: string) => {
+    setLosersTimeRange(newTimeRange as TimeRange);
+    fetchLosers(newTimeRange, false); // false = allow cache
+  };
 
   return {
     entries: entriesWithAvatars.length > 0 ? entriesWithAvatars : entries,
