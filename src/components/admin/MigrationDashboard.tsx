@@ -21,6 +21,7 @@ import { UsernameChangeData, UsernameChangeStatistics } from '../../lib/username
 import MigrationProgress from './MigrationProgress';
 import MigrationStats from './MigrationStats';
 import UsernameChangeCard from './UsernameChangeCard';
+import { supabase } from '../../lib/supabase';
 
 interface MigrationDashboardProps {
   className?: string;
@@ -47,6 +48,11 @@ const MigrationDashboard: React.FC<MigrationDashboardProps> = ({ className = '' 
 
   const [selectedChanges, setSelectedChanges] = useState<Set<string>>(new Set());
   const [showAdvanced, setShowAdvanced] = useState(false);
+  const [normalizing, setNormalizing] = useState(false);
+  const [normalizeResult, setNormalizeResult] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
+  const [autoNormalize, setAutoNormalize] = useState(false);
+  const [autoInterval, setAutoInterval] = useState(2); // default every 2 days
+  const autoNormalizeRef = React.useRef<NodeJS.Timeout | null>(null);
 
   // Callbacks for coordinator
   const handleStateChange = useCallback((state: MigrationCoordinatorState) => {
@@ -211,13 +217,47 @@ const MigrationDashboard: React.FC<MigrationDashboardProps> = ({ className = '' 
     
     return {
       status: allHealthy ? 'healthy' : 'warning',
-      color: allHealthy ? 'text-green-600' : 'text-yellow-600',
+      color: allHealthy ? CheckCircle : AlertTriangle,
       icon: allHealthy ? CheckCircle : AlertTriangle
     };
   };
 
   const healthStatus = getHealthStatus();
   const HealthIcon = healthStatus.icon;
+
+  // Handler for manual normalization
+  const handleNormalizeUsernames = async () => {
+    setNormalizing(true);
+    setNormalizeResult(null);
+    try {
+      const { data, error } = await supabase.rpc('normalize_rp_usernames');
+      if (error) {
+        setNormalizeResult({ message: `❌ Error: ${error.message}`, type: 'error' });
+      } else {
+        setNormalizeResult({ message: `✅ Normalized! Filled: ${data?.filled_user_ids ?? 0}, RP: ${data?.normalized_rp_changes ?? 0}, Optimized: ${data?.normalized_rp_optimized ?? 0}`, type: 'success' });
+      }
+    } catch (err: any) {
+      setNormalizeResult({ message: `❌ Error: ${err.message || err}`, type: 'error' });
+    } finally {
+      setNormalizing(false);
+    }
+  };
+
+  // Auto-normalize effect
+  useEffect(() => {
+    if (autoNormalize) {
+      if (autoNormalizeRef.current) clearInterval(autoNormalizeRef.current);
+      autoNormalizeRef.current = setInterval(() => {
+        handleNormalizeUsernames();
+      }, autoInterval * 24 * 60 * 60 * 1000); // X days
+    } else if (autoNormalizeRef.current) {
+      clearInterval(autoNormalizeRef.current);
+      autoNormalizeRef.current = null;
+    }
+    return () => {
+      if (autoNormalizeRef.current) clearInterval(autoNormalizeRef.current);
+    };
+  }, [autoNormalize, autoInterval]);
 
   return (
     <div className={`space-y-6 ${className}`}>
@@ -331,7 +371,7 @@ const MigrationDashboard: React.FC<MigrationDashboardProps> = ({ className = '' 
       {/* Quick Actions */}
       <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-6">
         <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">Quick Actions</h2>
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
           <button
             onClick={handleStartMigration}
             disabled={coordinatorState.isRunning}
@@ -365,7 +405,48 @@ const MigrationDashboard: React.FC<MigrationDashboardProps> = ({ className = '' 
             <Settings className="w-4 h-4" />
             <span>Advanced</span>
           </button>
+          {/* Normalize Usernames Button */}
+          <button
+            onClick={handleNormalizeUsernames}
+            disabled={normalizing}
+            className="flex items-center justify-center space-x-2 px-4 py-3 bg-orange-600 text-white rounded-lg hover:bg-orange-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+          >
+            {normalizing ? <Clock className="w-4 h-4 animate-spin" /> : <BarChart3 className="w-4 h-4" />}
+            <span>{normalizing ? 'Normalizing...' : 'Normalize Usernames'}</span>
+          </button>
         </div>
+        {/* Auto-normalize controls */}
+        <div className="flex items-center mt-4 space-x-4">
+          <label className="flex items-center space-x-2">
+            <input type="checkbox" checked={autoNormalize} onChange={e => setAutoNormalize(e.target.checked)} />
+            <span className="text-sm text-gray-700 dark:text-gray-300">Auto-normalize every</span>
+          </label>
+          <input
+            type="number"
+            min={1}
+            value={autoInterval}
+            onChange={e => setAutoInterval(Number(e.target.value))}
+            className="w-16 px-2 py-1 rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white text-sm"
+          />
+          <span className="text-sm text-gray-700 dark:text-gray-300">days</span>
+        </div>
+        {/* Notification Toast */}
+        {normalizeResult && (
+          <div
+            className={`mt-4 px-4 py-3 rounded-lg shadow text-sm font-medium flex items-center space-x-2 ${
+              normalizeResult.type === 'success'
+                ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200'
+                : 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200'
+            }`}
+            role="alert"
+            onClick={() => setNormalizeResult(null)}
+            style={{ cursor: 'pointer' }}
+          >
+            {normalizeResult.type === 'success' ? <CheckCircle className="w-4 h-4" /> : <AlertTriangle className="w-4 h-4" />}
+            <span>{normalizeResult.message}</span>
+            <span className="ml-auto text-xs opacity-60">(click to dismiss)</span>
+          </div>
+        )}
       </div>
 
       {/* Migration Progress */}
