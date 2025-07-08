@@ -1,6 +1,6 @@
 const LEADERBOARD_CACHE_KEY = 'leaderboard_raw_v1'; // Note: only raw data
 const ENRICHED_CACHE_KEY = 'leaderboard_enriched_v1'; // Add enriched cache
-const CACHE_DURATION = 8 * 60 * 1000; // 8 minutes
+const CACHE_DURATION = 30 * 60 * 1000; // 30 minutes - event-driven invalidation
 
 // Cache for RAW leaderboard data (from Supabase)
 export const getCachedRawLeaderboard = (): any[] | null => {
@@ -77,9 +77,32 @@ export const getCacheAge = (): number | null => {
     const cached = localStorage.getItem(LEADERBOARD_CACHE_KEY);
     if (!cached) return null;
     
-    const { timestamp }: CachedLeaderboard = JSON.parse(cached);
+    const { timestamp }: { timestamp: number } = JSON.parse(cached);
     return Math.round((Date.now() - timestamp) / 60000); // age in minutes
   } catch {
     return null;
   }
+}; 
+
+export const setupCacheInvalidationListener = (supabase: any) => {
+  const channel = supabase
+    .channel('cache_invalidation')
+    .on(
+      'postgres_changes',
+      {
+        event: 'INSERT',
+        schema: 'public',
+        table: 'leaderboard_refresh_trigger'
+      },
+      (_payload: any) => {
+        console.log('🔄 New leaderboard data detected, will clear cache in 30 seconds');
+        setTimeout(() => {
+          clearAllLeaderboardCache();
+          window.dispatchEvent(new CustomEvent('leaderboard_data_updated'));
+          console.log('🕒 Cache cleared and leaderboard_data_updated event dispatched after 30s delay');
+        }, 30000); // 30 seconds
+      }
+    )
+    .subscribe();
+  return channel;
 }; 

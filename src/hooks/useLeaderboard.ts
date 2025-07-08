@@ -15,7 +15,8 @@ import {
   setCachedRawLeaderboard,
   getCachedEnrichedLeaderboard,
   setCachedEnrichedLeaderboard,
-  clearAllLeaderboardCache
+  clearAllLeaderboardCache,
+  setupCacheInvalidationListener
 } from '../utils/leaderboardCache';
 
 const DEFAULT_TIME_RANGE: TimeRange = '12h';
@@ -344,21 +345,20 @@ export const useLeaderboard = () => {
 
   // Supabase trigger subscription for Lua script coordination
   useEffect(() => {
-    const subscription = supabase
-      .channel('leaderboard_refresh')
-      .on('postgres_changes', {
-        event: 'INSERT',
-        schema: 'public',
-        table: 'leaderboard_refresh_trigger'
-      }, (payload) => {
-        console.log('Lua script completed, refreshing leaderboard...');
-        refreshLeaderboard(true); // Silent refresh
-      })
-      .subscribe();
-    return () => {
-      subscription.unsubscribe();
+    const channel = setupCacheInvalidationListener(supabase);
+
+    // Listen for cache invalidation events
+    const handleCacheInvalidation = () => {
+      console.log('📡 Cache invalidated, fetching fresh data');
+      fetchLeaderboard(true); // Force fresh fetch
     };
-  }, [refreshLeaderboard]);
+    window.addEventListener('leaderboard_data_updated', handleCacheInvalidation);
+
+    return () => {
+      channel.unsubscribe();
+      window.removeEventListener('leaderboard_data_updated', handleCacheInvalidation);
+    };
+  }, [fetchLeaderboard]);
 
   return {
     entries: entriesWithAvatars.length > 0 ? entriesWithAvatars : entries,
