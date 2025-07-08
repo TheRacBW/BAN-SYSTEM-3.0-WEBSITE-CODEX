@@ -73,6 +73,13 @@ const LeaderboardPage: React.FC = () => {
   const [notification, setNotification] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
   const [showRealtimeToast, setShowRealtimeToast] = useState(false);
   const [recentRPChanges, setRecentRPChanges] = useState<Record<string, import('../services/leaderboardService').RPChangeData>>({});
+  const [now, setNow] = useState(Date.now());
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setNow(Date.now());
+    }, 30000); // Update every 30 seconds
+    return () => clearInterval(interval);
+  }, []);
 
   // 🔍 DIAGNOSTIC: Track search state changes (disabled for performance)
   // useEffect(() => {

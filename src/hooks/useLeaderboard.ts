@@ -16,7 +16,8 @@ import {
   getCachedEnrichedLeaderboard,
   setCachedEnrichedLeaderboard,
   clearAllLeaderboardCache,
-  setupCacheInvalidationListener
+  setupCacheInvalidationListener,
+  getCacheAge
 } from '../utils/leaderboardCache';
 
 const DEFAULT_TIME_RANGE: TimeRange = '12h';
@@ -144,12 +145,18 @@ export const useLeaderboard = () => {
     try {
       setIsLoading(true);
       setError(null);
+      let lastUpdateValue = '';
       // 1. Try enriched cache first
       if (!forceRefresh) {
         const enrichedCache = getCachedEnrichedLeaderboard();
         if (enrichedCache) {
           setIsUsingCache(true);
           setEntries(enrichedCache);
+          // Set lastUpdate from the most recent entry
+          if (enrichedCache.length > 0 && enrichedCache[0].inserted_at) {
+            lastUpdateValue = enrichedCache[0].inserted_at;
+          }
+          setLastUpdate(lastUpdateValue);
           setIsLoading(false);
           setIsInitialLoading(false);
           return enrichedCache;
@@ -161,6 +168,9 @@ export const useLeaderboard = () => {
         rawData = getCachedRawLeaderboard();
         if (rawData) {
           setIsUsingCache(true);
+          if (rawData.length > 0 && rawData[0].inserted_at) {
+            lastUpdateValue = rawData[0].inserted_at;
+          }
         }
       }
       // 3. If no raw cache, fetch from Supabase
@@ -168,14 +178,19 @@ export const useLeaderboard = () => {
         setIsUsingCache(false);
         rawData = await leaderboardService.getCurrentLeaderboardWithChanges();
         setCachedRawLeaderboard(rawData);
-        // Get last update time
+        // Get last update time from stats
         const stats = await leaderboardService.getLeaderboardStats();
-        setLastUpdate(stats.lastUpdated);
+        lastUpdateValue = stats.lastUpdated;
       }
       // 4. Always enrich
       const enrichedData = await enrichWithRobloxData(rawData);
       setCachedEnrichedLeaderboard(enrichedData);
       setEntries(enrichedData);
+      // Set lastUpdate from enriched data if possible
+      if (!lastUpdateValue && enrichedData.length > 0 && enrichedData[0].inserted_at) {
+        lastUpdateValue = enrichedData[0].inserted_at;
+      }
+      setLastUpdate(lastUpdateValue);
       setIsLoading(false);
       setIsInitialLoading(false);
       return enrichedData;
@@ -386,6 +401,9 @@ export const useLeaderboard = () => {
     isLoadingGainers,
     isLoadingLosers,
     filteredEntries,
-    lastInsightsUpdate
+    lastInsightsUpdate,
+    isUsingCache,
+    getCacheAge,
+    clearLeaderboardCache: clearAllLeaderboardCache
   };
 }; 
