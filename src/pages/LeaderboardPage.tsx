@@ -1045,33 +1045,7 @@ const LeaderboardPage: React.FC = () => {
 
           <div className="flex items-center gap-4 flex-wrap justify-end">
             {/* Cache status indicator */}
-            {isUsingCache && (
-              <div className="flex items-center gap-2 text-sm text-orange-500 bg-orange-50 dark:bg-orange-900/30 px-3 py-1 rounded-full">
-                <div className="w-2 h-2 bg-orange-400 rounded-full"></div>
-                <span>Cached data ({getCacheAge()} min old)</span>
-              </div>
-            )}
-            <button
-              onClick={async () => {
-                clearLeaderboardCache();
-                await refresh(true); // forceRefresh = true
-              }}
-              disabled={isLoading}
-              className={`inline-flex items-center gap-2 px-4 py-2 rounded-lg font-medium transition text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-400 focus:ring-offset-2 dark:focus:ring-offset-gray-900 ${isLoading ? 'opacity-60 cursor-not-allowed' : ''}`}
-            >
-              <RefreshCw size={18} className={isLoading ? 'animate-spin' : ''} />
-              Refresh
-            </button>
-
-            {/* Hide Clear Avatar Cache button visually, but keep code for dev use */}
-            {/* <button
-              onClick={handleClearCache}
-              className="ml-2 px-3 py-1.5 rounded-lg bg-red-100 text-red-700 font-semibold text-xs shadow hover:bg-red-200 transition hidden"
-              title="Clear Roblox avatar cache (debug)"
-            >
-              Clear Avatar Cache
-            </button> */}
-
+            
             <button
               onClick={async () => {
                 if (isRefreshingInsights) return;
