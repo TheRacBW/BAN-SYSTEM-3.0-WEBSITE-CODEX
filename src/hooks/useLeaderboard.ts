@@ -10,6 +10,13 @@ import {
   TimeRange
 } from '../types/leaderboard';
 import { supabase } from '../lib/supabase';
+import {
+  getCachedRawLeaderboard,
+  setCachedRawLeaderboard,
+  getCachedEnrichedLeaderboard,
+  setCachedEnrichedLeaderboard,
+  clearAllLeaderboardCache
+} from '../utils/leaderboardCache';
 
 const DEFAULT_TIME_RANGE: TimeRange = '12h';
 const ROBLOX_THUMBNAIL_PROXY = 'https://theracsproxy.theraccoonmolester.workers.dev/v1/users/avatar-headshot';
@@ -28,6 +35,7 @@ export const useLeaderboard = () => {
   const [activeTab, setActiveTab] = useState<TabType>('main');
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [refreshInterval, setRefreshInterval] = useState<NodeJS.Timeout | null>(null);
+  const [isUsingCache, setIsUsingCache] = useState(false);
 
   // Gainers/losers
   const [gainers, setGainers] = useState<RPChangeWithTimeRange[]>([]);
@@ -60,132 +68,129 @@ export const useLeaderboard = () => {
     };
   }
 
-  // Fetch main leaderboard with changes
-  const fetchLeaderboard = useCallback(async () => {
-    if (isInitialLoading) setIsLoading(true);
-    setError(null);
-    try {
-      const newEntries = await leaderboardService.getCurrentLeaderboardWithChanges();
-      setPreviousEntries(prev => prev); // Use functional update to avoid dependency
-      setEntries(newEntries);
-      // Get last update time
-      const stats = await leaderboardService.getLeaderboardStats();
-      setLastUpdate(stats.lastUpdated);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to fetch leaderboard data');
-    } finally {
-      setIsLoading(false);
-      setIsInitialLoading(false);
-    }
-  }, [isInitialLoading]); // Remove entries dependency
-
-  // Progressive loading: fetch leaderboard, then enrich avatars in background
-  const fetchLeaderboardProgressive = useCallback(async () => {
-    setIsLoading(true);
-    setError(null);
-    try {
-      // Step 1: Fetch core leaderboard data (fast)
-      const coreEntries = await leaderboardService.fetchLeaderboardData();
-      console.log('[Leaderboard] Raw leaderboard data:', coreEntries);
-      const coreWithChanges = coreEntries.map(toWithChanges);
-      setEntries(coreWithChanges);
-      setEntriesWithAvatars(coreWithChanges); // Show immediately
-      setIsInitialLoading(false);
-      setIsLoading(false);
-
-      // Step 2: Batch load user IDs and cached avatars using bright-function
-      const usernames = coreWithChanges.map(entry => entry.username);
-      const lookupResults = await lookupRobloxUserIds(usernames);
-      console.log('[Leaderboard] Username lookup results (bright-function):', lookupResults);
-      // Build a mapping from username (case-insensitive) to { user_id, profile_picture_url }
-      const userIdMap = new Map<string, { user_id: number | null, profile_picture_url: string | null }>();
-      lookupResults.forEach(result => {
-        let userId: number | null = null;
-        if (typeof result.user_id === 'number') {
-          userId = result.user_id;
-        } else if (typeof result.user_id === 'string' && !isNaN(Number(result.user_id))) {
-          userId = Number(result.user_id);
-        }
-        // Accept profile_picture_url if present
-        const profile_picture_url = (result as any).profile_picture_url ?? null;
-        const key = result.username.toLowerCase();
-        console.log('[Leaderboard] Mapping username:', result.username, '→', key, 'user_id:', userId, 'profile_picture_url:', profile_picture_url);
-        userIdMap.set(key, { user_id: userId, profile_picture_url });
-      });
-      console.log('[Leaderboard] Built userIdMap:', userIdMap);
-
-      // Step 3: Update entries with user IDs and cached avatars (case-insensitive match)
-      const entriesWithUserIds = coreWithChanges.map(entry => {
-        const key = entry.username.toLowerCase();
-        const mapped = userIdMap.get(key);
-        if (!mapped) {
-          console.warn('[Leaderboard] No mapping found for username:', entry.username, 'key:', key);
-        }
-        return {
-          ...entry,
-          user_id: mapped?.user_id ?? entry.user_id ?? null,
-          profile_picture: mapped?.profile_picture_url ?? null
-        };
-      });
-      console.log('[Leaderboard] entriesWithUserIds:', entriesWithUserIds);
-      setEntriesWithAvatars(entriesWithUserIds);
-
-      // Step 4: Load/fallback avatars for missing or failed images
-      const entriesNeedingProxy = entriesWithUserIds.filter(e => !e.profile_picture || e.profile_picture === '' || e.profile_picture === null);
-      if (entriesNeedingProxy.length > 0) {
-        console.log('[Avatar Proxy] Fetching avatars for uncached/missing:', entriesNeedingProxy.map(e => e.username));
-        const pictureMap = new Map<number, { imageUrl: string, targetId: number }>();
-        await Promise.all(entriesNeedingProxy.map(async (entry) => {
-          if (typeof entry.user_id !== 'number' || isNaN(entry.user_id)) return;
-          try {
-            const url = `${ROBLOX_THUMBNAIL_PROXY}?userIds=${entry.user_id}&size=150x150&format=Png&isCircular=true`;
-            console.log('[Avatar Proxy] Fetching avatar for userId:', entry.user_id, 'URL:', url);
-            const response = await fetch(url);
-            const raw = await response.clone().text();
-            if (response.ok) {
-              const data = await response.json();
-              console.log('[Avatar Proxy] Response for userId', entry.user_id, ':', data);
-              const imageUrl = data.data?.[0]?.imageUrl || '/default-avatar.svg';
-              const targetId = data.data?.[0]?.targetId || entry.user_id;
-              console.log('[Avatar Proxy] Extracted imageUrl:', imageUrl, 'targetId:', targetId);
-              pictureMap.set(entry.user_id, { imageUrl, targetId });
-            } else {
-              console.warn('[Avatar Proxy] Non-OK response for userId', entry.user_id, ':', raw);
-              pictureMap.set(entry.user_id, { imageUrl: '/default-avatar.svg', targetId: entry.user_id });
-            }
-          } catch (err) {
-            console.error('[Avatar Proxy] Error fetching avatar for userId', entry.user_id, ':', err);
+  const enrichWithRobloxData = async (rawData: any[]) => {
+    // Step 1: Add changes structure
+    const coreWithChanges = rawData.map(toWithChanges);
+    // Step 2: Batch load user IDs and cached avatars using bright-function
+    const usernames = coreWithChanges.map(entry => entry.username);
+    const lookupResults = await lookupRobloxUserIds(usernames);
+    const userIdMap = new Map<string, { user_id: number | null, profile_picture_url: string | null }>();
+    lookupResults.forEach(result => {
+      let userId: number | null = null;
+      if (typeof result.user_id === 'number') {
+        userId = result.user_id;
+      } else if (typeof result.user_id === 'string' && !isNaN(Number(result.user_id))) {
+        userId = Number(result.user_id);
+      }
+      const profile_picture_url = (result as any).profile_picture_url ?? null;
+      const key = result.username.toLowerCase();
+      userIdMap.set(key, { user_id: userId, profile_picture_url });
+    });
+    const entriesWithUserIds = coreWithChanges.map(entry => {
+      const key = entry.username.toLowerCase();
+      const mapped = userIdMap.get(key);
+      return {
+        ...entry,
+        user_id: mapped?.user_id ?? entry.user_id ?? null,
+        profile_picture: mapped?.profile_picture_url ?? null
+      };
+    });
+    // Step 3: Fallback avatars for missing/failed images
+    const entriesNeedingProxy = entriesWithUserIds.filter(e => !e.profile_picture || e.profile_picture === '' || e.profile_picture === null);
+    if (entriesNeedingProxy.length > 0) {
+      const pictureMap = new Map<number, { imageUrl: string, targetId: number }>();
+      await Promise.all(entriesNeedingProxy.map(async (entry) => {
+        if (typeof entry.user_id !== 'number' || isNaN(entry.user_id)) return;
+        try {
+          const url = `${ROBLOX_THUMBNAIL_PROXY}?userIds=${entry.user_id}&size=150x150&format=Png&isCircular=true`;
+          const response = await fetch(url);
+          if (response.ok) {
+            const data = await response.json();
+            const imageUrl = data.data?.[0]?.imageUrl || '/default-avatar.svg';
+            const targetId = data.data?.[0]?.targetId || entry.user_id;
+            pictureMap.set(entry.user_id, { imageUrl, targetId });
+          } else {
             pictureMap.set(entry.user_id, { imageUrl: '/default-avatar.svg', targetId: entry.user_id });
           }
-        }));
-        const fullyEnrichedEntries = entriesWithUserIds.map(entry => {
-          if (!entry.profile_picture || entry.profile_picture === '' || entry.profile_picture === null) {
-            if (typeof entry.user_id === 'number' && pictureMap.has(entry.user_id)) {
-              const { imageUrl, targetId } = pictureMap.get(entry.user_id)!;
-              console.log('[Avatar Proxy] Setting fallback img src for', entry.username, ':', imageUrl, 'and user_id:', targetId);
-              return {
-                ...entry,
-                profile_picture: imageUrl,
-                user_id: targetId // Use the proxy's targetId for profile links
-              };
-            }
+        } catch (err) {
+          pictureMap.set(entry.user_id, { imageUrl: '/default-avatar.svg', targetId: entry.user_id });
+        }
+      }));
+      const fullyEnrichedEntries = entriesWithUserIds.map(entry => {
+        if (!entry.profile_picture || entry.profile_picture === '' || entry.profile_picture === null) {
+          if (typeof entry.user_id === 'number' && pictureMap.has(entry.user_id)) {
+            const { imageUrl, targetId } = pictureMap.get(entry.user_id)!;
             return {
               ...entry,
-              profile_picture: '/default-avatar.svg'
+              profile_picture: imageUrl,
+              user_id: targetId
             };
           }
-          return entry;
-        });
-        setEntriesWithAvatars(fullyEnrichedEntries);
-      } else {
-        console.log('[Avatar Proxy] All avatars loaded from cache, no proxy calls needed.');
+          return {
+            ...entry,
+            profile_picture: '/default-avatar.svg'
+          };
+        }
+        return entry;
+      });
+      return fullyEnrichedEntries;
+    } else {
+      return entriesWithUserIds;
+    }
+  };
+
+  const fetchLeaderboard = async (forceRefresh = false) => {
+    try {
+      setIsLoading(true);
+      setError(null);
+      // 1. Try enriched cache first
+      if (!forceRefresh) {
+        const enrichedCache = getCachedEnrichedLeaderboard();
+        if (enrichedCache) {
+          setIsUsingCache(true);
+          setEntries(enrichedCache);
+          setIsLoading(false);
+          setIsInitialLoading(false);
+          return enrichedCache;
+        }
       }
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to fetch leaderboard data');
+      // 2. Try raw cache
+      let rawData;
+      if (!forceRefresh) {
+        rawData = getCachedRawLeaderboard();
+        if (rawData) {
+          setIsUsingCache(true);
+        }
+      }
+      // 3. If no raw cache, fetch from Supabase
+      if (!rawData) {
+        setIsUsingCache(false);
+        rawData = await leaderboardService.getCurrentLeaderboardWithChanges();
+        setCachedRawLeaderboard(rawData);
+        // Get last update time
+        const stats = await leaderboardService.getLeaderboardStats();
+        setLastUpdate(stats.lastUpdated);
+      }
+      // 4. Always enrich
+      const enrichedData = await enrichWithRobloxData(rawData);
+      setCachedEnrichedLeaderboard(enrichedData);
+      setEntries(enrichedData);
       setIsLoading(false);
       setIsInitialLoading(false);
+      return enrichedData;
+    } catch (error) {
+      setError(error instanceof Error ? error.message : 'Failed to fetch leaderboard data');
+      setIsLoading(false);
+      setIsInitialLoading(false);
+      throw error;
     }
-  }, []);
+  };
+
+  // Manual refresh clears all caches
+  const manualRefresh = () => {
+    clearAllLeaderboardCache();
+    fetchLeaderboard(true);
+  };
 
   // Debounced setters for time range
   const setGainersTimeRangeDebounced = (range: string) => {
@@ -270,7 +275,7 @@ export const useLeaderboard = () => {
   // Initial fetch
   useEffect(() => {
     console.log('🚀 INITIAL FETCH TRIGGERED at', new Date().toISOString());
-    fetchLeaderboardProgressive();
+    fetchLeaderboard();
     fetchGainers(gainersTimeRange);
     fetchLosers(losersTimeRange);
     startAutoRefresh();
@@ -310,10 +315,8 @@ export const useLeaderboard = () => {
   const refresh = useCallback(() => {
     gainersCache.current = {};
     losersCache.current = {};
-    fetchLeaderboard();
-    fetchGainers(latestGainersTimeRange.current);
-    fetchLosers(latestLosersTimeRange.current);
-  }, [fetchLeaderboard, fetchGainers, fetchLosers]);
+    manualRefresh();
+  }, [manualRefresh]);
 
   // Smart refresh with cache
   const refreshLeaderboard = useCallback(async (silent = false) => {
