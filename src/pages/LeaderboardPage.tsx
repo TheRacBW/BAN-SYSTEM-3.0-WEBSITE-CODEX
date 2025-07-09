@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { Search, RefreshCw, TrendingUp, TrendingDown, Trophy, Clock, Wifi, WifiOff, ExternalLink, Users, Zap } from 'lucide-react';
-import { useLeaderboard } from '../hooks/useLeaderboard';
+import { useLeaderboard, useCurrentlyRanking } from '../hooks/useLeaderboard';
 import { TabType } from '../types/leaderboard';
 import LeaderboardEntryComponent from '../components/leaderboard/LeaderboardEntry';
 import StatsCard from '../components/leaderboard/StatsCard';
@@ -10,7 +10,7 @@ import { lookupRobloxUserIds } from '../lib/robloxUserLookup';
 import { supabase } from '../lib/supabase';
 import { CSSTransition, TransitionGroup } from 'react-transition-group';
 import { AnimatePresence, motion } from 'framer-motion';
-import { getRecentRPChanges, getCurrentlyRankingPlayers } from '../services/leaderboardService';
+import { getRecentRPChanges } from '../services/leaderboardService';
 
 // Move these helpers to the top of the file:
 const getDisplayPercentage = (player: any) => {
@@ -852,18 +852,20 @@ const LeaderboardPage: React.FC = () => {
   }, [entries, fetchRPChanges]);
 
   // --- Currently Ranking State ---
-  const [currentlyRanking, setCurrentlyRanking] = useState<any[]>([]);
-  const [isLoadingCurrentlyRanking, setIsLoadingCurrentlyRanking] = useState(false);
+  const {
+    currentlyRanking,
+    isLoading: isLoadingCurrentlyRanking,
+    error: currentlyRankingError,
+    isUsingCache: isUsingCurrentlyRankingCache,
+    fetchCurrentlyRanking,
+    refresh: refreshCurrentlyRanking
+  } = useCurrentlyRanking();
 
   useEffect(() => {
     if (activeTab === 'currently-ranking') {
-      setIsLoadingCurrentlyRanking(true);
-      getCurrentlyRankingPlayers().then(players => {
-        setCurrentlyRanking(players);
-        setIsLoadingCurrentlyRanking(false);
-      });
+      fetchCurrentlyRanking();
     }
-  }, [activeTab]); // Remove lastUpdate dependency to prevent unnecessary re-fetches
+  }, [activeTab, fetchCurrentlyRanking]);
 
   // --- Avatar enrichment for currently ranking ---
   const [enrichedCurrentlyRanking, setEnrichedCurrentlyRanking] = useState<any[]>(currentlyRanking);

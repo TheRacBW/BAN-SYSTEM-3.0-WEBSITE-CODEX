@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { leaderboardService, getTimeFilter } from '../services/leaderboardService';
+import { leaderboardService, getTimeFilter, getCurrentlyRankingPlayers } from '../services/leaderboardService';
 // import { robloxApi } from '../services/robloxApi'; // No longer needed for user ID lookup
 import { lookupRobloxUserIds } from '../lib/robloxUserLookup';
 import {
@@ -17,7 +17,10 @@ import {
   setCachedEnrichedLeaderboard,
   clearAllLeaderboardCache,
   setupCacheInvalidationListener,
-  getCacheAge
+  getCacheAge,
+  getCachedCurrentlyRanking,
+  setCachedCurrentlyRanking,
+  getCurrentlyRankingCacheStatus
 } from '../utils/leaderboardCache';
 import {
   getCachedGainersLosers,
@@ -450,5 +453,86 @@ export const useLeaderboard = () => {
     isUsingCache,
     getCacheAge,
     clearLeaderboardCache: clearAllLeaderboardCache
+  };
+};
+
+export const useCurrentlyRanking = () => {
+  const [currentlyRanking, setCurrentlyRanking] = useState<any[]>([]);
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [isUsingCache, setIsUsingCache] = useState(false);
+  const [cacheStatus, setCacheStatus] = useState<string | null>(null);
+
+  // Listen for cache cleared events
+  useEffect(() => {
+    const handleCacheCleared = () => {
+      console.log('🔄 Currently ranking cache cleared event received');
+      // Clear the current data to force a fresh fetch on next interaction
+      setCurrentlyRanking([]);
+      setIsUsingCache(false);
+      setCacheStatus(null);
+    };
+
+    window.addEventListener('currently_ranking_cache_cleared', handleCacheCleared);
+    
+    return () => {
+      window.removeEventListener('currently_ranking_cache_cleared', handleCacheCleared);
+    };
+  }, []);
+
+  const fetchCurrentlyRanking = useCallback(async (forceRefresh = false) => {
+    try {
+      setIsLoading(true);
+      setError(null);
+      setCacheStatus(null);
+
+      // Try cache first (unless force refresh)
+      if (!forceRefresh) {
+        const cachedData = getCachedCurrentlyRanking();
+        if (cachedData) {
+          setIsUsingCache(true);
+          setCurrentlyRanking(cachedData);
+          const status = getCurrentlyRankingCacheStatus();
+          setCacheStatus(status.hasCache ? 'Cached' : null);
+          setIsLoading(false);
+          console.log('🔥 Using cached currently ranking data');
+          return cachedData;
+        }
+      }
+
+      // Fetch fresh data from Supabase
+      setIsUsingCache(false);
+      console.log('🔄 Fetching fresh currently ranking data from Supabase');
+      const freshData = await getCurrentlyRankingPlayers();
+      
+      // Cache the fresh data
+      setCachedCurrentlyRanking(freshData);
+      setCurrentlyRanking(freshData);
+      const status = getCurrentlyRankingCacheStatus();
+      setCacheStatus(status.hasCache ? 'Cached' : null);
+      setIsLoading(false);
+      
+      console.log('✅ Fetched and cached currently ranking data');
+      return freshData;
+    } catch (error) {
+      console.error('❌ Error fetching currently ranking data:', error);
+      setError(error instanceof Error ? error.message : 'Failed to fetch currently ranking data');
+      setIsLoading(false);
+      return [];
+    }
+  }, []);
+
+  const refresh = useCallback(() => {
+    return fetchCurrentlyRanking(true);
+  }, [fetchCurrentlyRanking]);
+
+  return {
+    currentlyRanking,
+    isLoading,
+    error,
+    isUsingCache,
+    cacheStatus,
+    fetchCurrentlyRanking,
+    refresh
   };
 }; 

@@ -1,5 +1,6 @@
 const LEADERBOARD_CACHE_KEY = 'leaderboard_raw_v1'; // Note: only raw data
 const ENRICHED_CACHE_KEY = 'leaderboard_enriched_v1'; // Add enriched cache
+const CURRENTLY_RANKING_CACHE_KEY = 'currently_ranking_v1'; // New cache for currently ranking
 const CACHE_DURATION = 30 * 60 * 1000; // 30 minutes - event-driven invalidation
 
 // Cache for RAW leaderboard data (from Supabase)
@@ -66,9 +67,75 @@ export const setCachedEnrichedLeaderboard = (data: any[]): void => {
   }
 };
 
+// Cache for CURRENTLY RANKING data with smart invalidation
+export const getCachedCurrentlyRanking = (): any[] | null => {
+  try {
+    const cached = localStorage.getItem(CURRENTLY_RANKING_CACHE_KEY);
+    if (!cached) return null;
+    
+    const { data, timestamp } = JSON.parse(cached);
+    const now = Date.now();
+    
+    // Check if cache is still valid (no trigger-based logic here)
+    if (now - timestamp > CACHE_DURATION) {
+      localStorage.removeItem(CURRENTLY_RANKING_CACHE_KEY);
+      return null;
+    }
+    
+    console.log(`🔥 Using cached currently ranking data`);
+    return data;
+  } catch (error) {
+    localStorage.removeItem(CURRENTLY_RANKING_CACHE_KEY);
+    return null;
+  }
+};
+
+export const setCachedCurrentlyRanking = (data: any[]): void => {
+  try {
+    localStorage.setItem(CURRENTLY_RANKING_CACHE_KEY, JSON.stringify({
+      data,
+      timestamp: Date.now()
+    }));
+    console.log(`💾 Cached currently ranking data`);
+  } catch (error) {
+    console.error('Cache write error:', error);
+  }
+};
+
+// Clear currently ranking cache
+export const clearCurrentlyRankingCache = (): void => {
+  localStorage.removeItem(CURRENTLY_RANKING_CACHE_KEY);
+  console.log('🗑️ Cleared currently ranking cache');
+};
+
+// Get cache status for currently ranking data
+export const getCurrentlyRankingCacheStatus = (): {
+  hasCache: boolean;
+  isExpired: boolean;
+} => {
+  try {
+    const cached = localStorage.getItem(CURRENTLY_RANKING_CACHE_KEY);
+    if (!cached) {
+      return { hasCache: false, isExpired: false };
+    }
+    
+    const { timestamp } = JSON.parse(cached);
+    const now = Date.now();
+    const isExpired = now - timestamp > CACHE_DURATION;
+    
+    return {
+      hasCache: true,
+      isExpired
+    };
+  } catch (error) {
+    return { hasCache: false, isExpired: false };
+  }
+};
+
 export const clearAllLeaderboardCache = (): void => {
   localStorage.removeItem(LEADERBOARD_CACHE_KEY);
   localStorage.removeItem(ENRICHED_CACHE_KEY);
+  localStorage.removeItem(CURRENTLY_RANKING_CACHE_KEY);
   console.log('🗑️ Cleared all leaderboard cache');
 };
 
@@ -82,8 +149,9 @@ export const getCacheAge = (): number | null => {
   } catch {
     return null;
   }
-}; 
+};
 
+// Enhanced cache invalidation with currently ranking support
 export const setupCacheInvalidationListener = (supabase: any) => {
   const channel = supabase
     .channel('cache_invalidation')
@@ -94,12 +162,16 @@ export const setupCacheInvalidationListener = (supabase: any) => {
         schema: 'public',
         table: 'leaderboard_refresh_trigger'
       },
-      (_payload: any) => {
+      (payload: any) => {
         console.log('🔄 New leaderboard data detected, will clear cache in 30 seconds');
+        
+        // Clear all caches after 30 seconds (including currently ranking)
         setTimeout(() => {
           clearAllLeaderboardCache();
+          clearCurrentlyRankingCache();
           window.dispatchEvent(new CustomEvent('leaderboard_data_updated'));
-          console.log('🕒 Cache cleared and leaderboard_data_updated event dispatched after 30s delay');
+          window.dispatchEvent(new CustomEvent('currently_ranking_cache_cleared'));
+          console.log('🕒 All caches cleared after 30s delay');
         }, 30000); // 30 seconds
       }
     )
