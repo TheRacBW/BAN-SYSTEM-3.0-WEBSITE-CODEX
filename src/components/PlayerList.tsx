@@ -1,22 +1,16 @@
 import React from 'react';
 import { Plus, RefreshCw } from 'lucide-react';
-import { PlayerCard } from './PlayerCard';
-import { usePlayers } from '../hooks/usePlayers';
-import { useAuth } from '../hooks/useAuth';
-
-interface Player {
-  id: string;
-  // ... other player properties
-}
+import PlayerCard from './PlayerCard';
+import { usePlayerStore } from '../store/playerStore';
+import { useAuth } from '../context/AuthContext';
 
 export function PlayerList() {
-  const { players, refreshPlayerData } = usePlayers();
+  const { players, loading, error, refreshPlayer, refreshAllPlayers } = usePlayerStore();
   const { isAdmin } = useAuth();
   const [showAddModal, setShowAddModal] = React.useState(false);
 
   const handleRefreshAll = async () => {
-    // Refresh all player data
-    await Promise.all(players.map(player => refreshPlayerData(player.id)));
+    await refreshAllPlayers();
   };
 
   return (
@@ -41,12 +35,15 @@ export function PlayerList() {
         </div>
       </div>
 
+      {loading && <div>Loading players...</div>}
+      {error && <div className="text-red-500">{error}</div>}
+
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         {players.map(player => (
           <PlayerCard
             key={player.id}
             player={player}
-            onDelete={isAdmin ? handleDeletePlayer : undefined}
+            onDelete={isAdmin ? undefined : undefined} // implement as needed
             isAdmin={isAdmin}
           />
         ))}
