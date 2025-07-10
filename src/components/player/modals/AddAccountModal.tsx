@@ -18,9 +18,14 @@ export default function AddAccountModal({ player, onClose, onSuccess }: AddAccou
   const { restrictedIds, loading: restrictedLoading } = useRestrictedUserIds();
   const debounceRef = useRef<NodeJS.Timeout | null>(null);
 
+  const showTemporaryError = (msg: string) => {
+    setError(msg);
+    setTimeout(() => setError(null), 3000);
+  };
+
   const handleAddAccount = async () => {
     if (!newUserId) {
-      setError('Please enter a Roblox User ID');
+      showTemporaryError('Please enter a Roblox User ID');
       return;
     }
 
@@ -29,14 +34,14 @@ export default function AddAccountModal({ player, onClose, onSuccess }: AddAccou
     // Check for restricted ID
     const isRestricted = restrictedIds.some(restrictedId => String(restrictedId).trim() === normalizedInputId);
     if (isRestricted) {
-      setError('This account cannot be added.');
+      showTemporaryError('This account cannot be added.');
       return;
     }
 
     // Check for duplicate in this player card
     const alreadyExists = player.accounts?.some(acc => String(acc.user_id) === normalizedInputId);
     if (alreadyExists) {
-      setError('This account is already added to this player.');
+      showTemporaryError('This account is already added to this player.');
       return;
     }
 
@@ -49,13 +54,21 @@ export default function AddAccountModal({ player, onClose, onSuccess }: AddAccou
           user_id: parseInt(newUserId)
         });
 
-      if (error) throw error;
+      if (error) {
+        if (error.message && error.message.toLowerCase().includes('restricted')) {
+          showTemporaryError('This account cannot be added.');
+        } else {
+          showTemporaryError('Failed to add account');
+        }
+        return; // Do NOT close the modal on error
+      }
 
       onSuccess();
       onClose();
     } catch (error) {
+      showTemporaryError('Failed to add account');
       console.error('Error adding account:', error);
-      setError('Failed to add account');
+      // Do NOT close the modal on error
     } finally {
       setSubmitting(false);
     }
@@ -68,6 +81,19 @@ export default function AddAccountModal({ player, onClose, onSuccess }: AddAccou
     debounceRef.current = setTimeout(() => {
       handleAddAccount();
     }, 500);
+  };
+
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = e.target.value;
+    const normalizedValue = String(value).trim();
+    const isRestricted = restrictedIds.some(restrictedId => String(restrictedId).trim() === normalizedValue);
+    if (isRestricted) {
+      setNewUserId('');
+      setError('This account cannot be added.');
+      return;
+    }
+    setNewUserId(value);
+    setError(null);
   };
 
   return (
@@ -97,10 +123,7 @@ export default function AddAccountModal({ player, onClose, onSuccess }: AddAccou
             <input
               type="number"
               value={newUserId}
-              onChange={(e) => {
-                setNewUserId(e.target.value);
-                setError(null);
-              }}
+              onChange={handleInputChange}
               className="w-full p-2 border rounded dark:bg-gray-700 dark:border-gray-600"
               placeholder="Enter Roblox User ID"
               disabled={restrictedLoading}
