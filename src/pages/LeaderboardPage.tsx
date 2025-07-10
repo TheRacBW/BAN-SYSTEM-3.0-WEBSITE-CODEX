@@ -857,15 +857,22 @@ const LeaderboardPage: React.FC = () => {
     isLoading: isLoadingCurrentlyRanking,
     error: currentlyRankingError,
     isUsingCache: isUsingCurrentlyRankingCache,
+    cacheStatus: currentlyRankingCacheStatus,
     fetchCurrentlyRanking,
-    refresh: refreshCurrentlyRanking
+    refresh: refreshCurrentlyRanking,
+    setTabVisibility,
+    isTabVisible
   } = useCurrentlyRanking();
 
+  // Track tab visibility for auto-refresh
   useEffect(() => {
     if (activeTab === 'currently-ranking') {
+      setTabVisibility(true);
       fetchCurrentlyRanking();
+    } else {
+      setTabVisibility(false);
     }
-  }, [activeTab, fetchCurrentlyRanking]);
+  }, [activeTab, fetchCurrentlyRanking, setTabVisibility]);
 
   // --- Avatar enrichment for currently ranking ---
   const [enrichedCurrentlyRanking, setEnrichedCurrentlyRanking] = useState<any[]>(currentlyRanking);
@@ -918,11 +925,38 @@ const LeaderboardPage: React.FC = () => {
     }
     return (
       <div>
-        <h2 className="text-2xl font-bold text-gray-900 dark:text-gray-100 mb-4 flex items-center gap-2">
-          <Clock size={22} className="text-blue-500 dark:text-blue-400" />
-          Currently Ranking
-          <span className="ml-2 text-base font-normal text-gray-500 dark:text-gray-400">({enrichedCurrentlyRanking.length} players)</span>
-        </h2>
+        <div className="flex items-center justify-between mb-4">
+          <h2 className="text-2xl font-bold text-gray-900 dark:text-gray-100 flex items-center gap-2">
+            <Clock size={22} className="text-blue-500 dark:text-blue-400" />
+            Currently Ranking
+            <span className="ml-2 text-base font-normal text-gray-500 dark:text-gray-400">({enrichedCurrentlyRanking.length} players)</span>
+          </h2>
+          {/* Cache status indicator */}
+          <div className="flex items-center gap-2">
+            {currentlyRankingCacheStatus && (
+              <span className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium ${
+                currentlyRankingCacheStatus === 'Cached' 
+                  ? 'bg-green-100 dark:bg-green-900 text-green-700 dark:text-green-300'
+                  : currentlyRankingCacheStatus === 'refreshing'
+                  ? 'bg-blue-100 dark:bg-blue-900 text-blue-700 dark:text-blue-300'
+                  : currentlyRankingCacheStatus === 'fresh'
+                  ? 'bg-purple-100 dark:bg-purple-900 text-purple-700 dark:text-purple-300'
+                  : 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300'
+              }`}>
+                {currentlyRankingCacheStatus === 'Cached' && '💾 Cached'}
+                {currentlyRankingCacheStatus === 'refreshing' && '🔄 Refreshing'}
+                {currentlyRankingCacheStatus === 'fresh' && '✨ Fresh'}
+                {currentlyRankingCacheStatus === 'expired' && '⏰ Expired'}
+                {currentlyRankingCacheStatus === 'error' && '❌ Error'}
+              </span>
+            )}
+            {isTabVisible && (
+              <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium bg-blue-100 dark:bg-blue-900 text-blue-700 dark:text-blue-300">
+                👁️ Active
+              </span>
+            )}
+          </div>
+        </div>
         <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-5">
           {enrichedCurrentlyRanking.map((entry, idx) => (
             <div

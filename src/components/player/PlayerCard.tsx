@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Player } from '../../types/players';
 import { useAuth } from '../../context/AuthContext';
 import { Edit2, Trash2, Plus, Star } from 'lucide-react';
@@ -12,6 +12,8 @@ import RankClaimModal from './modals/RankClaimModal';
 import TeammateModal from './modals/TeammateModal';
 import EditPlayerModal from './modals/EditPlayerModal';
 import { useKits } from '../../context/KitContext';
+import { useRestrictedUserIds } from '../../hooks/useRestrictedUserIds';
+import { supabase } from '../../lib/supabase';
 
 interface PlayerCardProps {
   player: Player;
@@ -38,6 +40,7 @@ function PlayerCard({ player, onDelete, isAdmin }: PlayerCardProps) {
     handleRemoveTeammate
   } = usePlayerData(player);
   const { kits } = useKits();
+  const { restrictedIds } = useRestrictedUserIds();
 
   const [showModal, setShowModal] = useState(false);
   const [showAddAccountModal, setShowAddAccountModal] = useState(false);
@@ -46,14 +49,43 @@ function PlayerCard({ player, onDelete, isAdmin }: PlayerCardProps) {
   const [showTeammateModal, setShowTeammateModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
 
+  useEffect(() => {
+    if (!playerData.accounts) return;
+    const seen = new Set();
+    const toDelete: string[] = [];
+    playerData.accounts.forEach(acc => {
+      const userIdStr = String(acc.user_id);
+      // Remove if restricted
+      if (restrictedIds.some(rid => String(rid).trim() === userIdStr)) {
+        toDelete.push(acc.id);
+        return;
+      }
+      // Remove duplicates (keep first occurrence)
+      if (seen.has(userIdStr)) {
+        toDelete.push(acc.id);
+      } else {
+        seen.add(userIdStr);
+      }
+    });
+    if (toDelete.length > 0) {
+      Promise.all(
+        toDelete.map(id =>
+          supabase.from('player_accounts').delete().eq('id', id)
+        )
+      ).then(() => {
+        refreshPlayerData();
+      });
+    }
+  }, [playerData.accounts, restrictedIds]);
+
   const getCommonKits = () => {
     const kitUsage = new Map<string, number>();
 
     playerData.strategies?.forEach(strategy => {
-      if (strategy.starred_kit_id) {
-        const count = kitUsage.get(strategy.starred_kit_id) || 0;
-        kitUsage.set(strategy.starred_kit_id, count + 1);
-      }
+      strategy.kit_ids?.forEach(kitId => {
+        const count = kitUsage.get(kitId) || 0;
+        kitUsage.set(kitId, count + 1);
+      });
     });
 
     return Array.from(kitUsage.entries())
@@ -82,7 +114,15 @@ function PlayerCard({ player, onDelete, isAdmin }: PlayerCardProps) {
             <div className="space-y-3 mt-4">
               {playerData.accounts?.map(account => (
                 <div key={account.id} className="flex items-center gap-3 bg-gray-50 dark:bg-gray-700/30 p-2 rounded-lg">
-                  <RobloxStatus userId={account.user_id} />
+                  {account.status && (
+                    <RobloxStatus
+                      username={account.status.username}
+                      isOnline={account.status.isOnline}
+                      isInGame={account.status.isInGame}
+                      inBedwars={account.status.inBedwars}
+                      lastUpdated={account.status.lastUpdated}
+                    />
+                  )}
                   {getAccountRank(account) && (
                     <img 
                       src={getAccountRank(account)?.image_url} 
@@ -188,6 +228,7 @@ function PlayerCard({ player, onDelete, isAdmin }: PlayerCardProps) {
 
       {showAddAccountModal && (
         <AddAccountModal
+          key={restrictedIds.join(',')}
           player={playerData}
           onClose={() => setShowAddAccountModal(false)}
           onSuccess={refreshPlayerData}

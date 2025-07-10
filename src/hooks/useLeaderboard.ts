@@ -462,15 +462,38 @@ export const useCurrentlyRanking = () => {
   const [error, setError] = useState<string | null>(null);
   const [isUsingCache, setIsUsingCache] = useState(false);
   const [cacheStatus, setCacheStatus] = useState<string | null>(null);
+  const [isTabVisible, setIsTabVisible] = useState(false);
+
+  // Track if Currently Ranking tab is currently visible/active
+  const setTabVisibility = (visible: boolean) => {
+    setIsTabVisible(visible);
+    console.log(`👁️ Currently Ranking tab visibility: ${visible ? 'visible' : 'hidden'}`);
+  };
 
   // Listen for cache cleared events
   useEffect(() => {
     const handleCacheCleared = () => {
       console.log('🔄 Currently ranking cache cleared event received');
-      // Clear the current data to force a fresh fetch on next interaction
-      setCurrentlyRanking([]);
-      setIsUsingCache(false);
-      setCacheStatus(null);
+      
+      // ONLY auto-refresh if user is actively viewing this tab
+      if (isTabVisible) {
+        console.log('👁️ User actively viewing Currently Ranking, auto-refreshing');
+        setCacheStatus('refreshing');
+        
+        fetchCurrentlyRanking(true).then(() => {
+          console.log('✅ Auto-refreshed for active viewer');
+          setCacheStatus('fresh');
+        }).catch((error) => {
+          console.error('❌ Auto-refresh failed:', error);
+          setCacheStatus('error');
+        });
+      } else {
+        console.log('👤 User not viewing Currently Ranking, skipping auto-refresh');
+        setCacheStatus('expired');
+        // Clear the current data to force a fresh fetch on next interaction
+        setCurrentlyRanking([]);
+        setIsUsingCache(false);
+      }
     };
 
     window.addEventListener('currently_ranking_cache_cleared', handleCacheCleared);
@@ -478,7 +501,7 @@ export const useCurrentlyRanking = () => {
     return () => {
       window.removeEventListener('currently_ranking_cache_cleared', handleCacheCleared);
     };
-  }, []);
+  }, [isTabVisible]);
 
   const fetchCurrentlyRanking = useCallback(async (forceRefresh = false) => {
     try {
@@ -533,6 +556,8 @@ export const useCurrentlyRanking = () => {
     isUsingCache,
     cacheStatus,
     fetchCurrentlyRanking,
-    refresh
+    refresh,
+    setTabVisibility,
+    isTabVisible
   };
 }; 

@@ -2,6 +2,8 @@ import React, { useState } from 'react';
 import { Player } from '../../../types/players';
 import { supabase } from '../../../lib/supabase';
 import { X } from 'lucide-react';
+import { useRestrictedUserIds } from '../../../hooks/useRestrictedUserIds';
+import { useRef } from 'react';
 
 interface AddAccountModalProps {
   player: Player;
@@ -12,6 +14,9 @@ interface AddAccountModalProps {
 export default function AddAccountModal({ player, onClose, onSuccess }: AddAccountModalProps) {
   const [newUserId, setNewUserId] = useState('');
   const [error, setError] = useState<string | null>(null);
+  const [submitting, setSubmitting] = useState(false);
+  const { restrictedIds, loading: restrictedLoading } = useRestrictedUserIds();
+  const debounceRef = useRef<NodeJS.Timeout | null>(null);
 
   const handleAddAccount = async () => {
     if (!newUserId) {
@@ -19,6 +24,23 @@ export default function AddAccountModal({ player, onClose, onSuccess }: AddAccou
       return;
     }
 
+    const normalizedInputId = String(newUserId).trim();
+
+    // Check for restricted ID
+    const isRestricted = restrictedIds.some(restrictedId => String(restrictedId).trim() === normalizedInputId);
+    if (isRestricted) {
+      setError('This account cannot be added.');
+      return;
+    }
+
+    // Check for duplicate in this player card
+    const alreadyExists = player.accounts?.some(acc => String(acc.user_id) === normalizedInputId);
+    if (alreadyExists) {
+      setError('This account is already added to this player.');
+      return;
+    }
+
+    setSubmitting(true);
     try {
       const { error } = await supabase
         .from('player_accounts')
@@ -34,7 +56,18 @@ export default function AddAccountModal({ player, onClose, onSuccess }: AddAccou
     } catch (error) {
       console.error('Error adding account:', error);
       setError('Failed to add account');
+    } finally {
+      setSubmitting(false);
     }
+  };
+
+  const handleAddAccountDebounced = () => {
+    if (debounceRef.current) {
+      clearTimeout(debounceRef.current);
+    }
+    debounceRef.current = setTimeout(() => {
+      handleAddAccount();
+    }, 500);
   };
 
   return (
@@ -64,9 +97,13 @@ export default function AddAccountModal({ player, onClose, onSuccess }: AddAccou
             <input
               type="number"
               value={newUserId}
-              onChange={(e) => setNewUserId(e.target.value)}
+              onChange={(e) => {
+                setNewUserId(e.target.value);
+                setError(null);
+              }}
               className="w-full p-2 border rounded dark:bg-gray-700 dark:border-gray-600"
               placeholder="Enter Roblox User ID"
+              disabled={restrictedLoading}
             />
           </div>
 
@@ -78,8 +115,9 @@ export default function AddAccountModal({ player, onClose, onSuccess }: AddAccou
               Cancel
             </button>
             <button
-              onClick={handleAddAccount}
+              onClick={handleAddAccountDebounced}
               className="btn btn-primary"
+              disabled={restrictedLoading || submitting}
             >
               Add Account
             </button>
