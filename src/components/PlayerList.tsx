@@ -39,14 +39,17 @@ export function PlayerList() {
       {error && <div className="text-red-500">{error}</div>}
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {players.map(player => (
-          <PlayerCard
-            key={player.id}
-            player={player}
-            onDelete={isAdmin ? undefined : undefined} // implement as needed
-            isAdmin={isAdmin}
-          />
-        ))}
+        {players.map(player => {
+          console.log('PlayerList accounts:', player.alias, player.accounts);
+          return (
+            <PlayerCard
+              key={player.id + '-' + (player.lastUpdated || 0)}
+              player={player}
+              onDelete={isAdmin ? undefined : undefined} // implement as needed
+              isAdmin={isAdmin}
+            />
+          );
+        })}
       </div>
 
       {/* ... rest of the component ... */}

@@ -2,16 +2,20 @@ import { create } from 'zustand';
 import { Player } from '../types/players';
 import { supabase } from '../lib/supabase';
 
+interface PlayerWithTimestamp extends Player {
+  lastUpdated?: number;
+}
+
 interface PlayerStoreState {
-  players: Player[];
+  players: PlayerWithTimestamp[];
   loading: boolean;
   error: string | null;
   fetchAllPlayers: () => Promise<void>;
-  fetchPlayerById: (id: string) => Promise<Player | undefined>;
+  fetchPlayerById: (id: string) => Promise<PlayerWithTimestamp | undefined>;
   refreshPlayer: (id: string) => Promise<void>;
   refreshAllPlayers: () => Promise<void>;
-  addPlayer: (player: Player) => void;
-  updatePlayer: (player: Player) => void;
+  addPlayer: (player: PlayerWithTimestamp) => void;
+  updatePlayer: (player: PlayerWithTimestamp) => void;
   removePlayer: (id: string) => void;
 }
 
@@ -50,7 +54,8 @@ export const usePlayerStore = create<PlayerStoreState>((set, get) => ({
       set({ error: error.message, loading: false });
       return;
     }
-    set({ players: data || [], loading: false });
+    // Add lastUpdated to all players
+    set({ players: (data || []).map((p: Player) => ({ ...p, lastUpdated: Date.now() })), loading: false });
   },
 
   fetchPlayerById: async (id: string) => {
@@ -85,10 +90,25 @@ export const usePlayerStore = create<PlayerStoreState>((set, get) => ({
       set({ error: error.message, loading: false });
       return undefined;
     }
-    // Update or add the player in the store
-    const players = get().players.filter((p: Player) => p.id !== id);
-    set({ players: [...players, data], loading: false });
-    return data;
+    // Log the fetched player data
+    console.log('Fetched player from Supabase:', data);
+    // Always replace the player in the array with a new object reference and update lastUpdated
+    set(state => {
+      const idx = state.players.findIndex((p: PlayerWithTimestamp) => p.id === data.id);
+      let newPlayers;
+      const updatedPlayer = { ...data, lastUpdated: Date.now() };
+      if (idx !== -1) {
+        newPlayers = [...state.players];
+        newPlayers[idx] = updatedPlayer;
+      } else {
+        newPlayers = [...state.players, updatedPlayer];
+      }
+      return {
+        players: newPlayers,
+        loading: false
+      };
+    });
+    return { ...data, lastUpdated: Date.now() };
   },
 
   refreshPlayer: async (id: string) => {
@@ -99,17 +119,17 @@ export const usePlayerStore = create<PlayerStoreState>((set, get) => ({
     await get().fetchAllPlayers();
   },
 
-  addPlayer: (player: Player) => {
-    set((state) => ({ players: [...state.players, player] }));
+  addPlayer: (player: PlayerWithTimestamp) => {
+    set((state) => ({ players: [...state.players, { ...player, lastUpdated: Date.now() }] }));
   },
 
-  updatePlayer: (player: Player) => {
+  updatePlayer: (player: PlayerWithTimestamp) => {
     set((state) => ({
-      players: state.players.map((p: Player) => (p.id === player.id ? player : p)),
+      players: state.players.map((p: PlayerWithTimestamp) => (p.id === player.id ? { ...player, lastUpdated: Date.now() } : p)),
     }));
   },
 
   removePlayer: (id: string) => {
-    set((state) => ({ players: state.players.filter((p: Player) => p.id !== id) }));
+    set((state) => ({ players: state.players.filter((p: PlayerWithTimestamp) => p.id !== id) }));
   },
 })); 

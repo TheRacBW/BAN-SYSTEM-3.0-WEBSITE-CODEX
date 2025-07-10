@@ -1,4 +1,5 @@
-import React, { useState, useEffect } from 'react';
+import React from 'react';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Player } from '../../types/players';
 import { useAuth } from '../../context/AuthContext';
 import { Edit2, Trash2, Plus, Star } from 'lucide-react';
@@ -13,7 +14,6 @@ import EditPlayerModal from './modals/EditPlayerModal';
 import { useKits } from '../../context/KitContext';
 import { useRestrictedUserIds } from '../../hooks/useRestrictedUserIds';
 import { supabase } from '../../lib/supabase';
-import { usePlayerStore } from '../../store/playerStore';
 
 interface PlayerCardProps {
   player: Player;
@@ -21,51 +21,80 @@ interface PlayerCardProps {
   isAdmin?: boolean;
 }
 
+async function fetchPlayer(playerId: string) {
+  const { data, error } = await supabase
+    .from('players')
+    .select(`
+      *,
+      accounts:player_accounts(
+        id,
+        user_id,
+        rank:player_account_ranks(
+          rank_id,
+          account_ranks(*)
+        ),
+        status,
+        created_at
+      ),
+      teammates:player_teammates!player_id(
+        teammate:players!teammate_id(*)
+      ),
+      strategies:player_strategies(
+        id,
+        image_url,
+        kit_ids,
+        teammate_ids,
+        starred_kit_id,
+        created_at
+      )
+    `)
+    .eq('id', playerId)
+    .single();
+  if (error) throw error;
+  return data;
+}
+
 function PlayerCard({ player, onDelete, isAdmin }: PlayerCardProps) {
   const { user } = useAuth();
   const { kits } = useKits();
   const { restrictedIds } = useRestrictedUserIds();
-  const { refreshPlayer } = usePlayerStore();
+  const queryClient = useQueryClient();
 
-  const [showModal, setShowModal] = useState(false);
-  const [showAddAccountModal, setShowAddAccountModal] = useState(false);
-  const [showAddStrategyModal, setShowAddStrategyModal] = useState(false);
-  const [showRankClaimModal, setShowRankClaimModal] = useState(false);
-  const [showTeammateModal, setShowTeammateModal] = useState(false);
-  const [showEditModal, setShowEditModal] = useState(false);
+  // Fetch player data live
+  const { data: livePlayer, isLoading, refetch } = useQuery(['player', player.id], () => fetchPlayer(player.id), {
+    refetchInterval: 5000, // Poll every 5 seconds for live updates
+    initialData: player,
+  });
 
-  useEffect(() => {
-    if (!player.accounts) return;
-    const seen = new Set();
-    const toDelete: string[] = [];
-    player.accounts.forEach(acc => {
-      const userIdStr = String(acc.user_id);
-      // Remove if restricted
-      if (restrictedIds.some(rid => String(rid).trim() === userIdStr)) {
-        toDelete.push(acc.id);
-        return;
-      }
-      // Remove duplicates (keep first occurrence)
-      if (seen.has(userIdStr)) {
-        toDelete.push(acc.id);
-      } else {
-        seen.add(userIdStr);
-      }
-    });
-    if (toDelete.length > 0) {
-      Promise.all(
-        toDelete.map(id =>
-          supabase.from('player_accounts').delete().eq('id', id)
-        )
-      ).then(() => {
-        refreshPlayer(player.id);
-      });
+  // Mutation for deleting an account
+  const deleteAccountMutation = useMutation(
+    async (accountId: string) => {
+      await supabase.from('player_accounts').delete().eq('id', accountId);
+    },
+    {
+      onSuccess: async () => {
+        // Wait 300ms to allow Supabase to update, then refetch
+        setTimeout(() => {
+          refetch();
+        }, 300);
+      },
     }
-  }, [player.accounts, restrictedIds, player.id, refreshPlayer]);
+  );
+
+  const [showModal, setShowModal] = React.useState(false);
+  const [showAddAccountModal, setShowAddAccountModal] = React.useState(false);
+  const [showAddStrategyModal, setShowAddStrategyModal] = React.useState(false);
+  const [showRankClaimModal, setShowRankClaimModal] = React.useState(false);
+  const [showTeammateModal, setShowTeammateModal] = React.useState(false);
+  const [showEditModal, setShowEditModal] = React.useState(false);
+
+  React.useEffect(() => {
+    console.log('Live player data:', livePlayer);
+  }, [livePlayer]);
 
   const getCommonKits = () => {
     const kitUsage = new Map<string, number>();
-    player.strategies?.forEach(strategy => {
+    livePlayer?.strategies?.forEach(strategy => {
       strategy.kit_ids?.forEach(kitId => {
         const count = kitUsage.get(kitId) || 0;
         kitUsage.set(kitId, count + 1);
@@ -86,7 +115,7 @@ function PlayerCard({ player, onDelete, isAdmin }: PlayerCardProps) {
     return account.rank[0].account_ranks;
   };
 
-  if (!user) return null;
+  if (!user || !livePlayer) return null;
 
   return (
     <>
@@ -96,9 +125,9 @@ function PlayerCard({ player, onDelete, isAdmin }: PlayerCardProps) {
       >
         <div className="flex justify-between items-start mb-4">
           <div>
-            <h3 className="text-xl font-semibold">{player.alias}</h3>
+            <h3 className="text-xl font-semibold">{livePlayer.alias}</h3>
             <div className="space-y-3 mt-4">
-              {player.accounts?.map(account => (
+              {livePlayer.accounts?.map(account => (
                 <div key={account.id} className="flex items-center gap-3 bg-gray-50 dark:bg-gray-700/30 p-2 rounded-lg">
                   {account.status && (
                     <RobloxStatus
@@ -123,8 +152,7 @@ function PlayerCard({ player, onDelete, isAdmin }: PlayerCardProps) {
                       title="Delete Account"
                       onClick={async (e) => {
                         e.stopPropagation();
-                        await supabase.from('player_accounts').delete().eq('id', account.id);
-                        refreshPlayer(player.id);
+                        deleteAccountMutation.mutate(account.id);
                       }}
                     >
                       <Trash2 size={16} />
@@ -177,7 +205,7 @@ function PlayerCard({ player, onDelete, isAdmin }: PlayerCardProps) {
         </div>
 
         <div className="flex flex-wrap gap-2 mb-4">
-          {player.strategies?.slice(0, 3).map(strategy => (
+          {livePlayer.strategies?.slice(0, 3).map(strategy => (
             strategy.kit_ids?.slice(0, 3).map(kitId => {
               const kit = kits.find(k => k.id === kitId);
               if (!kit) return null;
@@ -216,11 +244,10 @@ function PlayerCard({ player, onDelete, isAdmin }: PlayerCardProps) {
 
       {showModal && (
         <PlayerModal 
-          player={player}
+          player={livePlayer}
           onClose={() => setShowModal(false)}
           onShowRankClaim={() => setShowRankClaimModal(true)}
           onShowTeammates={() => setShowTeammateModal(true)}
-          // onDeleteStrategy={handleDeleteStrategy} // implement as needed
           isAdmin={isAdmin}
         />
       )}
@@ -228,42 +255,43 @@ function PlayerCard({ player, onDelete, isAdmin }: PlayerCardProps) {
       {showAddAccountModal && (
         <AddAccountModal
           key={restrictedIds.join(',')}
-          player={player}
+          player={livePlayer}
           onClose={() => setShowAddAccountModal(false)}
-          onSuccess={() => refreshPlayer(player.id)}
+          onSuccess={() => {
+            setTimeout(() => {
+              refetch();
+            }, 300);
+          }}
         />
       )}
 
       {showAddStrategyModal && (
         <AddStrategyModal
-          player={player}
+          player={livePlayer}
           onClose={() => setShowAddStrategyModal(false)}
-          onSuccess={() => refreshPlayer(player.id)}
+          onSuccess={() => refetch()}
         />
       )}
 
       {showRankClaimModal && (
         <RankClaimModal
-          player={player}
+          player={livePlayer}
           onClose={() => setShowRankClaimModal(false)}
-          onSuccess={() => refreshPlayer(player.id)}
+          onSuccess={() => refetch()}
         />
       )}
 
       {showTeammateModal && (
         <TeammateModal
-          player={player}
+          player={livePlayer}
           onClose={() => setShowTeammateModal(false)}
-          // onAddTeammate={handleAddTeammate} // implement as needed
-          // onRemoveTeammate={handleRemoveTeammate} // implement as needed
         />
       )}
 
       {showEditModal && (
         <EditPlayerModal
-          player={player}
+          player={livePlayer}
           onClose={() => setShowEditModal(false)}
-          // onSave={handleEditPlayer} // implement as needed
         />
       )}
     </>

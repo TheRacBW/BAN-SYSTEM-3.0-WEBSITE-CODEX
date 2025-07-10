@@ -8,7 +8,7 @@ import { useRef } from 'react';
 interface AddAccountModalProps {
   player: Player;
   onClose: () => void;
-  onSuccess: () => void;
+  onSuccess: (newAccount: any) => void;
 }
 
 export default function AddAccountModal({ player, onClose, onSuccess }: AddAccountModalProps) {
@@ -63,7 +63,17 @@ export default function AddAccountModal({ player, onClose, onSuccess }: AddAccou
         return; // Do NOT close the modal on error
       }
 
-      onSuccess();
+      // Fetch the newly added account for optimistic update
+      const { data: newAccount } = await supabase
+        .from('player_accounts')
+        .select('*')
+        .eq('player_id', player.id)
+        .eq('user_id', parseInt(newUserId))
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .single();
+
+      onSuccess(newAccount);
       onClose();
     } catch (error) {
       showTemporaryError('Failed to add account');
