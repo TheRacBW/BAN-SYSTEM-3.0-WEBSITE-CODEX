@@ -55,6 +55,9 @@ const StratPickerPage: React.FC = () => {
   ];
   const [createTab, setCreateTab] = useState<'kits' | 'details' | 'review'>('kits');
 
+  // Track which kits are in decrement mode
+  const [decrementModeKits, setDecrementModeKits] = useState<Set<string>>(new Set());
+
   const filteredKits = kits.filter(kit =>
     kit.name.toLowerCase().includes(searchQuery.toLowerCase())
   );
@@ -279,10 +282,25 @@ const StratPickerPage: React.FC = () => {
                             <div
                               key={kit.id}
                               onClick={() => {
-                                if (selectedKits.includes(kit.id)) {
-                                  const idx = selectedKits.indexOf(kit.id);
+                                const kitCount = selectedKits.filter(id => id === kit.id).length;
+                                const totalSelected = selectedKits.length;
+                                const isDecrementing = decrementModeKits.has(kit.id);
+                                if (!isDecrementing && kitCount < 5 && totalSelected < 5) {
+                                  addKitToStrategy(kit.id);
+                                  if (kitCount + 1 === 5) {
+                                    setDecrementModeKits(new Set(decrementModeKits).add(kit.id));
+                                  }
+                                } else if (kitCount > 0) {
+                                  // Decrement mode: keep removing until 0
+                                  const idx = selectedKits.lastIndexOf(kit.id);
                                   removeKitFromStrategy(kit.id, idx);
-                                } else if (selectedKits.length < 5) {
+                                  if (kitCount - 1 === 0) {
+                                    const newSet = new Set(decrementModeKits);
+                                    newSet.delete(kit.id);
+                                    setDecrementModeKits(newSet);
+                                  }
+                                } else if (kitCount === 0) {
+                                  // Start incrementing again
                                   addKitToStrategy(kit.id);
                                 }
                               }}
@@ -299,7 +317,7 @@ const StratPickerPage: React.FC = () => {
                               {selectedKits.includes(kit.id) && (
                                 <div className="absolute inset-0 bg-blue-400/10 border-2 border-blue-500 rounded-xl pointer-events-none animate-pulse z-10" />
                               )}
-                              <KitCard kit={kit} size="md" selected={selectedKits.includes(kit.id)} />
+                              <KitCard kit={kit} size="md" selected={selectedKits.includes(kit.id)} count={selectedKits.filter(id => id === kit.id).length} />
                             </div>
                           ))}
                         </div>

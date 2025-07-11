@@ -10,6 +10,7 @@ interface KitCardProps {
   size?: 'sm' | 'md' | 'lg';
   showDetails?: boolean;
   selected?: boolean;
+  count?: number;
 }
 
 const KitCard: React.FC<KitCardProps> = ({ 
@@ -17,7 +18,8 @@ const KitCard: React.FC<KitCardProps> = ({
   onClick, 
   size = 'md',
   showDetails = true,
-  selected = false
+  selected = false,
+  count = 1
 }) => {
   const { isBanned } = useBan();
   const { selectedKitId } = useKits();
@@ -77,7 +79,7 @@ const KitCard: React.FC<KitCardProps> = ({
       {/* Selected label (top left) - always render last for highest stacking */}
       {selected && (
         <span className="absolute top-0 -left-1 z-[999] px-2 py-0.5 rounded-md bg-blue-500 text-white text-xs font-bold shadow-md tracking-wide select-none" style={{letterSpacing: '0.03em'}}>
-          Selected
+          Selected{count > 1 ? ` ${count}x` : ''}
         </span>
       )}
       
