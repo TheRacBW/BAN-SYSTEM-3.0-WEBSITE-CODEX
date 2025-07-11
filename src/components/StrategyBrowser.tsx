@@ -6,6 +6,7 @@ import { useAuth } from '../context/AuthContext';
 import { Strategy, StrategyTag } from '../types';
 import StrategyCard from './StrategyCard';
 import { supabase } from '../lib/supabase';
+import StrategyModal from './StrategyModal';
 
 interface StrategyBrowserProps {
   onStrategyClick?: (strategyId: string) => void;
@@ -30,6 +31,7 @@ const StrategyBrowser: React.FC<StrategyBrowserProps> = ({
   const [showFilters, setShowFilters] = useState(false);
   const [ownedKits, setOwnedKits] = useState<string[]>([]);
   const [inactiveStrategies, setInactiveStrategies] = useState<string[]>([]);
+  const [modalStrategy, setModalStrategy] = useState<Strategy | null>(null);
 
   useEffect(() => {
     const fetchOwnedKits = async () => {
@@ -114,8 +116,8 @@ const StrategyBrowser: React.FC<StrategyBrowserProps> = ({
 
   const handleStrategyClick = (strategyId: string) => {
     if (isLoading) return;
-    
-    selectStrategy(strategyId === selectedStrategyId ? null : strategyId);
+    const strategy = strategies.find(s => s.id === strategyId);
+    if (strategy) setModalStrategy(strategy);
     if (onStrategyClick) {
       onStrategyClick(strategyId);
     }
@@ -187,14 +189,14 @@ const StrategyBrowser: React.FC<StrategyBrowserProps> = ({
             <div className="space-y-2">
               <div className="flex items-center">
                 <Filter size={16} className="mr-2 text-gray-500 dark:text-gray-400" />
-                <label className="flex items-center cursor-pointer">
+                <label className="flex items-center cursor-pointer relative">
                   <input
                     type="checkbox"
                     className="sr-only peer"
                     checked={showOnlyValid}
                     onChange={() => setShowOnlyValid(!showOnlyValid)}
                   />
-                  <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-2 
+                  <div className="relative w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-2 
                     peer-focus:ring-primary-300 dark:peer-focus:ring-primary-800 rounded-full peer 
                     dark:bg-gray-700 peer-checked:after:translate-x-full peer-checked:after:border-white 
                     after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white 
@@ -208,14 +210,14 @@ const StrategyBrowser: React.FC<StrategyBrowserProps> = ({
 
               <div className="flex items-center">
                 <ToggleLeft size={16} className="mr-2 text-gray-500 dark:text-gray-400" />
-                <label className="flex items-center cursor-pointer">
+                <label className="flex items-center cursor-pointer relative">
                   <input
                     type="checkbox"
                     className="sr-only peer"
                     checked={showOnlyActive}
                     onChange={() => setShowOnlyActive(!showOnlyActive)}
                   />
-                  <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-2 
+                  <div className="relative w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-2 
                     peer-focus:ring-primary-300 dark:peer-focus:ring-primary-800 rounded-full peer 
                     dark:bg-gray-700 peer-checked:after:translate-x-full peer-checked:after:border-white 
                     after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white 
@@ -229,14 +231,14 @@ const StrategyBrowser: React.FC<StrategyBrowserProps> = ({
 
               <div className="flex items-center">
                 <ToggleLeft size={16} className="mr-2 text-gray-500 dark:text-gray-400" />
-                <label className="flex items-center cursor-pointer">
+                <label className="flex items-center cursor-pointer relative">
                   <input
                     type="checkbox"
                     className="sr-only peer"
                     checked={showOnlyOwned}
                     onChange={() => setShowOnlyOwned(!showOnlyOwned)}
                   />
-                  <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-2 
+                  <div className="relative w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-2 
                     peer-focus:ring-primary-300 dark:peer-focus:ring-primary-800 rounded-full peer 
                     dark:bg-gray-700 peer-checked:after:translate-x-full peer-checked:after:border-white 
                     after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white 
@@ -305,6 +307,13 @@ const StrategyBrowser: React.FC<StrategyBrowserProps> = ({
           </div>
         )}
       </div>
+      {/* Strategy Modal for rating, comments, players encountered */}
+      {modalStrategy && (
+        <StrategyModal
+          strategy={modalStrategy}
+          onClose={() => setModalStrategy(null)}
+        />
+      )}
     </div>
   );
 };

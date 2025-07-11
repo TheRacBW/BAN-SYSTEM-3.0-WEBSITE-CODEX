@@ -13,7 +13,7 @@ interface Comment {
   user_id: string;
   created_at: string;
   likes: number;
-  username: string;
+  username?: string;
   isLiked?: boolean;
 }
 
@@ -211,13 +211,13 @@ const StrategyModal: React.FC<StrategyModalProps> = ({ strategy, onClose }) => {
 
       const likedCommentIds = new Set(userLikes?.map(like => like.comment_id));
 
-      const formattedComments = commentsData?.map(comment => ({
+      const formattedComments = commentsData?.map((comment: any) => ({
         id: comment.id,
         content: comment.content,
         user_id: comment.user_id,
         created_at: comment.created_at,
         likes: comment.likes,
-        username: comment.users?.username,
+        username: comment.users?.username || 'Anonymous',
         isLiked: likedCommentIds.has(comment.id)
       })) || [];
 
@@ -524,232 +524,137 @@ const StrategyModal: React.FC<StrategyModalProps> = ({ strategy, onClose }) => {
   };
 
   return (
-    <div 
-      className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50"
+    <div
+      className="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-[9999] p-4"
       onClick={handleBackdropClick}
     >
-      <div 
-        className="bg-white dark:bg-gray-800 rounded-lg max-w-2xl w-full mx-4 max-h-[90vh] overflow-y-auto"
+      <div
+        className="bg-gray-900 dark:bg-gray-800 rounded-2xl shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto border border-gray-700 relative"
         onClick={handleModalClick}
       >
-        <div className="p-6">
-          <div className="flex justify-between items-start mb-4">
-            {isEditing ? (
-              <div className="flex items-center gap-2 flex-1 mr-4">
-                <input
-                  type="text"
-                  value={editedName}
-                  onChange={(e) => setEditedName(e.target.value)}
-                  className="flex-1 px-2 py-1 border rounded dark:bg-gray-700 dark:border-gray-600"
-                  autoFocus
-                />
-                <button
-                  onClick={handleUpdateName}
-                  className="text-green-600 hover:text-green-700 dark:text-green-400 dark:hover:text-green-300"
-                >
-                  <Save size={20} />
-                </button>
-                <button
-                  onClick={() => {
-                    setIsEditing(false);
-                    setEditedName(strategy.name);
-                  }}
-                  className="text-gray-600 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300"
-                >
-                  <X size={20} />
-                </button>
-              </div>
-            ) : (
-              <div className="flex items-center gap-2">
-                <h2 className="text-2xl font-bold">{strategy.name}</h2>
-                {isAdmin && (
-                  <button
-                    onClick={() => setIsEditing(true)}
-                    className="text-gray-600 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300"
-                    title="Edit strategy name"
-                  >
-                    <Edit2 size={16} />
-                  </button>
-                )}
-              </div>
-            )}
-            <div className="flex items-center gap-2">
-              {isAdmin && (
-                <button
-                  onClick={handleDelete}
-                  disabled={isDeleting}
-                  className={`text-red-600 hover:text-red-700 dark:text-red-400 dark:hover:text-red-300 ${
-                    isDeleting ? 'opacity-50 cursor-not-allowed' : ''
-                  }`}
-                  title="Delete strategy"
-                >
-                  <Trash2 size={20} />
-                </button>
-              )}
-              <button
-                onClick={onClose}
-                className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
-              >
-                <X size={24} />
-              </button>
+        <div className="p-8 space-y-8">
+          {/* Header */}
+          <div className="flex justify-between items-center border-b border-gray-700 pb-4 mb-4">
+            <div>
+              <h2 className="text-2xl font-bold text-white mb-1">{strategy.name}</h2>
+              <div className="text-sm text-gray-400">by {strategy.createdBy || 'Unknown'}</div>
+            </div>
+            <button
+              onClick={onClose}
+              className="p-2 rounded-full hover:bg-gray-800 transition-colors text-gray-400 hover:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+              title="Close"
+            >
+              <X size={24} />
+            </button>
+          </div>
+
+          {/* Kit Composition */}
+          <div>
+            <h3 className="text-lg font-semibold text-white mb-3">Kit Composition</h3>
+            <div className="flex flex-wrap gap-3">
+              {strategy.kits.map(kitId => {
+                const kit = getKitById(kitId);
+                if (!kit) return null;
+                return <KitCard key={kitId} kit={kit} size="md" />;
+              })}
             </div>
           </div>
 
+          {/* Encounters */}
+          <div className="flex items-center gap-4 mb-2">
+            <button
+              onClick={handleEncounterToggle}
+              className={`flex items-center gap-2 px-4 py-2 rounded-full text-sm font-semibold transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500
+                ${hasEncounteredThisWeek ? 'bg-green-700 text-green-200' : 'bg-gray-800 text-gray-300 hover:bg-gray-700'}`}
+              title={hasEncounteredThisWeek ? 'Remove encounter' : 'Mark as encountered this week'}
+            >
+              <CheckCircle2 size={20} />
+              {hasEncounteredThisWeek ? 'Encountered' : 'Did you face this strat this week?'}
+            </button>
+            <span className="inline-flex items-center px-3 py-1 rounded-full bg-blue-900 text-blue-300 text-xs font-semibold">
+              {weeklyEncounters} {weeklyEncounters === 1 ? 'player' : 'players'} faced this week
+            </span>
+          </div>
+
+          {/* Ratings */}
+          <div className="space-y-6">
+            <div>
+              <h3 className="text-lg font-semibold text-white mb-2">Rate This Strategy</h3>
+              <div className="flex flex-col md:flex-row gap-6">
+                <div className="flex-1">
+                  <div className="mb-2 text-gray-300 font-medium">Effectiveness</div>
+                  <StarRating
+                    value={userRating.effectiveness}
+                    onChange={(value) => handleRating('effectiveness', value)}
+                  />
+                </div>
+                <div className="flex-1">
+                  <div className="mb-2 text-gray-300 font-medium">Counterability</div>
+                  <StarRating
+                    value={userRating.counterability}
+                    onChange={(value) => handleRating('counterability', value)}
+                  />
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Comments */}
+          <div>
+            <h3 className="text-lg font-semibold text-white mb-3 flex items-center gap-2">
+              <MessageSquare size={20} />
+              Comments ({comments.length})
+            </h3>
+            <div className="space-y-4 max-h-60 overflow-y-auto pr-2">
+              {comments.map((comment: any) => (
+                <div key={comment.id} className="bg-gray-800 rounded-lg p-3 flex flex-col gap-1 border border-gray-700">
+                  <div className="flex items-center gap-2 mb-1">
+                    <span className="text-xs text-blue-400 font-semibold">{comment.username || 'Anonymous'}</span>
+                    <span className="text-xs text-gray-500">{new Date(comment.created_at).toLocaleString()}</span>
+                  </div>
+                  <div className="text-gray-200 text-sm">{comment.content}</div>
+                  <div className="flex items-center gap-2 mt-1">
+                    <button
+                      onClick={() => handleLikeComment(comment.id, !!comment.isLiked)}
+                      className={`text-xs flex items-center gap-1 px-2 py-1 rounded-full transition-colors
+                        ${comment.isLiked ? 'bg-blue-700 text-blue-200' : 'bg-gray-700 text-gray-400 hover:bg-blue-800 hover:text-blue-200'}`}
+                    >
+                      <Heart size={14} /> {comment.likes}
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+            {user && (
+              <div className="mt-6">
+                <textarea
+                  value={newComment}
+                  onChange={(e) => setNewComment(e.target.value)}
+                  placeholder="Share your thoughts about this strategy..."
+                  className="w-full p-3 border rounded-lg dark:border-gray-600 dark:bg-gray-700 min-h-[80px] text-gray-200"
+                />
+                <button
+                  onClick={handleSubmitComment}
+                  disabled={!newComment.trim() || isSubmittingComment}
+                  className="mt-2 btn btn-primary rounded-full px-6 py-2 text-sm font-semibold"
+                >
+                  {isSubmittingComment ? 'Posting...' : 'Post Comment'}
+                </button>
+              </div>
+            )}
+          </div>
+
+          {/* Error/Success Messages */}
           {error && (
-            <div className="mb-4 p-3 bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-300 rounded">
+            <div className="p-3 bg-red-900/40 text-red-300 rounded mt-4 text-center">
               {error}
             </div>
           )}
-
           {success && (
-            <div className="mb-4 p-3 bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300 rounded">
+            <div className="p-3 bg-green-900/40 text-green-300 rounded mt-4 text-center">
               {success}
             </div>
           )}
-
-          <p className="text-gray-600 dark:text-gray-300 mb-6">
-            {strategy.description}
-          </p>
-
-          <div className="flex justify-between items-start mb-6">
-            <button
-              onClick={handleSave}
-              className="flex items-center gap-2 text-gray-600 dark:text-gray-300 hover:text-primary-600 dark:hover:text-primary-400"
-            >
-              {isSaved ? <BookmarkCheck size={20} /> : <Bookmark size={20} />}
-              {isSaved ? 'Saved' : 'Save Strategy'}
-            </button>
-
-            {user && (
-              <div className="flex flex-col items-end gap-1">
-                <h4 className="text-sm font-medium text-gray-700 dark:text-gray-300">
-                  Did you face this strat this week?
-                </h4>
-                <button
-                  onClick={handleEncounterToggle}
-                  className={`flex items-center gap-2 ${
-                    hasEncounteredThisWeek
-                      ? 'text-green-600 dark:text-green-400'
-                      : 'text-gray-600 dark:text-gray-400'
-                  }`}
-                  title={hasEncounteredThisWeek ? 'Remove encounter' : 'Mark as encountered this week'}
-                >
-                  <CheckCircle2 size={20} />
-                  <span>
-                    {weeklyEncounters} {weeklyEncounters === 1 ? 'player' : 'players'} faced this week
-                  </span>
-                </button>
-              </div>
-            )}
-          </div>
-
-          <div className="space-y-6">
-            <div>
-              <h3 className="text-lg font-semibold mb-3">Kit Composition</h3>
-              <div className="flex flex-wrap gap-3">
-                {strategy.kits.map(kitId => {
-                  const kit = getKitById(kitId);
-                  if (!kit) return null;
-                  return <KitCard key={kitId} kit={kit} size="sm" />;
-                })}
-              </div>
-            </div>
-
-            <div className="space-y-6">
-              <div>
-                <h3 className="text-lg font-semibold mb-4">Rate This Strategy</h3>
-                <div className="space-y-6">
-                  <div>
-                    <div className="mb-2">
-                      <span className="font-bold text-gray-900 dark:text-white">Effectiveness:</span>
-                      <p className="text-sm text-gray-600 dark:text-gray-400">How well did this strat perform?</p>
-                    </div>
-                    <StarRating
-                      value={userRating.effectiveness}
-                      onChange={(value) => handleRating('effectiveness', value)}
-                    />
-                  </div>
-
-                  <div>
-                    <div className="mb-2">
-                      <span className="font-bold text-gray-900 dark:text-white">Counterability:</span>
-                      <p className="text-sm text-gray-600 dark:text-gray-400">How tough is it to play against?</p>
-                    </div>
-                    <StarRating
-                      value={userRating.counterability}
-                      onChange={(value) => handleRating('counterability', value)}
-                    />
-                  </div>
-                </div>
-              </div>
-
-              <div className="border-t dark:border-gray-700 pt-6">
-                <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
-                  <MessageSquare size={20} />
-                  Comments ({comments.length})
-                </h3>
-
-                {user && (
-                  <div className="mb-6">
-                    <textarea
-                      value={newComment}
-                      onChange={(e) => setNewComment(e.target.value)}
-                      placeholder="Share your thoughts about this strategy..."
-                      className="w-full p-3 border rounded-lg dark:border-gray-600 dark:bg-gray-700 min-h-[100px]"
-                    />
-                    <button
-                      onClick={handleSubmitComment}
-                      disabled={!newComment.trim() || isSubmittingComment}
-                      className="mt-2 btn btn-primary"
-                    >
-                      {isSubmittingComment ? 'Posting...' : 'Post Comment'}
-                    </button>
-                  </div>
-                )}
-
-                <div className="space-y-4">
-                  {comments.map(comment => (
-                    <div key={comment.id} className="bg-gray-50 dark:bg-gray-700/50 rounded-lg p-4">
-                      <div className="flex justify-between items-start mb-2">
-                        <div>
-                          <span className="font-medium text-gray-900 dark:text-white">
-                            {comment.username}
-                          </span>
-                          <span className="text-sm text-gray-500 dark:text-gray-400 ml-2">
-                            {new Date(comment.created_at).toLocaleDateString()}
-                          </span>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          {user && (
-                            <button
-                              onClick={() => handleLikeComment(comment.id, comment.isLiked || false)}
-                              className={`flex items-center gap-1 text-sm ${
-                                comment.isLiked
-                                  ? 'text-red-500 dark:text-red-400'
-                                  : 'text-gray-500 dark:text-gray-400'
-                              }`}
-                            >
-                              {comment.isLiked ? <Heart size={16} /> : <HeartOff size={16} />}
-                              {comment.likes}
-                            </button>
-                          )}
-                          {(user?.id === comment.user_id || isAdmin) && (
-                            <button
-                              onClick={() => handleDeleteComment(comment.id)}
-                              className="text-red-500 dark:text-red-400 hover:text-red-600"
-                            >
-                              <Trash2 size={16} />
-                            </button>
-                          )}
-                        </div>
-                      </div>
-                      <p className="text-gray-700 dark:text-gray-300">{comment.content}</p>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            </div>
-          </div>
         </div>
       </div>
     </div>
