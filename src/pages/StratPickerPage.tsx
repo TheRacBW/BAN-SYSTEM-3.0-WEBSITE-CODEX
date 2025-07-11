@@ -11,6 +11,7 @@ import { Plus, X, Check, Search } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { useKitReload } from '../hooks/useKitReload';
 import { useNavigate } from 'react-router-dom';
+import { KitType, KitTypeColors, KitTypeIcons } from '../types';
 
 const TABS = [
   { id: 'banaware', label: 'Ban-Aware Kit Recommendations', icon: <Lightbulb size={20} /> },
@@ -251,17 +252,64 @@ const StratPickerPage: React.FC = () => {
                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-200 mb-2">
                   Select 5 Kits for Your Strategy
                 </label>
-                {/* Kit selection UI placeholder (replace with actual kit selection logic) */}
-                <div className="grid grid-cols-2 gap-4 mb-4">
-                  {kits.slice(0, 10).map((kit) => (
-                    <div key={kit.id} className="p-3 rounded-lg border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900 flex items-center gap-3 cursor-pointer hover:shadow-md transition-shadow">
-                      <span className="font-semibold text-gray-800 dark:text-gray-100">{kit.name}</span>
-                    </div>
-                  ))}
+                {/* Search bar for kits */}
+                <div className="relative mb-4">
+                  <input
+                    type="text"
+                    placeholder="Search kits..."
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    className="w-full p-3 pl-10 border rounded-lg dark:bg-gray-700 dark:border-gray-600"
+                  />
+                  <Search className="absolute left-3 top-3.5 text-gray-400" size={16} />
+                </div>
+                {/* Kits organized by class/type */}
+                <div className="max-h-64 overflow-y-auto rounded-lg border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900 p-2">
+                  {Object.keys(KitTypeColors).map((type) => {
+                    const kitsOfType = filteredKits.filter(kit => kit.type === type);
+                    if (kitsOfType.length === 0) return null;
+                    return (
+                      <div key={type} className="mb-4">
+                        <div className="flex items-center gap-2 mb-2">
+                          <span className={`inline-flex items-center justify-center w-6 h-6 rounded-full ${KitTypeColors[type as KitType]}`}>{KitTypeIcons[type as KitType]}</span>
+                          <span className="font-semibold text-gray-800 dark:text-gray-100 text-sm">{type}</span>
+                        </div>
+                        <div className="grid grid-cols-6 gap-3">
+                          {kitsOfType.map((kit) => (
+                            <div
+                              key={kit.id}
+                              onClick={() => {
+                                if (selectedKits.includes(kit.id)) {
+                                  const idx = selectedKits.indexOf(kit.id);
+                                  removeKitFromStrategy(kit.id, idx);
+                                } else if (selectedKits.length < 5) {
+                                  addKitToStrategy(kit.id);
+                                }
+                              }}
+                              className={`transition-all transform cursor-pointer rounded-xl overflow-hidden relative group
+                                ${selectedKits.includes(kit.id)
+                                  ? 'ring-4 ring-blue-400/50 shadow-[0_0_15px_rgba(59,130,246,0.5)] bg-blue-100/10 dark:bg-blue-900/20'
+                                  : 'hover:ring-4 hover:ring-blue-300/40 hover:shadow-lg'}
+                              `}
+                              style={{ minWidth: 0 }}
+                            >
+                              <KitCard kit={kit} size="sm" />
+                              {/* Glow animation on hover */}
+                              <div className="absolute inset-0 pointer-events-none rounded-xl group-hover:shadow-[0_0_20px_4px_rgba(59,130,246,0.25)] group-hover:scale-105 transition-all duration-200" />
+                              {/* Selected overlay */}
+                              {selectedKits.includes(kit.id) && (
+                                <div className="absolute inset-0 bg-blue-400/10 border-2 border-blue-500 rounded-xl pointer-events-none animate-pulse" />
+                              )}
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    );
+                  })}
                 </div>
                 <button
                   type="button"
-                  className="btn btn-primary mt-2"
+                  className="btn btn-primary mt-4"
                   onClick={() => setCreateTab('details')}
                   disabled={selectedKits.length !== 5}
                 >

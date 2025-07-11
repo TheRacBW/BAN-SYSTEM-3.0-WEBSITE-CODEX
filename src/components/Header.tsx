@@ -37,11 +37,10 @@ const Header: React.FC = () => {
 
             <Link
               to="/strat-picker"
-              className="text-gray-600 dark:text-gray-300 hover:text-primary-600 dark:hover:text-primary-400 flex items-center gap-1"
+              className="text-gray-600 dark:text-gray-300 hover:text-primary-600 dark:hover:text-primary-400"
               title="Strat Picker"
             >
               <Compass size={20} />
-              <span className="hidden sm:inline font-medium">Strat Picker</span>
             </Link>
             
             <Link
