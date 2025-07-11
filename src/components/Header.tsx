@@ -1,6 +1,6 @@
 import React from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { Moon, Sun, User, LogOut, Plus, TrendingUp, Settings, Home, Users, Trophy } from 'lucide-react';
+import { Moon, Sun, User, LogOut, Plus, TrendingUp, Settings, Home, Users, Trophy, Compass } from 'lucide-react';
 import { useTheme } from '../context/ThemeContext';
 import { useAuth } from '../context/AuthContext';
 
@@ -33,6 +33,15 @@ const Header: React.FC = () => {
               title="Home"
             >
               <Home size={20} />
+            </Link>
+
+            <Link
+              to="/strat-picker"
+              className="text-gray-600 dark:text-gray-300 hover:text-primary-600 dark:hover:text-primary-400 flex items-center gap-1"
+              title="Strat Picker"
+            >
+              <Compass size={20} />
+              <span className="hidden sm:inline font-medium">Strat Picker</span>
             </Link>
             
             <Link

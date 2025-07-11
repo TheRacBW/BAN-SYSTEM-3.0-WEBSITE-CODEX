@@ -16,6 +16,7 @@ import AuthPage from './pages/AuthPage';
 import SettingsPage from './pages/SettingsPage';
 import PlayersPage from './pages/PlayersPage';
 import LeaderboardPage from './pages/LeaderboardPage';
+import StratPickerPage from './pages/StratPickerPage';
 
 function App() {
   return (
@@ -29,9 +30,8 @@ function App() {
                 
                 <main className="flex-grow container mx-auto px-4 py-6">
                   <Routes>
-                    <Route path="/" element={<HomePage />} />
-                    <Route path="/create" element={<CreateStrategyPage />} />
-                    <Route path="/trending" element={<TrendingPage />} />
+                    <Route path="/" element={<div className="text-center py-20 text-2xl font-bold">Home coming soon!</div>} />
+                    <Route path="/strat-picker" element={<StratPickerPage />} />
                     <Route path="/dashboard" element={<DashboardPage />} />
                     <Route path="/admin" element={<AdminPage />} />
                     <Route path="/admin/migration" element={<AdminMigrationPage />} />
