@@ -9,13 +9,15 @@ interface KitCardProps {
   onClick?: () => void;
   size?: 'sm' | 'md' | 'lg';
   showDetails?: boolean;
+  selected?: boolean;
 }
 
 const KitCard: React.FC<KitCardProps> = ({ 
   kit, 
   onClick, 
   size = 'md',
-  showDetails = true 
+  showDetails = true,
+  selected = false
 }) => {
   const { isBanned } = useBan();
   const { selectedKitId } = useKits();
@@ -25,7 +27,6 @@ const KitCard: React.FC<KitCardProps> = ({
   }
   
   const banned = isBanned(kit.id);
-  const selected = selectedKitId === kit.id;
   
   const sizeClasses = {
     sm: 'w-12 h-12',
@@ -44,7 +45,7 @@ const KitCard: React.FC<KitCardProps> = ({
 
   return (
     <div 
-      className={`kit-card ${bgColorClass} ${banned ? 'banned' : ''} ${selected ? 'selected' : ''}`}
+      className={`kit-card ${bgColorClass} ${banned ? 'banned' : ''} ${selected ? 'selected' : ''} relative z-0`}
       onClick={onClick}
     >
       <div className={`relative ${sizeClasses[size]}`}>
@@ -73,6 +74,12 @@ const KitCard: React.FC<KitCardProps> = ({
           </div>
         )}
       </div>
+      {/* Selected label (top left) - always render last for highest stacking */}
+      {selected && (
+        <span className="absolute top-0.8 -left-1 z-[999] px-2 py-0.5 rounded-md bg-blue-500 text-white text-xs font-bold shadow-md tracking-wide select-none" style={{letterSpacing: '0.03em'}}>
+          Selected
+        </span>
+      )}
       
       {showDetails && (
         <div className="mt-2 text-center w-full">

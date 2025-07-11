@@ -293,13 +293,13 @@ const StratPickerPage: React.FC = () => {
                               `}
                               style={{ minWidth: 0 }}
                             >
-                              <KitCard kit={kit} size="md" />
-                              {/* Glow animation on hover */}
-                              <div className="absolute inset-0 pointer-events-none rounded-xl group-hover:shadow-[0_0_20px_4px_rgba(59,130,246,0.25)] group-hover:scale-105 transition-all duration-200" />
-                              {/* Selected overlay */}
+                              {/* Glow animation on hover (behind card/label) */}
+                              <div className="absolute inset-0 pointer-events-none rounded-xl group-hover:shadow-[0_0_20px_4px_rgba(59,130,246,0.25)] group-hover:scale-105 transition-all duration-200 z-0" />
+                              {/* Selected overlay (behind card/label) */}
                               {selectedKits.includes(kit.id) && (
-                                <div className="absolute inset-0 bg-blue-400/10 border-2 border-blue-500 rounded-xl pointer-events-none animate-pulse" />
+                                <div className="absolute inset-0 bg-blue-400/10 border-2 border-blue-500 rounded-xl pointer-events-none animate-pulse z-10" />
                               )}
+                              <KitCard kit={kit} size="md" selected={selectedKits.includes(kit.id)} />
                             </div>
                           ))}
                         </div>
