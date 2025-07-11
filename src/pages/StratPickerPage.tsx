@@ -224,7 +224,7 @@ const StratPickerPage: React.FC = () => {
       );
     } else {
       tabContent = (
-        <div className="max-w-2xl mx-auto">
+        <div className="max-w-4xl mx-auto">
           <h1 className="text-2xl font-bold mb-6 text-gray-900 dark:text-white">Create New Strategy</h1>
           {/* Step/Tab System for Create Strategy */}
           <div className="mb-8">
@@ -245,7 +245,7 @@ const StratPickerPage: React.FC = () => {
               ))}
             </div>
           </div>
-          <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-6 mb-6">
+          <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-8 mb-6 w-full">
             {/* Tabbed form content */}
             {createTab === 'kits' && (
               <div>
@@ -264,17 +264,17 @@ const StratPickerPage: React.FC = () => {
                   <Search className="absolute left-3 top-3.5 text-gray-400" size={16} />
                 </div>
                 {/* Kits organized by class/type */}
-                <div className="max-h-64 overflow-y-auto rounded-lg border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900 p-2">
+                <div className="max-h-96 overflow-y-auto rounded-lg border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900 p-4">
                   {Object.keys(KitTypeColors).map((type) => {
                     const kitsOfType = filteredKits.filter(kit => kit.type === type);
                     if (kitsOfType.length === 0) return null;
                     return (
-                      <div key={type} className="mb-4">
-                        <div className="flex items-center gap-2 mb-2">
-                          <span className={`inline-flex items-center justify-center w-6 h-6 rounded-full ${KitTypeColors[type as KitType]}`}>{KitTypeIcons[type as KitType]}</span>
-                          <span className="font-semibold text-gray-800 dark:text-gray-100 text-sm">{type}</span>
+                      <div key={type} className="mb-6">
+                        <div className="flex items-center gap-2 mb-3">
+                          <span className={`inline-flex items-center justify-center w-7 h-7 rounded-full ${KitTypeColors[type as KitType]}`}>{KitTypeIcons[type as KitType]}</span>
+                          <span className="font-semibold text-gray-800 dark:text-gray-100 text-base">{type}</span>
                         </div>
-                        <div className="grid grid-cols-6 gap-3">
+                        <div className="grid grid-cols-6 gap-5">
                           {kitsOfType.map((kit) => (
                             <div
                               key={kit.id}
@@ -293,7 +293,7 @@ const StratPickerPage: React.FC = () => {
                               `}
                               style={{ minWidth: 0 }}
                             >
-                              <KitCard kit={kit} size="sm" />
+                              <KitCard kit={kit} size="md" />
                               {/* Glow animation on hover */}
                               <div className="absolute inset-0 pointer-events-none rounded-xl group-hover:shadow-[0_0_20px_4px_rgba(59,130,246,0.25)] group-hover:scale-105 transition-all duration-200" />
                               {/* Selected overlay */}

@@ -79,9 +79,6 @@ const KitCard: React.FC<KitCardProps> = ({
           <h3 className={`font-medium truncate text-white ${size === 'sm' ? 'text-xs' : 'text-sm'}`}>
             {kit.name}
           </h3>
-          <p className={`text-xs uppercase text-white/80 ${size === 'sm' ? 'hidden' : ''}`}>
-            {kit.type}
-          </p>
         </div>
       )}
     </div>
