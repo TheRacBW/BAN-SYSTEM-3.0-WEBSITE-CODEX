@@ -44,14 +44,6 @@ const Header: React.FC = () => {
             </Link>
             
             <Link
-              to="/trending"
-              className="text-gray-600 dark:text-gray-300 hover:text-primary-600 dark:hover:text-primary-400"
-              title="Trending Strategies"
-            >
-              <TrendingUp size={20} />
-            </Link>
-
-            <Link
               to="/leaderboard"
               className="text-gray-600 dark:text-gray-300 hover:text-primary-600 dark:hover:text-primary-400"
               title="Leaderboard"
@@ -61,14 +53,6 @@ const Header: React.FC = () => {
             
             {user && (
               <>
-                <Link
-                  to="/create"
-                  className="text-gray-600 dark:text-gray-300 hover:text-primary-600 dark:hover:text-primary-400"
-                  title="Create Strategy"
-                >
-                  <Plus size={20} />
-                </Link>
-
                 <Link
                   to="/players"
                   className="text-gray-600 dark:text-gray-300 hover:text-primary-600 dark:hover:text-primary-400"
