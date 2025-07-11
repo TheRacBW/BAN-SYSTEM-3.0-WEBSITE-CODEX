@@ -285,23 +285,34 @@ const StratPickerPage: React.FC = () => {
                                 const kitCount = selectedKits.filter(id => id === kit.id).length;
                                 const totalSelected = selectedKits.length;
                                 const isDecrementing = decrementModeKits.has(kit.id);
-                                if (!isDecrementing && kitCount < 5 && totalSelected < 5) {
-                                  addKitToStrategy(kit.id);
-                                  if (kitCount + 1 === 5) {
+                                const maxForThisKit = Math.min(5, 5 - totalSelected + kitCount);
+                                if (isDecrementing) {
+                                  if (kitCount > 0) {
+                                    const idx = selectedKits.lastIndexOf(kit.id);
+                                    removeKitFromStrategy(kit.id, idx);
+                                    if (kitCount - 1 === 0) {
+                                      const newSet = new Set(decrementModeKits);
+                                      newSet.delete(kit.id);
+                                      setDecrementModeKits(newSet);
+                                    }
+                                  }
+                                } else {
+                                  if (totalSelected < 5) {
+                                    addKitToStrategy(kit.id);
+                                    if (kitCount + 1 === 5 || totalSelected + 1 === 5) {
+                                      setDecrementModeKits(new Set(decrementModeKits).add(kit.id));
+                                    }
+                                  } else if (kitCount > 0) {
+                                    // If at max, start decrementing
                                     setDecrementModeKits(new Set(decrementModeKits).add(kit.id));
+                                    const idx = selectedKits.lastIndexOf(kit.id);
+                                    removeKitFromStrategy(kit.id, idx);
+                                    if (kitCount - 1 === 0) {
+                                      const newSet = new Set(decrementModeKits);
+                                      newSet.delete(kit.id);
+                                      setDecrementModeKits(newSet);
+                                    }
                                   }
-                                } else if (kitCount > 0) {
-                                  // Decrement mode: keep removing until 0
-                                  const idx = selectedKits.lastIndexOf(kit.id);
-                                  removeKitFromStrategy(kit.id, idx);
-                                  if (kitCount - 1 === 0) {
-                                    const newSet = new Set(decrementModeKits);
-                                    newSet.delete(kit.id);
-                                    setDecrementModeKits(newSet);
-                                  }
-                                } else if (kitCount === 0) {
-                                  // Start incrementing again
-                                  addKitToStrategy(kit.id);
                                 }
                               }}
                               className={`transition-all transform cursor-pointer rounded-xl overflow-hidden relative group
