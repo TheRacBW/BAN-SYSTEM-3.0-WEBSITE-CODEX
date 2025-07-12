@@ -856,4 +856,29 @@ export async function getCurrentlyRankingPlayers(): Promise<LeaderboardEntry[]> 
   // 6. Sort by rank_position ascending
   enriched.sort((a, b) => a.rank_position - b.rank_position);
   return enriched;
+}
+
+/**
+ * Run the egress optimizer cleanup function
+ * Reduces database egress costs by removing redundant historical data
+ */
+export async function runEgressOptimizer(): Promise<any> {
+  try {
+    console.log('🧹 Starting egress optimizer cleanup...');
+    
+    const { data, error } = await supabase.rpc('egress_optimizer_comprehensive_enhanced_cleanup');
+    
+    if (error) {
+      console.error('❌ Egress optimizer error:', error);
+      throw error;
+    }
+
+    console.log('✅ Egress optimizer completed successfully');
+    console.log('📊 Cleanup results:', data);
+    
+    return data;
+  } catch (error) {
+    console.error('💥 Error in runEgressOptimizer:', error);
+    throw error;
+  }
 } 

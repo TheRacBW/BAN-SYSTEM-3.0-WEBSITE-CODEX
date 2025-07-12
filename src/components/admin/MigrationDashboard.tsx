@@ -21,6 +21,7 @@ import { UsernameChangeData, UsernameChangeStatistics } from '../../lib/username
 import MigrationProgress from './MigrationProgress';
 import MigrationStats from './MigrationStats';
 import UsernameChangeCard from './UsernameChangeCard';
+import EgressOptimizer from './EgressOptimizer';
 import { supabase } from '../../lib/supabase';
 
 interface MigrationDashboardProps {
@@ -456,6 +457,9 @@ const MigrationDashboard: React.FC<MigrationDashboardProps> = ({ className = '' 
         overallProgress={coordinatorState.overallProgress}
         lastError={coordinatorState.lastError}
       />
+
+      {/* Egress Optimizer */}
+      <EgressOptimizer />
 
       {/* Username Changes Section */}
       {coordinatorState.usernameChanges.length > 0 && (
