@@ -28,7 +28,7 @@ const StrategyCard: React.FC<StrategyCardProps> = ({
   const { isBanned } = useBan();
   const { user, isAdmin } = useAuth();
   const [isSaved, setIsSaved] = useState(false);
-  const [error, setError] = useState<boolean | null>(null);
+  const [error, setError] = useState<boolean | undefined>(undefined);
   const [errorMessage, setErrorMessage] = useState<string>('');
   const [creatorName, setCreatorName] = useState<string>('Unknown');
   const [isActive, setIsActive] = useState(strategy.isActive ?? true);
@@ -192,7 +192,7 @@ const StrategyCard: React.FC<StrategyCardProps> = ({
     if (!user) return;
 
     try {
-      setError(null);
+      setError(undefined);
       setErrorMessage('');
 
       const { data: existingStrategy, error: selectError } = await supabase
@@ -323,14 +323,14 @@ const StrategyCard: React.FC<StrategyCardProps> = ({
   const bannedKitsCount = kits.filter(kitId => isBanned(kitId)).length;
   
   const borderClass = isSelected 
-    ? 'border-primary-500 dark:border-primary-400 ring-2 ring-primary-300 dark:ring-primary-700' 
+    ? 'border-primary-500 dark:border-primary-400 ring-2 ring-primary-300 dark:ring-primary-700 shadow-lg shadow-primary-500/20 dark:shadow-primary-400/20' 
     : hasBannedKits 
       ? 'border-red-300 dark:border-red-800' 
       : 'border-gray-200 dark:border-gray-700';
 
   return (
     <div 
-      className={`combo-card ${borderClass} ${hasBannedKits ? 'opacity-75' : ''} relative`}
+      className={`combo-card ${borderClass} ${hasBannedKits ? 'opacity-75' : ''} relative transition-all duration-200 ease-in-out hover:shadow-lg hover:shadow-primary-500/10 dark:hover:shadow-primary-400/10 hover:scale-[1.01] hover:border-primary-300 dark:hover:border-primary-600 cursor-pointer`}
       onClick={onClick}
     >
       <div className="flex justify-between items-start mb-3">
