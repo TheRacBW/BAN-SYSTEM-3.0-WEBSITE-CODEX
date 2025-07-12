@@ -11,7 +11,9 @@ import {
   Calendar,
   Database,
   TrendingDown,
-  HardDrive
+  HardDrive,
+  ChevronDown,
+  ChevronRight
 } from 'lucide-react';
 import { runEgressOptimizer } from '../../services/leaderboardService';
 
@@ -24,6 +26,22 @@ interface CleanupResult {
   old_after: number;
   total_removed: number;
   space_saved_mb: number;
+}
+
+interface CleanupPhaseStats {
+  phase: string;
+  totalRemoved: number;
+  spaceSaved: number;
+  tablesAffected: string[];
+}
+
+interface CleanupSummary {
+  totalRecordsRemoved: number;
+  totalSpaceSaved: number;
+  phases: CleanupPhaseStats[];
+  tablesAffected: string[];
+  mostEffectivePhase: string;
+  mostAffectedTable: string;
 }
 
 interface CleanupHistory {
@@ -50,8 +68,10 @@ const EgressOptimizer: React.FC = () => {
   });
   const [cleanupHistory, setCleanupHistory] = useState<CleanupHistory[]>([]);
   const [lastResult, setLastResult] = useState<CleanupResult[] | null>(null);
+  const [lastAnalysis, setLastAnalysis] = useState<CleanupSummary | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
+  const [showDetailedResults, setShowDetailedResults] = useState(false);
   const schedulerRef = useRef<NodeJS.Timeout | null>(null);
 
   // Load settings and history from localStorage on mount
@@ -155,22 +175,22 @@ const EgressOptimizer: React.FC = () => {
       
       if (data && Array.isArray(data)) {
         const results = data as CleanupResult[];
-        const totalRecordsRemoved = results.reduce((sum, result) => sum + result.total_removed, 0);
-        const totalSpaceSaved = results.reduce((sum, result) => sum + result.space_saved_mb, 0);
+        const analysis = analyzeCleanupResults(results);
 
         const historyEntry: CleanupHistory = {
           id: Date.now().toString(),
           timestamp: new Date().toISOString(),
           results,
-          totalRecordsRemoved,
-          totalSpaceSaved,
+          totalRecordsRemoved: analysis.totalRecordsRemoved,
+          totalSpaceSaved: analysis.totalSpaceSaved,
           status: 'success'
         };
 
         const newHistory = [historyEntry, ...cleanupHistory];
         saveHistory(newHistory);
         setLastResult(results);
-        setSuccess(`✅ Cleanup completed! Removed ${totalRecordsRemoved.toLocaleString()} records and saved ${totalSpaceSaved.toFixed(2)} MB.`);
+        setLastAnalysis(analysis);
+        setSuccess(`✅ Cleanup completed! Removed ${analysis.totalRecordsRemoved.toLocaleString()} records and saved ${analysis.totalSpaceSaved.toFixed(2)} MB.`);
       } else {
         throw new Error('No data returned from cleanup function');
       }
@@ -238,6 +258,68 @@ const EgressOptimizer: React.FC = () => {
     return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
   };
 
+  const analyzeCleanupResults = (results: CleanupResult[]): CleanupSummary => {
+    const summary: CleanupSummary = {
+      totalRecordsRemoved: 0,
+      totalSpaceSaved: 0,
+      phases: [],
+      tablesAffected: [],
+      mostEffectivePhase: '',
+      mostAffectedTable: ''
+    };
+
+    // Group by phase
+    const phaseMap = new Map<string, CleanupPhaseStats>();
+    const tableSet = new Set<string>();
+    let maxRemoved = 0;
+    let maxTableRemoved = 0;
+    let mostEffectivePhase = '';
+    let mostAffectedTable = '';
+
+    results.forEach(result => {
+      // Add to total
+      summary.totalRecordsRemoved += result.total_removed;
+      summary.totalSpaceSaved += result.space_saved_mb;
+      tableSet.add(result.table_name);
+
+      // Group by phase
+      if (!phaseMap.has(result.phase)) {
+        phaseMap.set(result.phase, {
+          phase: result.phase,
+          totalRemoved: 0,
+          spaceSaved: 0,
+          tablesAffected: []
+        });
+      }
+
+      const phase = phaseMap.get(result.phase)!;
+      phase.totalRemoved += result.total_removed;
+      phase.spaceSaved += result.space_saved_mb;
+      if (!phase.tablesAffected.includes(result.table_name)) {
+        phase.tablesAffected.push(result.table_name);
+      }
+
+      // Track most effective phase
+      if (result.total_removed > maxRemoved) {
+        maxRemoved = result.total_removed;
+        mostEffectivePhase = result.phase;
+      }
+
+      // Track most affected table
+      if (result.total_removed > maxTableRemoved) {
+        maxTableRemoved = result.total_removed;
+        mostAffectedTable = result.table_name;
+      }
+    });
+
+    summary.phases = Array.from(phaseMap.values());
+    summary.tablesAffected = Array.from(tableSet);
+    summary.mostEffectivePhase = mostEffectivePhase;
+    summary.mostAffectedTable = mostAffectedTable;
+
+    return summary;
+  };
+
   return (
     <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-6">
       {/* Header */}
@@ -262,17 +344,17 @@ const EgressOptimizer: React.FC = () => {
       </div>
 
       {/* Quick Stats */}
-      {lastResult && (
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+      {lastAnalysis && (
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
           <div className="bg-blue-50 dark:bg-blue-900/30 rounded-lg p-4">
             <div className="flex items-center gap-2">
               <Database className="w-5 h-5 text-blue-600 dark:text-blue-400" />
-              <span className="text-sm font-medium text-blue-700 dark:text-blue-300">Last Cleanup</span>
+              <span className="text-sm font-medium text-blue-700 dark:text-blue-300">Records Removed</span>
             </div>
             <p className="text-2xl font-bold text-blue-900 dark:text-blue-100">
-              {lastResult.reduce((sum, r) => sum + r.total_removed, 0).toLocaleString()}
+              {lastAnalysis.totalRecordsRemoved.toLocaleString()}
             </p>
-            <p className="text-xs text-blue-600 dark:text-blue-400">records removed</p>
+            <p className="text-xs text-blue-600 dark:text-blue-400">total across all phases</p>
           </div>
           
           <div className="bg-green-50 dark:bg-green-900/30 rounded-lg p-4">
@@ -281,7 +363,7 @@ const EgressOptimizer: React.FC = () => {
               <span className="text-sm font-medium text-green-700 dark:text-green-300">Space Saved</span>
             </div>
             <p className="text-2xl font-bold text-green-900 dark:text-green-100">
-              {lastResult.reduce((sum, r) => sum + r.space_saved_mb, 0).toFixed(2)}
+              {lastAnalysis.totalSpaceSaved.toFixed(2)}
             </p>
             <p className="text-xs text-green-600 dark:text-green-400">MB</p>
           </div>
@@ -292,9 +374,20 @@ const EgressOptimizer: React.FC = () => {
               <span className="text-sm font-medium text-purple-700 dark:text-purple-300">Cost Reduction</span>
             </div>
             <p className="text-2xl font-bold text-purple-900 dark:text-purple-100">
-              ~{Math.round(lastResult.reduce((sum, r) => sum + r.space_saved_mb, 0) * 0.1 * 100) / 100}
+              ~{Math.round(lastAnalysis.totalSpaceSaved * 0.1 * 100) / 100}
             </p>
             <p className="text-xs text-purple-600 dark:text-purple-400">USD/month</p>
+          </div>
+
+          <div className="bg-orange-50 dark:bg-orange-900/30 rounded-lg p-4">
+            <div className="flex items-center gap-2">
+              <Settings className="w-5 h-5 text-orange-600 dark:text-orange-400" />
+              <span className="text-sm font-medium text-orange-700 dark:text-orange-300">Phases</span>
+            </div>
+            <p className="text-2xl font-bold text-orange-900 dark:text-orange-100">
+              {lastAnalysis.phases.length}
+            </p>
+            <p className="text-xs text-orange-600 dark:text-orange-400">cleanup phases</p>
           </div>
         </div>
       )}
@@ -379,6 +472,107 @@ const EgressOptimizer: React.FC = () => {
         </div>
       </div>
 
+      {/* Detailed Results */}
+      {lastAnalysis && (
+        <div className="mb-6">
+          <button
+            onClick={() => setShowDetailedResults(!showDetailedResults)}
+            className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white transition-colors"
+          >
+            {showDetailedResults ? (
+              <>
+                <ChevronDown className="w-4 h-4" />
+                Hide Detailed Results
+              </>
+            ) : (
+              <>
+                <ChevronRight className="w-4 h-4" />
+                Show Detailed Results
+              </>
+            )}
+          </button>
+
+          {showDetailedResults && (
+            <div className="mt-4 space-y-6">
+              {/* Phase Breakdown */}
+              <div className="bg-gray-50 dark:bg-gray-800 rounded-lg p-4">
+                <h4 className="text-lg font-medium text-gray-900 dark:text-white mb-3">Phase Breakdown</h4>
+                <div className="space-y-3">
+                  {lastAnalysis.phases.map((phase, index) => (
+                    <div key={index} className="flex items-center justify-between p-3 bg-white dark:bg-gray-700 rounded-lg">
+                      <div className="flex-1">
+                        <div className="font-medium text-gray-900 dark:text-white">{phase.phase}</div>
+                        <div className="text-sm text-gray-600 dark:text-gray-400">
+                          Tables: {phase.tablesAffected.join(', ')}
+                        </div>
+                      </div>
+                      <div className="text-right">
+                        <div className="font-bold text-gray-900 dark:text-white">
+                          {phase.totalRemoved.toLocaleString()} records
+                        </div>
+                        <div className="text-sm text-gray-600 dark:text-gray-400">
+                          {phase.spaceSaved.toFixed(2)} MB saved
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Table Impact */}
+              <div className="bg-gray-50 dark:bg-gray-800 rounded-lg p-4">
+                <h4 className="text-lg font-medium text-gray-900 dark:text-white mb-3">Table Impact</h4>
+                <div className="space-y-3">
+                  {lastResult && Object.entries(lastResult.reduce((acc, result) => {
+                    if (!acc[result.table_name]) {
+                      acc[result.table_name] = { totalRemoved: 0, spaceSaved: 0, phases: [] };
+                    }
+                    acc[result.table_name].totalRemoved += result.total_removed;
+                    acc[result.table_name].spaceSaved += result.space_saved_mb;
+                    if (!acc[result.table_name].phases.includes(result.phase)) {
+                      acc[result.table_name].phases.push(result.phase);
+                    }
+                    return acc;
+                  }, {} as Record<string, { totalRemoved: number; spaceSaved: number; phases: string[] }>)).map(([tableName, stats]) => (
+                    <div key={tableName} className="flex items-center justify-between p-3 bg-white dark:bg-gray-700 rounded-lg">
+                      <div className="flex-1">
+                        <div className="font-medium text-gray-900 dark:text-white">{tableName}</div>
+                        <div className="text-sm text-gray-600 dark:text-gray-400">
+                          Phases: {stats.phases.join(', ')}
+                        </div>
+                      </div>
+                      <div className="text-right">
+                        <div className="font-bold text-gray-900 dark:text-white">
+                          {stats.totalRemoved.toLocaleString()} records
+                        </div>
+                        <div className="text-sm text-gray-600 dark:text-gray-400">
+                          {stats.spaceSaved.toFixed(2)} MB saved
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Key Insights */}
+              <div className="bg-gray-50 dark:bg-gray-800 rounded-lg p-4">
+                <h4 className="text-lg font-medium text-gray-900 dark:text-white mb-3">Key Insights</h4>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="p-3 bg-blue-50 dark:bg-blue-900/30 rounded-lg">
+                    <div className="text-sm font-medium text-blue-700 dark:text-blue-300">Most Effective Phase</div>
+                    <div className="text-lg font-bold text-blue-900 dark:text-blue-100">{lastAnalysis.mostEffectivePhase}</div>
+                  </div>
+                  <div className="p-3 bg-green-50 dark:bg-green-900/30 rounded-lg">
+                    <div className="text-sm font-medium text-green-700 dark:text-green-300">Most Affected Table</div>
+                    <div className="text-lg font-bold text-green-900 dark:text-green-100">{lastAnalysis.mostAffectedTable}</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
       {/* Cleanup History */}
       <div className="space-y-4">
         <h3 className="text-lg font-medium text-gray-900 dark:text-white">Cleanup History</h3>
@@ -419,19 +613,26 @@ const EgressOptimizer: React.FC = () => {
                 </div>
                 
                 {entry.status === 'success' ? (
-                  <div className="grid grid-cols-2 gap-4 text-sm">
-                    <div>
-                      <span className="text-gray-600 dark:text-gray-400">Records removed:</span>
-                      <span className="ml-2 font-medium text-gray-900 dark:text-white">
-                        {entry.totalRecordsRemoved.toLocaleString()}
-                      </span>
+                  <div className="space-y-2">
+                    <div className="grid grid-cols-2 gap-4 text-sm">
+                      <div>
+                        <span className="text-gray-600 dark:text-gray-400">Records removed:</span>
+                        <span className="ml-2 font-medium text-gray-900 dark:text-white">
+                          {entry.totalRecordsRemoved.toLocaleString()}
+                        </span>
+                      </div>
+                      <div>
+                        <span className="text-gray-600 dark:text-gray-400">Space saved:</span>
+                        <span className="ml-2 font-medium text-gray-900 dark:text-white">
+                          {entry.totalSpaceSaved.toFixed(2)} MB
+                        </span>
+                      </div>
                     </div>
-                    <div>
-                      <span className="text-gray-600 dark:text-gray-400">Space saved:</span>
-                      <span className="ml-2 font-medium text-gray-900 dark:text-white">
-                        {entry.totalSpaceSaved.toFixed(2)} MB
-                      </span>
-                    </div>
+                    {entry.results.length > 0 && (
+                      <div className="text-xs text-gray-500 dark:text-gray-400">
+                        Phases: {entry.results.map(r => r.phase).filter((v, i, a) => a.indexOf(v) === i).join(', ')}
+                      </div>
+                    )}
                   </div>
                 ) : (
                   <div className="text-sm text-red-600 dark:text-red-400">
