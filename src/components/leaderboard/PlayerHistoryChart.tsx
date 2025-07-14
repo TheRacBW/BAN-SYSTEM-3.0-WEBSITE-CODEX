@@ -339,15 +339,16 @@ const PlayerHistoryChart: React.FC<{ data: RPChangeEntry[]; stats?: any }> = ({ 
             labelFormatter={(_, payload) => {
               if (!payload || !payload.length) return '';
               const entry = payload[0].payload;
-              const date = new Date(entry.change_timestamp);
-              return `${formatDate(date.toISOString())} (${entry.dataDensity} pts)`;
+              // Use the original date, not chartX
+              return formatDate(new Date(entry.change_timestamp).toISOString());
             }}
-            content={({ active, payload, label }) => {
+            content={({ active, payload }) => {
               if (active && payload && payload.length > 0) {
                 const entry = payload[0].payload;
+                const dateLabel = formatDate(new Date(entry.change_timestamp).toISOString());
                 return (
                   <div style={{ background: '#1F2937', border: '1px solid #374151', color: '#fff', padding: 10, borderRadius: 8 }}>
-                    <div><strong>{label}</strong></div>
+                    <div><strong>{dateLabel}</strong></div>
                     <div>Rank: {entry.displayRank}</div>
                     <div>RP: {entry.new_rp}</div>
                   </div>
