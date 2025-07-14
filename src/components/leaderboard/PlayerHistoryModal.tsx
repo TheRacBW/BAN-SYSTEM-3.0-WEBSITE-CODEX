@@ -3,10 +3,14 @@ import type { PlayerHistoryModalProps, RPChangeEntry } from '../../types/leaderb
 import { usePlayerHistory } from '../../hooks/usePlayerHistory';
 import PlayerStatsCard from './PlayerStatsCard';
 import PlayerHistoryChart from './PlayerHistoryChart';
+import { useState } from 'react';
+import PlayerRankPositionChart from './PlayerRankPositionChart';
 import * as FaIcons from 'react-icons/fa';
 
 const PlayerHistoryModal: React.FC<PlayerHistoryModalProps> = ({ username, isVisible, onClose }) => {
   const { data, stats, loading, error } = usePlayerHistory(username, isVisible);
+
+  const [activeTab, setActiveTab] = useState<'rp' | 'rank'>('rp');
 
   if (!isVisible) return null;
 
@@ -89,6 +93,21 @@ const PlayerHistoryModal: React.FC<PlayerHistoryModalProps> = ({ username, isVis
         )}
         {!loading && !error && data && data.length > 0 && (
           <>
+            {/* Tab UI */}
+            <div className="flex mb-4 gap-2">
+              <button
+                className={`px-4 py-2 rounded-t-lg font-semibold focus:outline-none transition-colors ${activeTab === 'rp' ? 'bg-gray-800 text-blue-400' : 'bg-gray-700 text-gray-300 hover:bg-gray-600'}`}
+                onClick={() => setActiveTab('rp')}
+              >
+                RP History
+              </button>
+              <button
+                className={`px-4 py-2 rounded-t-lg font-semibold focus:outline-none transition-colors ${activeTab === 'rank' ? 'bg-gray-800 text-blue-400' : 'bg-gray-700 text-gray-300 hover:bg-gray-600'}`}
+                onClick={() => setActiveTab('rank')}
+              >
+                Rank Position
+              </button>
+            </div>
             {/* Modern info box */}
             <div className="flex flex-wrap gap-4 items-center justify-start bg-gray-800 rounded-lg px-6 py-4 mb-2 shadow">
               <div className="flex items-center gap-2 text-yellow-400 text-base font-semibold">
@@ -118,7 +137,12 @@ const PlayerHistoryModal: React.FC<PlayerHistoryModalProps> = ({ username, isVis
                 <span className="font-bold text-white">{joinedDate}</span>
               </div>
             </div>
-            <PlayerHistoryChart data={data} />
+            {/* Tab content: show the selected graph */}
+            {activeTab === 'rp' ? (
+              <PlayerHistoryChart data={data} />
+            ) : (
+              <PlayerRankPositionChart data={data} />
+            )}
           </>
         )}
       </div>
