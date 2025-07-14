@@ -217,15 +217,22 @@ const PlayerHistoryChart: React.FC<{ data: RPChangeEntry[]; stats?: any }> = ({ 
     return acc;
   }, {} as Record<string, string>);
 
-  // Build gradient stops for the line
-  const getRankColor = (rankName: string) => {
-    const zone = RANK_ZONES.find(z => z.name.toLowerCase() === rankName.toLowerCase());
-    return zone ? zone.color : '#3B82F6';
-  };
-  const stops = chartData.map((pt, i) => {
-    const offset = (i / (chartData.length - 1)) * 100;
-    return { color: getRankColor(pt.displayRank), offset: `${offset}%` };
-  });
+  // Build gradient stops for the line based on weighted X and rank transitions
+  const stops = [];
+  let lastColor = null;
+  for (const pt of chartData) {
+    const color = getRankColor(pt.displayRank);
+    const offset = `${(pt.chartX * 100).toFixed(2)}%`;
+    if (color !== lastColor) {
+      stops.push({ color, offset });
+      lastColor = color;
+    }
+  }
+  // Always add the last point
+  if (stops.length === 0 || stops[stops.length - 1].offset !== '100.00%') {
+    const lastPt = chartData[chartData.length - 1];
+    stops.push({ color: getRankColor(lastPt.displayRank), offset: '100%' });
+  }
 
   // Calculate rank positions from actual chart data
   const calculateRankPositions = (chartData: ChartDataPoint[]) => {
@@ -279,7 +286,7 @@ const PlayerHistoryChart: React.FC<{ data: RPChangeEntry[]; stats?: any }> = ({ 
                 <stop offset="100%" stopColor={zone.gradient[1]} />
               </linearGradient>
             ))}
-            {/* Gradient for the line */}
+            {/* Gradient for the line: stops at rank transitions, weighted by chartX */}
             <linearGradient id="rank-gradient" x1="0" y1="0" x2="1" y2="0">
               {stops.map((stop, i) => (
                 <stop key={i} offset={stop.offset} stopColor={stop.color} />
