@@ -13,6 +13,7 @@ import {
 } from 'recharts';
 import { getRankTierInfo, getLadderScore } from '../../utils/rankingSystem';
 import * as FaIcons from 'react-icons/fa';
+import { startOfDay, formatISO } from 'date-fns';
 
 // Define rank zones and gradients (should match your system)
 const RANK_ZONES = [
@@ -125,38 +126,79 @@ const FLAT_LINE_COLORS: Record<string, string> = {
   BRONZE: "#CD7C32",    // bronze
 };
 
+// --- Dynamic density-based visual weighting utilities ---
+interface DaySegment {
+  date: string;
+  points: RPChangeEntry[];
+  dataPoints: number;
+  visualWeight: number;
+  chartStart: number;
+  chartEnd: number;
+  chartWidth: number;
+}
+
+function groupByDay(data: RPChangeEntry[]) {
+  const groups: Record<string, RPChangeEntry[]> = {};
+  data.forEach(d => {
+    const day = formatISO(startOfDay(new Date(d.change_timestamp)), { representation: 'date' });
+    if (!groups[day]) groups[day] = [];
+    groups[day].push(d);
+  });
+  return Object.entries(groups).map(([date, points]) => ({ date, points }));
+}
+function calculateVisualWeight(dataPointsInDay: RPChangeEntry[]) {
+  const BASE_WEIGHT = 1.0, MAX_POINTS_PER_DAY = 50, MIN_VISUAL_WEIGHT = 0.2;
+  const normalizedDensity = Math.min(dataPointsInDay.length / MAX_POINTS_PER_DAY, 1.0);
+  const visualWeight = BASE_WEIGHT - (normalizedDensity * 0.8);
+  return Math.max(visualWeight, MIN_VISUAL_WEIGHT);
+}
+function buildSegments(data: RPChangeEntry[]): DaySegment[] {
+  const dayGroups = groupByDay(data);
+  const dayDensity = dayGroups.map(day => ({
+    date: day.date,
+    dataPoints: day.points.length,
+    points: day.points,
+    visualWeight: calculateVisualWeight(day.points)
+  }));
+  const totalWeight = dayDensity.reduce((sum, d) => sum + d.visualWeight, 0);
+  let accWidth = 0;
+  return dayDensity.map(day => {
+    const width = day.visualWeight / totalWeight;
+    const segment: DaySegment = {
+      ...day,
+      chartStart: accWidth,
+      chartEnd: accWidth + width,
+      chartWidth: width
+    };
+    accWidth += width;
+    return segment;
+  });
+}
+function mapDataToWeightedX(segments: DaySegment[]) {
+  return segments.flatMap(segment => {
+    const { points, chartStart, chartEnd } = segment;
+    if (points.length === 1) {
+      return [{ ...points[0], chartX: (chartStart + chartEnd) / 2, dataDensity: points.length }];
+    }
+    return points.map((pt, i) => ({
+      ...pt,
+      chartX: chartStart + (chartEnd - chartStart) * (i / (points.length - 1 || 1)),
+      dataDensity: points.length
+    }));
+  });
+}
+
 const PlayerHistoryChart: React.FC<{ data: RPChangeEntry[]; stats?: any }> = ({ data, stats }) => {
   if (!data || data.length === 0) return null;
 
-  // Calculate joined leaderboard date (first entry)
-  const joinedDate = data[0]?.change_timestamp ? formatDate(data[0].change_timestamp) : '—';
-
-  // Calculate highest RP and rank
-  const highestEntry = data.reduce((max, entry) => (entry.new_rp > max.new_rp ? entry : max), data[0]);
-  const highestRP = highestEntry?.new_rp ?? '—';
-  const highestRank = highestEntry?.new_calculated_rank ?? '—';
-
-  // Calculate current rank
-  const currentEntry = data[data.length - 1];
-  const currentRank = currentEntry?.new_calculated_rank ?? '—';
-
-  // Calculate total RP gained
-  const totalRPGained = (data[data.length - 1]?.new_rp ?? 0) - (data[0]?.previous_rp ?? 0);
-
-  // Calculate promotions (number)
-  const promotions = data.filter((e, i) => i > 0 && e.new_calculated_rank !== data[i-1].new_calculated_rank).length;
-  // Promotion events (array) for chart markers
-  const promotionEvents = data.filter((e, i) => i > 0 && e.new_calculated_rank !== data[i-1].new_calculated_rank);
-
-  // Prepare chart data: add displayRank, ladderScore, and timestamp
-  const chartData = data.map(entry => ({
-    ...entry,
-    displayRank: getDisplayRank(entry),
-    ladderScore: getLadderScore(getDisplayRank(entry), entry.new_rp),
-    timestamp: new Date(entry.change_timestamp).getTime(),
+  // --- Dynamic segment calculation ---
+  const segments = buildSegments(data);
+  const chartData = mapDataToWeightedX(segments).map(d => ({
+    ...d,
+    displayRank: getDisplayRank(d),
+    ladderScore: getLadderScore(getDisplayRank(d), d.new_rp),
   }));
-  // Sort by timestamp
-  chartData.sort((a, b) => a.timestamp - b.timestamp);
+  chartData.sort((a, b) => a.chartX - b.chartX);
 
   // Defensive check for allSameY: only true if at least two points
   const allSameY = chartData.length > 1 && chartData.every(pt => pt.ladderScore === chartData[0].ladderScore);
@@ -217,38 +259,27 @@ const PlayerHistoryChart: React.FC<{ data: RPChangeEntry[]; stats?: any }> = ({ 
     return rankTicks;
   };
 
-  const findRankTransitions = (chartData: ChartDataPoint[]) => {
-    const transitions = [];
-    for (let i = 1; i < chartData.length; i++) {
-      const prev = chartData[i - 1];
-      const curr = chartData[i];
-      if (prev.displayRank !== curr.displayRank) {
-        transitions.push({
-          fromRank: prev.displayRank,
-          toRank: curr.displayRank,
-          fromTotalRP: prev.ladderScore,
-          toTotalRP: curr.ladderScore,
-          timestamp: curr.change_timestamp
-        });
-      }
-    }
-    return transitions;
-  };
-
-  // Calculate rank ticks and log debug info
-  const rankTicks = useRankBasedYAxis(chartData);
-  // Debug: log the values
-  console.log('Rank Positions from Data:');
-  rankTicks.forEach(tick => {
-    console.log(`${tick.label}: ${tick.value}`);
-  });
-  const transitions = findRankTransitions(chartData);
-  console.log('Rank Transitions:', transitions);
-
   // Custom tick formatter for Y-axis
+  const rankTicks = useRankBasedYAxis(chartData);
   const formatYAxisTick = (value: number) => {
     const closestRank = rankTicks.find(tick => Math.abs(tick.value - value) < 10);
     return closestRank ? closestRank.label : '';
+  };
+
+  // Custom X axis tick formatter for segment boundaries
+  const segmentTicks = segments.map(s => s.chartStart).concat([1]);
+  const formatSegmentTick = (x: number) => {
+    const seg = segments.find(s => Math.abs(s.chartStart - x) < 0.001);
+    return seg ? seg.date : '';
+  };
+
+  // Adaptive dot styling based on data density
+  const adaptiveDot = (props: any) => {
+    const { payload } = props;
+    const maxR = 6, minR = 2, maxDensity = 50;
+    const r = Math.max(minR, maxR - (payload.dataDensity / maxDensity) * (maxR - minR));
+    const opacity = Math.max(0.3, 1 - (payload.dataDensity / maxDensity));
+    return <circle cx={props.cx} cy={props.cy} r={r} fill="#fff" stroke="#333" strokeWidth={1} opacity={opacity} />;
   };
 
   // Get the rank for the flat line (use displayRank of the first point)
@@ -295,11 +326,15 @@ const PlayerHistoryChart: React.FC<{ data: RPChangeEntry[]; stats?: any }> = ({ 
           ))}
           <CartesianGrid stroke="#374151" strokeDasharray="3 3" />
           <XAxis
-            dataKey="change_timestamp"
-            tickFormatter={formatDate}
+            dataKey="chartX"
+            type="number"
+            domain={[0, 1]}
+            ticks={segmentTicks}
+            tickFormatter={formatSegmentTick}
             stroke="#9CA3AF"
             fontSize={12}
             minTickGap={20}
+            allowDuplicatedCategory={false}
           />
           <YAxis
             dataKey="ladderScore"
@@ -313,14 +348,18 @@ const PlayerHistoryChart: React.FC<{ data: RPChangeEntry[]; stats?: any }> = ({ 
           />
           <Tooltip
             contentStyle={{ background: '#1F2937', border: '1px solid #374151', color: '#fff' }}
-            labelFormatter={formatDate}
+            labelFormatter={(_, payload) => {
+              if (!payload || !payload.length) return '';
+              const entry = payload[0].payload;
+              const date = new Date(entry.change_timestamp);
+              return `${formatDate(date.toISOString())} (${entry.dataDensity} pts)`;
+            }}
             content={({ active, payload, label }) => {
               if (active && payload && payload.length > 0) {
                 const entry = payload[0].payload;
-                const dateLabel = typeof label === 'string' ? label : String(label);
                 return (
                   <div style={{ background: '#1F2937', border: '1px solid #374151', color: '#fff', padding: 10, borderRadius: 8 }}>
-                    <div><strong>{formatDate(dateLabel)}</strong></div>
+                    <div><strong>{label}</strong></div>
                     <div>Rank: {entry.displayRank}</div>
                     <div>RP: {entry.new_rp}</div>
                   </div>
@@ -335,7 +374,7 @@ const PlayerHistoryChart: React.FC<{ data: RPChangeEntry[]; stats?: any }> = ({ 
             dataKey="ladderScore"
             stroke={allSameY ? flatLineColor : "url(#rank-gradient)"}
             strokeWidth={3}
-            dot={{ fill: 'transparent', stroke: 'transparent', r: 6 }}
+            dot={adaptiveDot}
             activeDot={{ r: 8, stroke: '#fff', strokeWidth: 2, fill: flatLineColor }}
             isAnimationActive={!allSameY}
           />
