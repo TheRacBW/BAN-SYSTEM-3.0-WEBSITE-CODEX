@@ -203,22 +203,12 @@ const PlayerHistoryChart: React.FC<{ data: RPChangeEntry[]; stats?: any }> = ({ 
   // Defensive check for allSameY: only true if at least two points
   const allSameY = chartData.length > 1 && chartData.every(pt => pt.ladderScore === chartData[0].ladderScore);
 
-  // Calculate min/max for Y-axis
+  // Calculate min/max for Y-axis with 10% padding to avoid cutoff from outliers
   const minLadder = Math.min(...chartData.map(e => e.ladderScore));
   const maxLadder = Math.max(...chartData.map(e => e.ladderScore));
-  let yMin = minLadder;
-  let yMax = maxLadder;
-  if (allSameY) {
-    yMin = minLadder - 5;
-    yMax = maxLadder + 5;
-  } else {
-    const minRange = Math.max(20, (maxLadder || 1) * 0.05);
-    if (maxLadder - minLadder < minRange) {
-      const mid = (maxLadder + minLadder) / 2;
-      yMin = mid - minRange / 2;
-      yMax = mid + minRange / 2;
-    }
-  }
+  const yPadding = Math.max(10, (maxLadder - minLadder) * 0.1);
+  let yMin = minLadder - yPadding;
+  let yMax = maxLadder + yPadding;
 
   // Find all unique rank zones in the data
   const usedZones = RANK_ZONES.filter(zone => data.some(e => e.new_rp >= zone.min && e.new_rp <= zone.max));
@@ -271,15 +261,6 @@ const PlayerHistoryChart: React.FC<{ data: RPChangeEntry[]; stats?: any }> = ({ 
   const formatSegmentTick = (x: number) => {
     const seg = segments.find(s => Math.abs(s.chartStart - x) < 0.001);
     return seg ? seg.date : '';
-  };
-
-  // Adaptive dot styling based on data density
-  const adaptiveDot = (props: any) => {
-    const { payload } = props;
-    const maxR = 6, minR = 2, maxDensity = 50;
-    const r = Math.max(minR, maxR - (payload.dataDensity / maxDensity) * (maxR - minR));
-    const opacity = Math.max(0.3, 1 - (payload.dataDensity / maxDensity));
-    return <circle cx={props.cx} cy={props.cy} r={r} fill="#fff" stroke="#333" strokeWidth={1} opacity={opacity} />;
   };
 
   // Get the rank for the flat line (use displayRank of the first point)
@@ -368,14 +349,14 @@ const PlayerHistoryChart: React.FC<{ data: RPChangeEntry[]; stats?: any }> = ({ 
               return null;
             }}
           />
-          {/* Single continuous line with smooth gradient */}
+          {/* Single continuous line with smooth gradient, no visible data dots */}
           <Line
             type="monotone"
             dataKey="ladderScore"
             stroke={allSameY ? flatLineColor : "url(#rank-gradient)"}
             strokeWidth={3}
-            dot={adaptiveDot}
-            activeDot={{ r: 8, stroke: '#fff', strokeWidth: 2, fill: flatLineColor }}
+            dot={false} // Hide all data point indicators
+            activeDot={false}
             isAnimationActive={!allSameY}
           />
         </LineChart>
