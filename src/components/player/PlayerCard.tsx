@@ -19,6 +19,7 @@ interface PlayerCardProps {
   player: Player;
   onDelete?: (playerId: string) => void;
   isAdmin?: boolean;
+  onAccountChange?: () => void; // <-- Add this
 }
 
 async function fetchPlayer(playerId: string) {
@@ -54,7 +55,7 @@ async function fetchPlayer(playerId: string) {
   return data;
 }
 
-function PlayerCard({ player, onDelete, isAdmin }: PlayerCardProps) {
+function PlayerCard({ player, onDelete, isAdmin, onAccountChange }: PlayerCardProps) {
   const { user } = useAuth();
   const { kits } = useKits();
   const { restrictedIds } = useRestrictedUserIds();
@@ -73,9 +74,9 @@ function PlayerCard({ player, onDelete, isAdmin }: PlayerCardProps) {
     },
     {
       onSuccess: async () => {
-        // Wait 300ms to allow Supabase to update, then refetch
         setTimeout(() => {
           refetch();
+          if (onAccountChange) onAccountChange();
         }, 300);
       },
     }
@@ -260,6 +261,7 @@ function PlayerCard({ player, onDelete, isAdmin }: PlayerCardProps) {
           onSuccess={() => {
             setTimeout(() => {
               refetch();
+              if (onAccountChange) onAccountChange();
             }, 300);
           }}
         />

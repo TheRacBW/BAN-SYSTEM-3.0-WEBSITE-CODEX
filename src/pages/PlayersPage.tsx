@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { supabase } from '../lib/supabase';
@@ -16,6 +16,7 @@ export default function PlayersPage() {
   const [players, setPlayers] = useState<Player[]>([]);
   const [loading, setLoading] = useState(true);
   const [dataReady, setDataReady] = useState(false);
+  const [isRefreshing, setIsRefreshing] = useState(false); // NEW
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
@@ -324,27 +325,55 @@ export default function PlayersPage() {
     timestamp: new Date().toISOString()
   });
 
-  const handleRefreshAll = async () => {
-    console.log('🔄 handleRefreshAll: Starting refresh...');
-    setLoading(true);
-    setDataReady(false);
-    setError(null);
-    
+  // Seamless refresh function (no flicker)
+  const refreshPlayersSeamlessly = async () => {
+    setIsRefreshing(true);
     try {
-      // Fetch fresh player data with updated statuses
-      // loadPlayers() will handle setting dataReady = true when data is available
-      await loadPlayers();
-      console.log('✅ handleRefreshAll: Refresh completed successfully');
-      
+      const newData = await loadPlayers(); // loadPlayers already updates setPlayers
+      // If you want to only update after all data is ready, you can refactor loadPlayers to return the new data instead of setting state directly
+      // setPlayers(newData);
     } catch (error) {
-      console.error('❌ handleRefreshAll: Refresh failed:', error);
-      setError(error instanceof Error ? error.message : 'Failed to refresh player data');
-      // Don't set dataReady = true on error, let user retry
+      console.error('Refresh failed:', error);
     } finally {
-      setLoading(false);
-      console.log('🏁 handleRefreshAll: Refresh operation finished');
+      setIsRefreshing(false);
     }
   };
+
+  // Smart polling hook
+  function useSmartPlayerPolling(refreshFn: () => void, intervalMs = 15000) {
+    const intervalRef = useRef<NodeJS.Timeout>();
+    const [isPolling, setIsPolling] = useState(false);
+
+    const startPolling = () => {
+      if (intervalRef.current) clearInterval(intervalRef.current);
+      setIsPolling(true);
+      intervalRef.current = setInterval(refreshFn, intervalMs);
+    };
+
+    const stopPolling = () => {
+      if (intervalRef.current) clearInterval(intervalRef.current);
+      setIsPolling(false);
+    };
+
+    useEffect(() => {
+      startPolling();
+      return () => stopPolling();
+    }, []);
+
+    useEffect(() => {
+      const handleVisibilityChange = () => {
+        if (document.hidden) stopPolling();
+        else startPolling();
+      };
+      document.addEventListener('visibilitychange', handleVisibilityChange);
+      return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
+    }, []);
+
+    return { isPolling, startPolling, stopPolling };
+  }
+
+  // Use smart polling for seamless refresh
+  useSmartPlayerPolling(refreshPlayersSeamlessly, 30000);
 
   const handleNavigateToPlayer = (playerId: string) => {
     const targetPlayer = players.find(p => p.id === playerId);
@@ -411,7 +440,7 @@ export default function PlayersPage() {
             });
 
             // Update player's accounts with status data
-            const updatedAccounts = (playerData.accounts || []).map(acc => {
+            const updatedAccounts = (playerData.accounts || []).map((acc: any) => {
               const status = statusMap.get(acc.user_id);
               if (status) {
                 return {
@@ -478,7 +507,8 @@ export default function PlayersPage() {
     );
   }
 
-  if (loading || !dataReady) {
+  // Only show full loading spinner on very first load
+  if ((loading || !dataReady) && players.length === 0) {
     return (
       <div className="flex items-center justify-center h-[60vh]">
         <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-600"></div>
@@ -515,8 +545,20 @@ export default function PlayersPage() {
     );
   }
 
+  const handleRefreshAll = async () => {
+    await refreshPlayersSeamlessly();
+  };
+
   return (
-    <div className="space-y-6">
+    <div className="relative space-y-6">
+      {isRefreshing && (
+        <div className="absolute top-2 right-2 z-10">
+          <div className="bg-blue-500/90 text-white px-3 py-1 rounded-full text-sm flex items-center gap-2">
+            <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24" stroke="currentColor"><circle cx="12" cy="12" r="10" strokeWidth="4" className="opacity-25" /><path d="M4 12a8 8 0 018-8v8z" className="opacity-75" /></svg>
+            Updating...
+          </div>
+        </div>
+      )}
       <div className="flex justify-between items-center">
         <h2 className="text-2xl font-bold">Players</h2>
         <div className="flex gap-2">
@@ -628,6 +670,7 @@ export default function PlayersPage() {
               onPinToggle={handlePinToggle}
               showPinIcon={!!user}
               onPlayerUpdate={handlePlayerUpdate}
+              onAccountChange={refreshPlayersSeamlessly}
             />
           </div>
         ))}
