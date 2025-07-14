@@ -73,6 +73,11 @@ function mapDataToWeightedX(segments: DaySegment[]) {
   });
 }
 
+// Helper to get display rank (copied from PlayerHistoryChart)
+function getDisplayRank(entry: RPChangeEntry) {
+  return entry.new_rank_title || entry.new_calculated_rank || 'Unknown';
+}
+
 const PlayerRankPositionChart: React.FC<{ data: RPChangeEntry[] }> = ({ data }) => {
   if (!data || data.length === 0) return null;
 
@@ -81,6 +86,7 @@ const PlayerRankPositionChart: React.FC<{ data: RPChangeEntry[] }> = ({ data }) 
   const chartData = mapDataToWeightedX(segments).map(d => ({
     ...d,
     rankPosition: d.new_rank,
+    displayRank: getDisplayRank(d),
     timestamp: new Date(d.change_timestamp).getTime(),
   }));
   chartData.sort((a, b) => a.chartX - b.chartX);
@@ -152,8 +158,8 @@ const PlayerRankPositionChart: React.FC<{ data: RPChangeEntry[] }> = ({ data }) 
                   <div style={{ background: '#1F2937', border: '1px solid #374151', color: '#fff', padding: 10, borderRadius: 8 }}>
                     <div><strong>{dateLabel}</strong></div>
                     <div>Rank Position: #{entry.rankPosition}</div>
+                    <div>Rank: {entry.displayRank || '—'}</div>
                     <div>RP: {entry.new_rp}</div>
-                    <div>Rank: {entry.displayRank}</div>
                   </div>
                 );
               }
