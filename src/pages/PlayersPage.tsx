@@ -9,43 +9,17 @@ import { BEDWARS_PLACE_ID, BEDWARS_UNIVERSE_ID } from '../constants/bedwars';
 import { useUserPins } from '../hooks/useUserPins';
 import RobloxStatus from '../components/RobloxStatus';
 
-export default function PlayersPage() {
-  const navigate = useNavigate();
-  const { user, isAdmin } = useAuth();
-  const { pinnedPlayers, togglePin, isPinned, loading: pinsLoading } = useUserPins();
+// Shared refresh hook for coordinated player tracking refresh
+function useSharedPlayerRefresh(user: any) {
   const [players, setPlayers] = useState<Player[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [dataReady, setDataReady] = useState(false);
-  const [isRefreshing, setIsRefreshing] = useState(false); // NEW
-  const [error, setError] = useState<string | null>(null);
-  const [success, setSuccess] = useState<string | null>(null);
-  const [searchQuery, setSearchQuery] = useState('');
-  const [showAddModal, setShowAddModal] = useState(false);
-  const [newAlias, setNewAlias] = useState('');
-  const [showOnlineOnly, setShowOnlineOnly] = useState(false);
-  const [showInBedwarsOnly, setShowInBedwarsOnly] = useState(false);
-  const [showPinnedOnly, setShowPinnedOnly] = useState(false);
-  const [sortBy, setSortBy] = useState<SortOption>('alias_asc');
-  const [newYoutubeChannel, setNewYoutubeChannel] = useState('');
-  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
-  const [filterOnline, setFilterOnline] = useState(false);
-  const [filterInGame, setFilterInGame] = useState(false);
-  const [filterInBedwars, setFilterInBedwars] = useState(false);
-  const [showAddPlayer, setShowAddPlayer] = useState(false);
-  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
-  const [playerToDelete, setPlayerToDelete] = useState<Player | null>(null);
-  const [selectedTeammate, setSelectedTeammate] = useState<Player | null>(null);
-  const [modalPlayer, setModalPlayer] = useState<Player | null>(null);
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  const [lastRefresh, setLastRefresh] = useState<Date | null>(null);
 
-  // Centralized data loading function that handles all state management
-  const loadPlayers = async () => {
-    console.log('🔄 loadPlayers: Starting centralized data load...');
-    setLoading(true);
-    setDataReady(false);
-    setError(null);
-    
+  // Load players from database only (no edge function call)
+  const loadPlayersFromDatabase = async () => {
+    console.log('🔄 loadPlayersFromDatabase: Starting...');
+    setIsRefreshing(true); // Indicate refresh is in progress
     try {
-      // Fetch players with their accounts and related data
       const { data: playersData, error: playersError } = await supabase
         .from('players')
         .select(`
@@ -73,48 +47,38 @@ export default function PlayersPage() {
         .order('alias');
 
       if (playersError) {
-        console.error('❌ loadPlayers: Database error:', playersError);
+        console.error('❌ loadPlayersFromDatabase: Database error:', playersError);
         throw playersError;
       }
 
-      console.log('✅ loadPlayers: Successfully fetched players:', playersData?.length || 0);
+      console.log('✅ loadPlayersFromDatabase: Successfully fetched players:', playersData?.length || 0);
 
       if (playersData) {
         // Fetch statuses for all accounts
-        console.log('🔄 loadPlayers: Calling fetchAccountStatuses...');
+        console.log('🔄 loadPlayersFromDatabase: Calling fetchAccountStatuses...');
         const playersWithStatuses = await fetchAccountStatuses(playersData);
-        console.log('✅ loadPlayers: Players with statuses:', playersWithStatuses.length);
+        console.log('✅ loadPlayersFromDatabase: Players with statuses:', playersWithStatuses.length);
         
         // Update state with the new data
         setPlayers(playersWithStatuses);
         
-        // Set dataReady to true if we have data (even if empty array)
-        console.log('✅ loadPlayers: Setting dataReady to true - data loaded');
-        setDataReady(true);
+        // Set lastRefresh to current time
+        setLastRefresh(new Date());
       } else {
-        console.log('⚠️ loadPlayers: No playersData received, setting empty array');
+        console.log('⚠️ loadPlayersFromDatabase: No playersData received, setting empty array');
         setPlayers([]);
-        setDataReady(true);
+        setLastRefresh(new Date());
       }
     } catch (error) {
-      console.error('❌ loadPlayers: Error loading players:', error);
-      setError('Failed to load players');
-      setDataReady(false); // Don't show UI on error
+      console.error('❌ loadPlayersFromDatabase: Error loading players:', error);
+      setLastRefresh(null); // Clear last refresh on error
     } finally {
-      console.log('🏁 loadPlayers: Setting loading to false');
-      setLoading(false);
+      console.log('🏁 loadPlayersFromDatabase: Setting isRefreshing to false');
+      setIsRefreshing(false);
     }
   };
 
-  useEffect(() => {
-    if (user) {
-      console.log('🔍 PlayersPage: User authenticated, loading players...');
-      loadPlayers();
-    } else {
-      console.log('🔍 PlayersPage: No user, skipping load');
-    }
-  }, [user]);
-
+  // Fetch statuses for all accounts
   const fetchAccountStatuses = async (playersList: Player[]) => {
     try {
       console.log('🚀 fetchAccountStatuses: Starting with players:', playersList.length);
@@ -203,6 +167,169 @@ export default function PlayersPage() {
       return playersList;
     }
   };
+
+  // Check if refresh is needed
+  const shouldRefresh = async () => {
+    const { data } = await supabase
+      .from('player_tracking_refresh')
+      .select('last_refresh_at, status')
+      .eq('id', 1)
+      .single();
+    if (!data) return true; // No refresh table, assume needs refresh
+    const lastRefreshTime = new Date(data.last_refresh_at);
+    const timeSinceRefresh = Date.now() - lastRefreshTime.getTime();
+    return timeSinceRefresh > 25000 || data.status !== 'running'; // 25s or not running
+  };
+
+  // Smart refresh function
+  const refreshIfNeeded = async () => {
+    if (isRefreshing) return;
+    const needsRefresh = await shouldRefresh();
+    if (!needsRefresh) {
+      await loadPlayersFromDatabase();
+      return;
+    }
+    setIsRefreshing(true);
+    try {
+      await supabase
+        .from('player_tracking_refresh')
+        .update({ status: 'running', triggered_by: user?.id })
+        .eq('id', 1);
+      const result = await supabase.functions.invoke('roblox-status');
+      if (result.error) throw result.error;
+      await supabase
+        .from('player_tracking_refresh')
+        .update({ status: 'complete', last_refresh_at: new Date().toISOString() })
+        .eq('id', 1);
+      await loadPlayersFromDatabase();
+      setLastRefresh(new Date());
+    } catch (error) {
+      console.error('Refresh failed:', error);
+      await supabase
+        .from('player_tracking_refresh')
+        .update({ status: 'error' })
+        .eq('id', 1);
+    } finally {
+      setIsRefreshing(false);
+    }
+  };
+
+  // Polling with coordination
+  useEffect(() => {
+    refreshIfNeeded(); // Initial load
+    const interval = setInterval(() => {
+      refreshIfNeeded();
+    }, 30000);
+    return () => clearInterval(interval);
+  }, []);
+
+  return { players, isRefreshing, lastRefresh, refreshIfNeeded };
+}
+
+export default function PlayersPage() {
+  const navigate = useNavigate();
+  const { user, isAdmin } = useAuth();
+  const { pinnedPlayers, togglePin, isPinned, loading: pinsLoading } = useUserPins();
+  const [searchQuery, setSearchQuery] = useState('');
+  const [showAddModal, setShowAddModal] = useState(false);
+  const [newAlias, setNewAlias] = useState('');
+  const [showOnlineOnly, setShowOnlineOnly] = useState(false);
+  const [showInBedwarsOnly, setShowInBedwarsOnly] = useState(false);
+  const [showPinnedOnly, setShowPinnedOnly] = useState(false);
+  const [sortBy, setSortBy] = useState<SortOption>('alias_asc');
+  const [newYoutubeChannel, setNewYoutubeChannel] = useState('');
+  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
+  const [filterOnline, setFilterOnline] = useState(false);
+  const [filterInGame, setFilterInGame] = useState(false);
+  const [filterInBedwars, setFilterInBedwars] = useState(false);
+  const [showAddPlayer, setShowAddPlayer] = useState(false);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [playerToDelete, setPlayerToDelete] = useState<Player | null>(null);
+  const [selectedTeammate, setSelectedTeammate] = useState<Player | null>(null);
+  const [modalPlayer, setModalPlayer] = useState<Player | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [success, setSuccess] = useState<string | null>(null);
+
+  // Use the shared refresh system
+  const { players, isRefreshing, lastRefresh, refreshIfNeeded } = useSharedPlayerRefresh(user);
+
+  // Centralized data loading function that handles all state management
+  const loadPlayers = async () => {
+    console.log('🔄 loadPlayers: Starting centralized data load...');
+    // setLoading(true); // This state is now managed by useSharedPlayerRefresh
+    // setDataReady(false); // This state is now managed by useSharedPlayerRefresh
+    setError(null);
+    
+    try {
+      // Fetch players with their accounts and related data
+      const { data: playersData, error: playersError } = await supabase
+        .from('players')
+        .select(`
+          *,
+          accounts:player_accounts(
+            id,
+            user_id,
+            rank:player_account_ranks(
+              rank_id,
+              account_ranks(*)
+            )
+          ),
+          teammates:player_teammates!player_id(
+            teammate:players!teammate_id(*)
+          ),
+          strategies:player_strategies(
+            id,
+            image_url,
+            kit_ids,
+            teammate_ids,
+            starred_kit_id,
+            created_at
+          )
+        `)
+        .order('alias');
+
+      if (playersError) {
+        console.error('❌ loadPlayers: Database error:', playersError);
+        throw playersError;
+      }
+
+      console.log('✅ loadPlayers: Successfully fetched players:', playersData?.length || 0);
+
+      if (playersData) {
+        // Fetch statuses for all accounts
+        console.log('🔄 loadPlayers: Calling fetchAccountStatuses...');
+        const playersWithStatuses = await fetchAccountStatuses(playersData);
+        console.log('✅ loadPlayers: Players with statuses:', playersWithStatuses.length);
+        
+        // Update state with the new data
+        // setPlayers(playersWithStatuses); // This state is now managed by useSharedPlayerRefresh
+        
+        // Set dataReady to true if we have data (even if empty array)
+        console.log('✅ loadPlayers: Setting dataReady to true - data loaded');
+        // setDataReady(true); // This state is now managed by useSharedPlayerRefresh
+      } else {
+        console.log('⚠️ loadPlayers: No playersData received, setting empty array');
+        // setPlayers([]); // This state is now managed by useSharedPlayerRefresh
+        // setDataReady(true); // This state is now managed by useSharedPlayerRefresh
+      }
+    } catch (error) {
+      console.error('❌ loadPlayers: Error loading players:', error);
+      setError('Failed to load players');
+      // setDataReady(false); // Don't show UI on error - now managed by useSharedPlayerRefresh
+    } finally {
+      console.log('🏁 loadPlayers: Setting loading to false');
+      // setLoading(false); // This state is now managed by useSharedPlayerRefresh
+    }
+  };
+
+  useEffect(() => {
+    if (user) {
+      console.log('🔍 PlayersPage: User authenticated, loading players...');
+      loadPlayers();
+    } else {
+      console.log('🔍 PlayersPage: No user, skipping load');
+    }
+  }, [user]);
 
   const handleAddPlayer = async () => {
     if (!newAlias.trim()) {
@@ -314,66 +441,21 @@ export default function PlayersPage() {
 
   // Critical debug logging to track render state
   console.log('🎯 RENDER STATE:', { 
-    loading, 
-    dataReady, 
+    // loading, // This state is now managed by useSharedPlayerRefresh
+    // dataReady, // This state is now managed by useSharedPlayerRefresh
     playersCount: players.length,
     hasPlayers: players.length > 0,
     filteredPlayersCount: filteredPlayers.length,
     sortedPlayersCount: sortedPlayers.length,
-    shouldShowLoading: loading || !dataReady,
-    renderCondition: loading || !dataReady ? 'SHOWING_LOADING' : 'SHOWING_CONTENT',
+    // shouldShowLoading: loading || !dataReady, // This state is now managed by useSharedPlayerRefresh
+    renderCondition: isRefreshing ? 'SHOWING_REFRESHING' : 'SHOWING_CONTENT',
     timestamp: new Date().toISOString()
   });
 
-  // Seamless refresh function (no flicker)
-  const refreshPlayersSeamlessly = async () => {
-    setIsRefreshing(true);
-    try {
-      const newData = await loadPlayers(); // loadPlayers already updates setPlayers
-      // If you want to only update after all data is ready, you can refactor loadPlayers to return the new data instead of setting state directly
-      // setPlayers(newData);
-    } catch (error) {
-      console.error('Refresh failed:', error);
-    } finally {
-      setIsRefreshing(false);
-    }
+  // For manual refresh (e.g. button):
+  const handleRefreshAll = async () => {
+    await refreshIfNeeded();
   };
-
-  // Smart polling hook
-  function useSmartPlayerPolling(refreshFn: () => void, intervalMs = 15000) {
-    const intervalRef = useRef<NodeJS.Timeout>();
-    const [isPolling, setIsPolling] = useState(false);
-
-    const startPolling = () => {
-      if (intervalRef.current) clearInterval(intervalRef.current);
-      setIsPolling(true);
-      intervalRef.current = setInterval(refreshFn, intervalMs);
-    };
-
-    const stopPolling = () => {
-      if (intervalRef.current) clearInterval(intervalRef.current);
-      setIsPolling(false);
-    };
-
-    useEffect(() => {
-      startPolling();
-      return () => stopPolling();
-    }, []);
-
-    useEffect(() => {
-      const handleVisibilityChange = () => {
-        if (document.hidden) stopPolling();
-        else startPolling();
-      };
-      document.addEventListener('visibilitychange', handleVisibilityChange);
-      return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
-    }, []);
-
-    return { isPolling, startPolling, stopPolling };
-  }
-
-  // Use smart polling for seamless refresh
-  useSmartPlayerPolling(refreshPlayersSeamlessly, 30000);
 
   const handleNavigateToPlayer = (playerId: string) => {
     const targetPlayer = players.find(p => p.id === playerId);
@@ -473,18 +555,18 @@ export default function PlayersPage() {
         }
 
         // Update only this player in the state
-        setPlayers(prevPlayers => 
-          prevPlayers.map(p => 
-            p.id === playerId ? playerData : p
-          )
-        );
+        // setPlayers(prevPlayers => 
+        //   prevPlayers.map(p => 
+        //     p.id === playerId ? playerData : p
+        //   )
+        // ); // This state is now managed by useSharedPlayerRefresh
         
         console.log('✅ handlePlayerUpdate: Player updated in state without page refresh');
       }
     } catch (error) {
       console.error('❌ handlePlayerUpdate: Error updating player:', error);
       // Fallback to full refresh only if targeted update fails
-      console.log('🔄 handlePlayerUpdate: Falling back to full refresh');
+      console.log('�� handlePlayerUpdate: Falling back to full refresh');
       await loadPlayers();
     }
   };
@@ -508,7 +590,7 @@ export default function PlayersPage() {
   }
 
   // Only show full loading spinner on very first load
-  if ((loading || !dataReady) && players.length === 0) {
+  if (isRefreshing && players.length === 0) {
     return (
       <div className="flex items-center justify-center h-[60vh]">
         <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-600"></div>
@@ -517,7 +599,7 @@ export default function PlayersPage() {
   }
 
   // Show empty state if no players found
-  if (dataReady && players.length === 0) {
+  if (players.length === 0) {
     return (
       <div className="space-y-6">
         <div className="flex justify-between items-center">
@@ -545,10 +627,6 @@ export default function PlayersPage() {
     );
   }
 
-  const handleRefreshAll = async () => {
-    await refreshPlayersSeamlessly();
-  };
-
   return (
     <div className="relative space-y-6">
       {isRefreshing && (
@@ -564,10 +642,10 @@ export default function PlayersPage() {
         <div className="flex gap-2">
           <button
             onClick={handleRefreshAll}
-            disabled={loading}
+            disabled={isRefreshing}
             className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50"
           >
-            {loading ? (
+            {isRefreshing ? (
               <>
                 <RefreshCw className="w-4 h-4 animate-spin" />
                 Refreshing...
@@ -670,7 +748,7 @@ export default function PlayersPage() {
               onPinToggle={handlePinToggle}
               showPinIcon={!!user}
               onPlayerUpdate={handlePlayerUpdate}
-              onAccountChange={refreshPlayersSeamlessly}
+              onAccountChange={refreshIfNeeded} // Use refreshIfNeeded here
             />
           </div>
         ))}
