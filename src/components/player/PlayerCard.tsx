@@ -77,7 +77,7 @@ function PlayerCard({ player, onDelete, isAdmin, onAccountChange }: PlayerCardPr
         setTimeout(() => {
           refetch();
           if (onAccountChange) onAccountChange();
-        }, 300);
+        }, 100); // Reduce delay for more instant update
       },
     }
   );
@@ -260,9 +260,9 @@ function PlayerCard({ player, onDelete, isAdmin, onAccountChange }: PlayerCardPr
           onClose={() => setShowAddAccountModal(false)}
           onSuccess={() => {
             setTimeout(() => {
-              refetch();
+              refetch(); // force: true is not a standard option, but this ensures a fresh fetch
               if (onAccountChange) onAccountChange();
-            }, 300);
+            }, 100); // Reduce delay for more instant update
           }}
         />
       )}
