@@ -63,6 +63,277 @@ interface PlayerCardProps {
   isModal?: boolean;
 }
 
+// --- Safe Roblox Profile Integration ---
+interface RobloxProfile {
+  username: string;
+  user_id: number;
+  profile_picture_url?: string;
+  cached_at: string;
+  source?: 'cache' | 'status';
+}
+
+const useRobloxProfiles = (playerAccounts: any[]) => {
+  const [profiles, setProfiles] = useState<Map<string, RobloxProfile>>(new Map());
+  const [loading, setLoading] = useState(false);
+
+  const fetchRobloxProfiles = async () => {
+    if (!playerAccounts?.length) return;
+    setLoading(true);
+    try {
+      const usernames = [...new Set(
+        playerAccounts
+          .map(acc => acc.username)
+          .filter(Boolean)
+          .filter(username => typeof username === 'string' && username.trim().length > 0)
+      )];
+      if (usernames.length === 0) {
+        setProfiles(new Map());
+        return;
+      }
+      // Cache first
+      const { data: cachedProfiles } = await supabase
+        .from('roblox_user_cache')
+        .select('username, user_id, profile_picture_url, cached_at')
+        .in('username', usernames);
+      const profileMap = new Map<string, RobloxProfile>();
+      cachedProfiles?.forEach(profile => {
+        if (profile.user_id && profile.username) {
+          profileMap.set(profile.username, {
+            username: profile.username,
+            user_id: profile.user_id,
+            profile_picture_url: profile.profile_picture_url || undefined,
+            cached_at: profile.cached_at,
+            source: 'cache'
+          });
+        }
+      });
+      // Fallback to status table
+      const missingUsernames = usernames.filter(username => !profileMap.has(username));
+      if (missingUsernames.length > 0) {
+        const { data: statusProfiles } = await supabase
+          .from('roblox_user_status')
+          .select('username, user_id')
+          .in('username', missingUsernames)
+          .not('user_id', 'is', null)
+          .not('username', 'is', null);
+        statusProfiles?.forEach(profile => {
+          if (profile.user_id && profile.username && !profileMap.has(profile.username)) {
+            profileMap.set(profile.username, {
+              username: profile.username,
+              user_id: Number(profile.user_id),
+              profile_picture_url: undefined,
+              cached_at: new Date().toISOString(),
+              source: 'status'
+            });
+          }
+        });
+      }
+      setProfiles(profileMap);
+    } catch (error) {
+      setProfiles(new Map());
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchRobloxProfiles();
+  }, [JSON.stringify(playerAccounts?.map(acc => acc.username))]);
+
+  return { profiles, loading, refetch: fetchRobloxProfiles };
+};
+
+interface RobloxProfilePictureProps {
+  username: string;
+  profile?: RobloxProfile;
+  size?: 'sm' | 'md' | 'lg';
+  showLink?: boolean;
+  className?: string;
+}
+
+const RobloxProfilePicture: React.FC<RobloxProfilePictureProps> = ({
+  username,
+  profile,
+  size = 'md',
+  showLink = false, // Avatar is NOT a link
+  className = ''
+}) => {
+  const [imageError, setImageError] = useState(false);
+  const sizeClass = 'w-12 h-12';
+  // Fallback: username or user_id or ''
+  const safeUsername = typeof username === 'string' && username.trim().length > 0
+    ? username
+    : (profile?.user_id ? String(profile.user_id) : '');
+  // Avatar fallback order: cache -> API -> default
+  const getProfilePictureUrl = () => {
+    if (profile?.profile_picture_url && !imageError) {
+      return profile.profile_picture_url;
+    }
+    if (profile?.user_id && !imageError) {
+      return `https://www.roblox.com/headshot-thumbnail/image?userId=${profile.user_id}&width=150&height=150&format=png`;
+    }
+    return '/default-avatar.svg';
+  };
+  return (
+    <div className={`${sizeClass} rounded-full overflow-hidden bg-gray-200 dark:bg-gray-700 flex items-center justify-center border border-gray-300 dark:border-gray-600 ${className}`}>
+      <img
+        src={getProfilePictureUrl()}
+        alt={`${safeUsername}'s Roblox avatar`}
+        className="w-full h-full object-cover"
+        onError={e => {
+          setImageError(true);
+          e.currentTarget.src = '/default-avatar.svg';
+        }}
+      />
+    </div>
+  );
+};
+
+const AccountListWithProfiles = ({ accounts, onDeleteAccount, isAdmin, ranks, handleUpdateRank, isUpdatingRank }: { 
+  accounts: any[], 
+  onDeleteAccount: (accountId: string) => void,
+  isAdmin?: boolean,
+  ranks: AccountRank[],
+  handleUpdateRank: (accountId: string, rankId: string) => void,
+  isUpdatingRank: boolean
+}) => {
+  const { profiles, loading } = useRobloxProfiles(accounts);
+  if (!accounts?.length) {
+    return (
+      <div className="text-sm text-gray-500 italic">
+        No accounts added yet
+      </div>
+    );
+  }
+  return (
+    <div className="space-y-1">
+      <div className="flex items-center justify-between">
+        <h4 className="font-medium text-sm text-gray-700 dark:text-gray-300">
+          Accounts ({accounts.length})
+        </h4>
+        {loading && (
+          <div className="text-xs text-gray-500 flex items-center gap-1">
+            <div className="w-3 h-3 border border-gray-300 border-t-blue-500 rounded-full animate-spin"></div>
+            Loading profiles...
+          </div>
+        )}
+      </div>
+      {accounts.map((account) => {
+        // Always prefer account.user_id for link and avatar
+        const userId = account.user_id || profiles.get(account.username)?.user_id;
+        const profile = profiles.get(account.username);
+        const status = account.status;
+        const rank = account.rank && Array.isArray(account.rank) && account.rank.length > 0 ? account.rank[0].account_ranks : null;
+        // Display name: username or user_id or ''
+        const displayName = account.username || '';
+        // Hyperlink if user_id
+        const profileLink = userId ? `https://www.roblox.com/users/${userId}/profile` : undefined;
+        // Avatar src: cache, else API, else default
+        const avatarUrl = profile?.profile_picture_url
+          ? profile.profile_picture_url
+          : (userId ? `https://www.roblox.com/headshot-thumbnail/image?userId=${userId}&width=150&height=150&format=png` : '/default-avatar.svg');
+        return (
+          <div
+            key={account.id}
+            className="flex items-center gap-x-3 min-h-[48px] bg-gray-50 dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 px-3"
+          >
+            {/* Avatar (not a link) */}
+            <div className="w-12 h-12 rounded-full overflow-hidden bg-gray-200 dark:bg-gray-700 flex items-center justify-center border border-gray-300 dark:border-gray-600">
+              <img
+                src={avatarUrl}
+                alt={displayName ? `${displayName}'s Roblox avatar` : 'Roblox avatar'}
+                className="w-full h-full object-cover"
+                onError={e => { e.currentTarget.src = '/default-avatar.svg'; }}
+              />
+            </div>
+            {/* Username + status as a single link if user_id, else plain text */}
+            <div className="flex flex-col min-w-0 flex-1">
+              {profileLink ? (
+                <a
+                  href={profileLink}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex items-center gap-x-2 font-medium text-base truncate hover:underline text-blue-700 dark:text-blue-300"
+                  title={`View ${displayName || userId ? (displayName || userId) : 'Roblox'}'s Roblox profile`}
+                >
+                  <span>{displayName}</span>
+                  <RobloxStatus 
+                    username={status?.username || displayName || userId}
+                    isOnline={status?.isOnline || false}
+                    isInGame={status?.isInGame || false}
+                    inBedwars={status?.inBedwars || false}
+                    lastUpdated={status?.lastUpdated}
+                  />
+                </a>
+              ) : (
+                <span className="flex items-center gap-x-2 font-medium text-base truncate text-gray-700 dark:text-gray-300">
+                  <span>{displayName}</span>
+                  <RobloxStatus 
+                    username={status?.username || displayName || userId}
+                    isOnline={status?.isOnline || false}
+                    isInGame={status?.isInGame || false}
+                    inBedwars={status?.inBedwars || false}
+                    lastUpdated={status?.lastUpdated}
+                  />
+                </span>
+              )}
+              {userId && (
+                <span className="text-xs text-gray-500">ID: {userId}</span>
+              )}
+              {profile?.source && (
+                <span className={`px-1 py-0.5 rounded text-xs ${
+                  profile.source === 'cache' 
+                    ? 'bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-300' 
+                    : 'bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300'
+                }`}>
+                  {profile.source}
+                </span>
+              )}
+            </div>
+            {/* Rank badge and admin controls */}
+            <div className="flex flex-col items-end gap-1 min-w-[90px]">
+              <div className="w-8 h-8 flex items-center justify-center">
+                {rank && rank.image_url ? (
+                  <img src={rank.image_url} alt={rank.name} className="w-8 h-8 object-contain" title={rank.name} />
+                ) : rank ? (
+                  <span className="text-xs font-bold text-blue-600 border border-blue-300 rounded px-1" title={rank.name}>{rank.name[0]}</span>
+                ) : (
+                  <HelpCircle size={18} className="text-gray-400" />
+                )}
+              </div>
+              {isAdmin && (
+                <select
+                  value={rank?.id || ''}
+                  onChange={e => handleUpdateRank(account.id, e.target.value)}
+                  className="w-full p-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600 dark:text-gray-100 bg-white border-gray-300 text-gray-900 focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400"
+                  disabled={isUpdatingRank}
+                  onClick={e => e.stopPropagation()}
+                  onFocus={e => e.stopPropagation()}
+                >
+                  <option value="" className="dark:bg-gray-700 dark:text-gray-100">Set Rank</option>
+                  {ranks.map(rankOpt => (
+                    <option key={rankOpt.id} value={rankOpt.id} className="dark:bg-gray-700 dark:text-gray-100">{rankOpt.name}</option>
+                  ))}
+                </select>
+              )}
+              {isAdmin && (
+                <button
+                  onClick={() => onDeleteAccount(account.id)}
+                  className="p-1.5 text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 rounded transition-colors"
+                  title="Delete account"
+                  disabled={isUpdatingRank}
+                >
+                  <Trash2 size={18} />
+                </button>
+              )}
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  );
+};
+
 function PlayerCard({ player, onDelete, isAdmin, isPinned, onPinToggle, showPinIcon, onTeammateClick, onPlayerUpdate, onNavigateToPlayer, onClose, isModal }: PlayerCardProps) {
   console.log('🎯 MAIN PlayerCard rendering:', player.alias, {
     hasAccounts: player.accounts?.length || 0,
@@ -989,73 +1260,14 @@ function PlayerCard({ player, onDelete, isAdmin, isPinned, onPinToggle, showPinI
         <div className="space-y-8">
           <section>
             <h3 className="text-lg font-semibold mb-4">Known Accounts</h3>
-            <div className="space-y-4">
-              {getSortedAccounts().map(account => (
-                <div 
-                  key={account.id}
-                  className="flex items-center justify-between bg-gray-50 dark:bg-gray-700/50 p-4 rounded-lg"
-                >
-                  <div className="flex items-center gap-4">
-                    <div>
-                      <RobloxStatus 
-                        username={account.status?.username || ''}
-                        isOnline={account.status?.isOnline || false}
-                        isInGame={account.status?.isInGame || false}
-                        inBedwars={account.status?.inBedwars || false}
-                        lastUpdated={account.status?.lastUpdated}
-                      />
-                    </div>
-                    <div className="w-8 h-8 flex items-center justify-center">
-                      <RankIcon account={account} />
-                    </div>
-                    {account.status?.inBedwars && (
-                      <img
-                        src={BEDWARS_ICON_URL}
-                        alt="BedWars"
-                        className="w-8 h-8"
-                        title="In Bedwars"
-                      />
-                    )}
-                  </div>
-
-                  {isAdmin && (
-                    <div className="flex gap-2">
-                      <select
-                        value={getAccountRank(account)?.id || ''}
-                        onChange={(e) => handleUpdateRank(account.id, e.target.value)}
-                        className="w-full p-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600 dark:text-gray-100 bg-white border-gray-300 text-gray-900 focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400"
-                        disabled={isUpdatingRank}
-                        onClick={(e) => e.stopPropagation()}
-                        onFocus={(e) => e.stopPropagation()}
-                      >
-                        <option value="" className="dark:bg-gray-700 dark:text-gray-100">
-                          Set Rank
-                        </option>
-                        {ranks.map(rank => (
-                          <option 
-                            key={rank.id} 
-                            value={rank.id}
-                            className="dark:bg-gray-700 dark:text-gray-100"
-                          >
-                            {rank.name}
-                          </option>
-                        ))}
-                      </select>
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleDeleteAccount(account.id);
-                        }}
-                        className="text-red-600 hover:text-red-700 p-2 rounded-lg hover:bg-red-50 dark:hover:bg-red-900/20"
-                        disabled={isUpdatingRank}
-                      >
-                        <Trash2 size={18} />
-                      </button>
-                    </div>
-                  )}
-                </div>
-              ))}
-            </div>
+            <AccountListWithProfiles 
+              accounts={getSortedAccounts()} 
+              onDeleteAccount={handleDeleteAccount} 
+              isAdmin={isAdmin} 
+              ranks={ranks}
+              handleUpdateRank={handleUpdateRank}
+              isUpdatingRank={isUpdatingRank}
+            />
           </section>
 
           <section>

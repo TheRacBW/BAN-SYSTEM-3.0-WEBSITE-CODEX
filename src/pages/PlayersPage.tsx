@@ -14,6 +14,16 @@ function useSharedPlayerRefresh(user: any) {
   const [players, setPlayers] = useState<Player[]>([]);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [lastRefresh, setLastRefresh] = useState<Date | null>(null);
+  const tabVisibleRef = useRef(true);
+
+  // Listen for tab visibility changes
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      tabVisibleRef.current = !document.hidden;
+    };
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
+  }, []);
 
   // Load players from database only (no edge function call)
   const loadPlayersFromDatabase = async () => {
@@ -214,13 +224,19 @@ function useSharedPlayerRefresh(user: any) {
     }
   };
 
-  // Polling with coordination
+  // Polling with coordination and tab visibility awareness
   useEffect(() => {
-    refreshIfNeeded(); // Initial load
-    const interval = setInterval(() => {
-      refreshIfNeeded();
-    }, 30000);
-    return () => clearInterval(interval);
+    let interval: NodeJS.Timeout | null = null;
+    const poll = () => {
+      if (tabVisibleRef.current) {
+        refreshIfNeeded();
+      }
+    };
+    poll(); // Initial load
+    interval = setInterval(poll, 30000);
+    return () => {
+      if (interval) clearInterval(interval);
+    };
   }, []);
 
   return { players, isRefreshing, lastRefresh, refreshIfNeeded };
@@ -297,9 +313,6 @@ export default function PlayersPage() {
 
       if (playersData) {
         // Fetch statuses for all accounts
-        console.log('🔄 loadPlayers: Calling fetchAccountStatuses...');
-        const playersWithStatuses = await fetchAccountStatuses(playersData);
-        console.log('✅ loadPlayers: Players with statuses:', playersWithStatuses.length);
         
         // Update state with the new data
         // setPlayers(playersWithStatuses); // This state is now managed by useSharedPlayerRefresh
@@ -379,15 +392,15 @@ export default function PlayersPage() {
 
   const getPlayerRankScore = (player: Player) => {
     const ranks = player.accounts
-      ?.map(account => {
+      ?.map((acc: any) => {
         // Handle array structure
-        if (account.rank && Array.isArray(account.rank) && account.rank.length > 0) {
-          return account.rank[0].account_ranks?.name;
+        if (acc.rank && Array.isArray(acc.rank) && acc.rank.length > 0) {
+          return acc.rank[0].account_ranks?.name;
         }
         return null;
       })
       .filter(Boolean)
-      .map(rankName => RANK_VALUES[rankName as keyof typeof RANK_VALUES] || 0);
+      .map((rankName: string) => RANK_VALUES[rankName as keyof typeof RANK_VALUES] || 0);
     
     return ranks?.length ? ranks.reduce((a, b) => a + b, 0) / ranks.length : 0;
   };
@@ -748,7 +761,6 @@ export default function PlayersPage() {
               onPinToggle={handlePinToggle}
               showPinIcon={!!user}
               onPlayerUpdate={handlePlayerUpdate}
-              onAccountChange={refreshIfNeeded} // Use refreshIfNeeded here
             />
           </div>
         ))}
