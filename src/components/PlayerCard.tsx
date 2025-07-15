@@ -247,13 +247,13 @@ const AccountListWithProfiles = ({ accounts, onDeleteAccount, isAdmin, ranks, ha
               />
             </div>
             {/* Username + status as a single link if user_id, else plain text */}
-            <div className="flex flex-col min-w-0 flex-1">
+            <div className="flex flex-col min-w-0 flex-1 items-start">
               {profileLink ? (
                 <a
                   href={profileLink}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="flex items-center gap-x-2 font-medium text-base truncate hover:underline text-blue-700 dark:text-blue-300"
+                  className="flex items-center gap-x-2 font-medium text-base truncate hover:underline text-blue-700 dark:text-blue-300 -ml-2"
                   title={`View ${displayName || userId ? (displayName || userId) : 'Roblox'}'s Roblox profile`}
                 >
                   <span>{displayName}</span>
@@ -266,7 +266,7 @@ const AccountListWithProfiles = ({ accounts, onDeleteAccount, isAdmin, ranks, ha
                   />
                 </a>
               ) : (
-                <span className="flex items-center gap-x-2 font-medium text-base truncate text-gray-700 dark:text-gray-300">
+                <span className="flex items-center gap-x-2 font-medium text-base truncate text-gray-700 dark:text-gray-300 -ml-2">
                   <span>{displayName}</span>
                   <RobloxStatus 
                     username={status?.username || displayName || userId}
