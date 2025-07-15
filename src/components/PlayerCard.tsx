@@ -206,7 +206,7 @@ const AccountListWithProfiles = ({ accounts, onDeleteAccount, isAdmin, ranks, ha
     );
   }
   return (
-    <div className="space-y-1">
+    <div className="space-y-3">
       <div className="flex items-center justify-between">
         <h4 className="font-medium text-sm text-gray-700 dark:text-gray-300">
           Accounts ({accounts.length})
@@ -235,7 +235,7 @@ const AccountListWithProfiles = ({ accounts, onDeleteAccount, isAdmin, ranks, ha
         return (
           <div
             key={account.id}
-            className="flex items-center gap-x-3 min-h-[48px] bg-gray-50 dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 px-3"
+            className="flex items-center gap-x-3 min-h-[48px] bg-white/60 dark:bg-gray-800/60 backdrop-blur-sm rounded-2xl border border-gray-300/40 dark:border-gray-700/60 px-3 py-3 shadow-md transition-all hover:shadow-lg hover:border-blue-400"
           >
             {/* Avatar (not a link) */}
             <div className="w-12 h-12 rounded-full overflow-hidden bg-gray-200 dark:bg-gray-700 flex items-center justify-center border border-gray-300 dark:border-gray-600">
@@ -246,85 +246,91 @@ const AccountListWithProfiles = ({ accounts, onDeleteAccount, isAdmin, ranks, ha
                 onError={e => { e.currentTarget.src = '/default-avatar.svg'; }}
               />
             </div>
-            {/* Username + status as a single link if user_id, else plain text */}
-            <div className="flex flex-col min-w-0 flex-1 items-start">
-              {profileLink ? (
-                <a
-                  href={profileLink}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="flex items-center gap-x-2 font-medium text-base truncate hover:underline text-blue-700 dark:text-blue-300 -ml-2"
-                  title={`View ${displayName || userId ? (displayName || userId) : 'Roblox'}'s Roblox profile`}
-                >
-                  <span>{displayName}</span>
-                  <RobloxStatus 
-                    username={status?.username || displayName || userId}
-                    isOnline={status?.isOnline || false}
-                    isInGame={status?.isInGame || false}
-                    inBedwars={status?.inBedwars || false}
-                    lastUpdated={status?.lastUpdated}
-                  />
-                </a>
-              ) : (
-                <span className="flex items-center gap-x-2 font-medium text-base truncate text-gray-700 dark:text-gray-300 -ml-2">
-                  <span>{displayName}</span>
-                  <RobloxStatus 
-                    username={status?.username || displayName || userId}
-                    isOnline={status?.isOnline || false}
-                    isInGame={status?.isInGame || false}
-                    inBedwars={status?.inBedwars || false}
-                    lastUpdated={status?.lastUpdated}
-                  />
-                </span>
-              )}
-              {userId && (
-                <span className="text-xs text-gray-500">ID: {userId}</span>
-              )}
-              {profile?.source && (
-                <span className={`px-1 py-0.5 rounded text-xs ${
-                  profile.source === 'cache' 
-                    ? 'bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-300' 
-                    : 'bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300'
-                }`}>
-                  {profile.source}
-                </span>
-              )}
-            </div>
-            {/* Rank badge and admin controls */}
-            <div className="flex flex-col items-end gap-1 min-w-[90px]">
-              <div className="w-8 h-8 flex items-center justify-center">
-                {rank && rank.image_url ? (
-                  <img src={rank.image_url} alt={rank.name} className="w-8 h-8 object-contain" title={rank.name} />
-                ) : rank ? (
-                  <span className="text-xs font-bold text-blue-600 border border-blue-300 rounded px-1" title={rank.name}>{rank.name[0]}</span>
-                ) : (
-                  <HelpCircle size={18} className="text-gray-400" />
+            {/* Username/status + rank badge (center), admin controls (right) */}
+            <div className="flex flex-1 items-center min-w-0">
+              {/* Username/status and ID (left) */}
+              <div className="flex flex-col min-w-0 flex-1 items-start">
+                <div className="flex items-center min-w-0 w-full">
+                  {profileLink ? (
+                    <a
+                      href={profileLink}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="flex items-center gap-x-2 font-medium text-base truncate hover:underline text-blue-700 dark:text-blue-300 -ml-2"
+                      title={`View ${displayName || userId ? (displayName || userId) : 'Roblox'}'s Roblox profile`}
+                    >
+                      <span>{displayName}</span>
+                      <RobloxStatus 
+                        username={status?.username || displayName || userId}
+                        isOnline={status?.isOnline || false}
+                        isInGame={status?.isInGame || false}
+                        inBedwars={status?.inBedwars || false}
+                        lastUpdated={status?.lastUpdated}
+                      />
+                    </a>
+                  ) : (
+                    <span className="flex items-center gap-x-2 font-medium text-base truncate text-gray-700 dark:text-gray-300 -ml-2">
+                      <span>{displayName}</span>
+                      <RobloxStatus 
+                        username={status?.username || displayName || userId}
+                        isOnline={status?.isOnline || false}
+                        isInGame={status?.isInGame || false}
+                        inBedwars={status?.inBedwars || false}
+                        lastUpdated={status?.lastUpdated}
+                      />
+                    </span>
+                  )}
+                  {/* Rank badge (right, same line) */}
+                  <div className="flex-shrink-0 ml-auto pl-2">
+                    {rank && rank.image_url ? (
+                      <img src={rank.image_url} alt={rank.name} className="w-8 h-8 object-contain" title={rank.name} />
+                    ) : rank ? (
+                      <span className="text-xs font-bold text-blue-600 border border-blue-300 rounded px-1" title={rank.name}>{rank.name[0]}</span>
+                    ) : (
+                      <HelpCircle size={18} className="text-gray-400" />
+                    )}
+                  </div>
+                </div>
+                {userId && (
+                  <span className="text-xs text-gray-500">ID: {userId}</span>
+                )}
+                {profile?.source && (
+                  <span className={`px-1 py-0.5 rounded text-xs ${
+                    profile.source === 'cache' 
+                      ? 'bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-300' 
+                      : 'bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300'
+                  }`}>
+                    {profile.source}
+                  </span>
                 )}
               </div>
+              {/* Admin controls (right) */}
               {isAdmin && (
-                <select
-                  value={rank?.id || ''}
-                  onChange={e => handleUpdateRank(account.id, e.target.value)}
-                  className="w-full p-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600 dark:text-gray-100 bg-white border-gray-300 text-gray-900 focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400"
-                  disabled={isUpdatingRank}
-                  onClick={e => e.stopPropagation()}
-                  onFocus={e => e.stopPropagation()}
-                >
-                  <option value="" className="dark:bg-gray-700 dark:text-gray-100">Set Rank</option>
-                  {ranks.map(rankOpt => (
-                    <option key={rankOpt.id} value={rankOpt.id} className="dark:bg-gray-700 dark:text-gray-100">{rankOpt.name}</option>
-                  ))}
-                </select>
-              )}
-              {isAdmin && (
-                <button
-                  onClick={() => onDeleteAccount(account.id)}
-                  className="p-1.5 text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 rounded transition-colors"
-                  title="Delete account"
-                  disabled={isUpdatingRank}
-                >
-                  <Trash2 size={18} />
-                </button>
+                <div className="flex flex-col items-end gap-1 min-w-[110px] ml-4">
+                  <div className="flex items-center gap-2 w-full">
+                    <select
+                      value={rank?.id || ''}
+                      onChange={e => handleUpdateRank(account.id, e.target.value)}
+                      className="p-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600 dark:text-gray-100 bg-white border-gray-300 text-gray-900 focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400"
+                      disabled={isUpdatingRank}
+                      onClick={e => e.stopPropagation()}
+                      onFocus={e => e.stopPropagation()}
+                    >
+                      <option value="" className="dark:bg-gray-700 dark:text-gray-100">Set Rank</option>
+                      {ranks.map(rankOpt => (
+                        <option key={rankOpt.id} value={rankOpt.id} className="dark:bg-gray-700 dark:text-gray-100">{rankOpt.name}</option>
+                      ))}
+                    </select>
+                    <button
+                      onClick={() => onDeleteAccount(account.id)}
+                      className="p-1.5 text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 rounded transition-colors"
+                      title="Delete account"
+                      disabled={isUpdatingRank}
+                    >
+                      <Trash2 size={18} />
+                    </button>
+                  </div>
+                </div>
               )}
             </div>
           </div>
