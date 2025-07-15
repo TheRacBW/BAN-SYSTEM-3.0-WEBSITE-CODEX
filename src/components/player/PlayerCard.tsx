@@ -14,6 +14,226 @@ import EditPlayerModal from './modals/EditPlayerModal';
 import { useKits } from '../../context/KitContext';
 import { useRestrictedUserIds } from '../../hooks/useRestrictedUserIds';
 import { supabase } from '../../lib/supabase';
+import { Loader2 } from 'lucide-react';
+import { useState, useEffect } from 'react';
+
+// --- Safe Roblox Profile Integration ---
+interface RobloxProfile {
+  username: string;
+  user_id: number;
+  profile_picture_url: string | null;
+  cached_at: string;
+  source?: 'cache' | 'status';
+}
+
+const useRobloxProfiles = (playerAccounts: any[]) => {
+  const [profiles, setProfiles] = useState<Map<string, RobloxProfile>>(new Map());
+  const [loading, setLoading] = useState(false);
+
+  const fetchRobloxProfiles = async () => {
+    if (!playerAccounts?.length) return;
+    setLoading(true);
+    try {
+      const usernames = [...new Set(
+        playerAccounts
+          .map(acc => acc.username)
+          .filter(Boolean)
+          .filter(username => typeof username === 'string' && username.trim().length > 0)
+      )];
+      if (usernames.length === 0) {
+        setProfiles(new Map());
+        return;
+      }
+      // Cache first
+      const { data: cachedProfiles } = await supabase
+        .from('roblox_user_cache')
+        .select('username, user_id, profile_picture_url, cached_at')
+        .in('username', usernames);
+      const profileMap = new Map<string, RobloxProfile>();
+      cachedProfiles?.forEach(profile => {
+        if (profile.user_id && profile.username) {
+          profileMap.set(profile.username, {
+            ...profile,
+            source: 'cache'
+          });
+        }
+      });
+      // Fallback to status table
+      const missingUsernames = usernames.filter(username => !profileMap.has(username));
+      if (missingUsernames.length > 0) {
+        const { data: statusProfiles } = await supabase
+          .from('roblox_user_status')
+          .select('username, user_id')
+          .in('username', missingUsernames)
+          .not('user_id', 'is', null)
+          .not('username', 'is', null);
+        statusProfiles?.forEach(profile => {
+          if (profile.user_id && profile.username && !profileMap.has(profile.username)) {
+            profileMap.set(profile.username, {
+              username: profile.username,
+              user_id: Number(profile.user_id),
+              profile_picture_url: null,
+              cached_at: new Date().toISOString(),
+              source: 'status'
+            });
+          }
+        });
+      }
+      setProfiles(profileMap);
+    } catch (error) {
+      setProfiles(new Map());
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchRobloxProfiles();
+  }, [JSON.stringify(playerAccounts?.map(acc => acc.username))]);
+
+  return { profiles, loading, refetch: fetchRobloxProfiles };
+};
+
+interface RobloxProfilePictureProps {
+  username: string;
+  profile?: RobloxProfile;
+  size?: 'sm' | 'md' | 'lg';
+  showLink?: boolean;
+  className?: string;
+}
+
+const RobloxProfilePicture: React.FC<RobloxProfilePictureProps> = ({
+  username,
+  profile,
+  size = 'md',
+  showLink = true,
+  className = ''
+}) => {
+  const [imageError, setImageError] = useState(false);
+  const sizeClasses = {
+    sm: 'w-8 h-8',
+    md: 'w-12 h-12',
+    lg: 'w-16 h-16'
+  };
+  const getProfilePictureUrl = () => {
+    if (profile?.profile_picture_url && !imageError) {
+      return profile.profile_picture_url;
+    }
+    if (profile?.user_id) {
+      return `https://www.roblox.com/headshot-thumbnail/image?userId=${profile.user_id}&width=150&height=150&format=png`;
+    }
+    return null;
+  };
+  const ProfileImage = () => (
+    <div className={`${sizeClasses[size]} rounded-full overflow-hidden bg-gray-200 dark:bg-gray-700 flex items-center justify-center border border-gray-300 dark:border-gray-600 ${className}`}>
+      {getProfilePictureUrl() ? (
+        <img
+          src={getProfilePictureUrl()}
+          alt={`${username}'s Roblox avatar`}
+          className="w-full h-full object-cover"
+          onError={() => setImageError(true)}
+        />
+      ) : (
+        <div className="text-gray-400 text-xs font-bold flex items-center justify-center">
+          {username.slice(0, 2).toUpperCase()}
+        </div>
+      )}
+    </div>
+  );
+  if (showLink && profile?.user_id) {
+    return (
+      <a
+        href={`https://www.roblox.com/users/${profile.user_id}/profile`}
+        target="_blank"
+        rel="noopener noreferrer"
+        className="hover:opacity-80 transition-opacity hover:scale-105 transform duration-200"
+        title={`View ${username}'s Roblox profile (ID: ${profile.user_id})`}
+      >
+        <ProfileImage />
+      </a>
+    );
+  }
+  return <ProfileImage />;
+};
+
+const AccountListWithProfiles = ({ accounts, onDeleteAccount }: { 
+  accounts: any[], 
+  onDeleteAccount: (accountId: string) => void 
+}) => {
+  const { profiles, loading } = useRobloxProfiles(accounts);
+  if (!accounts?.length) {
+    return (
+      <div className="text-sm text-gray-500 italic">
+        No accounts added yet
+      </div>
+    );
+  }
+  return (
+    <div className="space-y-3">
+      <div className="flex items-center justify-between">
+        <h4 className="font-medium text-sm text-gray-700 dark:text-gray-300">
+          Accounts ({accounts.length})
+        </h4>
+        {loading && (
+          <div className="text-xs text-gray-500 flex items-center gap-1">
+            <div className="w-3 h-3 border border-gray-300 border-t-blue-500 rounded-full animate-spin"></div>
+            Loading profiles...
+          </div>
+        )}
+      </div>
+      <div className="space-y-2 max-h-40 overflow-y-auto">
+        {accounts.map((account) => {
+          const profile = profiles.get(account.username);
+          return (
+            <div
+              key={account.id}
+              className="flex items-center gap-3 p-3 bg-gray-50 dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700"
+            >
+              <RobloxProfilePicture
+                username={account.username}
+                profile={profile}
+                size="sm"
+                showLink={true}
+              />
+              <div className="flex-1 min-w-0">
+                <div className="font-medium text-sm truncate">
+                  {account.username}
+                </div>
+                <div className="flex items-center gap-2 text-xs text-gray-500">
+                  {profile?.user_id && (
+                    <span>ID: {profile.user_id}</span>
+                  )}
+                  {profile?.source && (
+                    <span className={`px-1.5 py-0.5 rounded text-xs ${
+                      profile.source === 'cache' 
+                        ? 'bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-300' 
+                        : 'bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300'
+                    }`}>
+                      {profile.source}
+                    </span>
+                  )}
+                </div>
+              </div>
+              <div className="flex items-center gap-2">
+                <div className="w-2 h-2 bg-gray-400 rounded-full" title="Status unknown"></div>
+                <button
+                  onClick={() => onDeleteAccount(account.id)}
+                  className="p-1.5 text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 rounded transition-colors"
+                  title="Delete account"
+                >
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                  </svg>
+                </button>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+};
+// --- End Safe Roblox Profile Integration ---
 
 interface PlayerCardProps {
   player: Player;
@@ -250,6 +470,13 @@ function PlayerCard({ player, onDelete, isAdmin, onAccountChange }: PlayerCardPr
           onShowRankClaim={() => setShowRankClaimModal(true)}
           onShowTeammates={() => setShowTeammateModal(true)}
           isAdmin={isAdmin}
+          // Add enhanced accounts section
+          accountsSection={
+            <AccountListWithProfiles 
+              accounts={livePlayer.accounts || []} 
+              onDeleteAccount={deleteAccountMutation.mutate} 
+            />
+          }
         />
       )}
 
