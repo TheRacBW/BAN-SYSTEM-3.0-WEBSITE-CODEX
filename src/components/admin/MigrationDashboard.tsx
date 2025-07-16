@@ -55,6 +55,14 @@ const MigrationDashboard: React.FC<MigrationDashboardProps> = ({ className = '' 
   const [autoInterval, setAutoInterval] = useState(2); // default every 2 days
   const autoNormalizeRef = React.useRef<NodeJS.Timeout | null>(null);
 
+  // --- Player Tracker Cache Sync State ---
+  const [cacheSyncLoading, setCacheSyncLoading] = useState(false);
+  const [cacheSyncResult, setCacheSyncResult] = useState<string | null>(null);
+  const [lastCacheSync, setLastCacheSync] = useState<Date | null>(null);
+  const [lastCacheSyncCount, setLastCacheSyncCount] = useState<number | null>(null);
+  const [autoCacheSyncEnabled, setAutoCacheSyncEnabled] = useState(false);
+  const [nextCacheSync, setNextCacheSync] = useState<string>(""); // ISO string
+
   // Callbacks for coordinator
   const handleStateChange = useCallback((state: MigrationCoordinatorState) => {
     setCoordinatorState(state);
@@ -260,6 +268,34 @@ const MigrationDashboard: React.FC<MigrationDashboardProps> = ({ className = '' 
     };
   }, [autoNormalize, autoInterval]);
 
+  // Manual cache sync handler
+  const handleManualCacheSync = async () => {
+    setCacheSyncLoading(true);
+    setCacheSyncResult(null);
+    try {
+      const { data, error } = await supabase.functions.invoke('roblox-cache-batch-sync', {
+        method: 'POST',
+        body: {},
+      });
+      if (error) {
+        setCacheSyncResult('Error running cache sync.');
+      } else {
+        setCacheSyncResult(`Added ${data?.added ?? 0} users to cache.`);
+        setLastCacheSync(new Date());
+        setLastCacheSyncCount(data?.added ?? 0);
+      }
+    } catch (err) {
+      setCacheSyncResult('Error running cache sync.');
+    } finally {
+      setCacheSyncLoading(false);
+    }
+  };
+
+  // Simulate trigger on new player add
+  const handleTriggerSync = async () => {
+    await handleManualCacheSync();
+  };
+
   return (
     <div className={`space-y-6 ${className}`}>
       {/* Header */}
@@ -448,6 +484,63 @@ const MigrationDashboard: React.FC<MigrationDashboardProps> = ({ className = '' 
             <span className="ml-auto text-xs opacity-60">(click to dismiss)</span>
           </div>
         )}
+      </div>
+
+      {/* Player Tracker Cache Sync Section */}
+      <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-6">
+        <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-1 flex items-center gap-2">
+          <Zap className="w-5 h-5 text-blue-500" /> Player Tracker Cache Sync
+        </h2>
+        <p className="text-gray-600 dark:text-gray-400 mb-4">
+          Ensures all tracked players have up-to-date Roblox profile pictures and info in the cache for fast, rich UI. Keeps the player tracking and leaderboard avatars fresh and accurate.
+        </p>
+        <div className="flex flex-col md:flex-row md:items-center gap-4 mb-2">
+          <button
+            onClick={handleManualCacheSync}
+            disabled={cacheSyncLoading}
+            className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 transition-colors"
+          >
+            <RefreshCw className="w-4 h-4" />
+            {cacheSyncLoading ? 'Syncing...' : 'Run Cache Sync Now'}
+          </button>
+          <button
+            onClick={handleTriggerSync}
+            className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
+          >
+            <Play className="w-4 h-4" /> Trigger Sync (Simulate New Player)
+          </button>
+          <label className="flex items-center gap-2">
+            <input
+              type="checkbox"
+              checked={autoCacheSyncEnabled}
+              onChange={e => setAutoCacheSyncEnabled(e.target.checked)}
+              className="form-checkbox"
+            />
+            Enable Automatic Sync
+          </label>
+          <div className="flex items-center gap-2">
+            <span>Next Sync:</span>
+            <input
+              type="datetime-local"
+              value={nextCacheSync}
+              onChange={e => setNextCacheSync(e.target.value)}
+              className="border rounded px-2 py-1 dark:bg-gray-700 dark:text-gray-100"
+            />
+            {/* TODO: Wire this up to backend scheduling if needed */}
+            <button
+              className="ml-2 px-3 py-1 bg-gray-200 dark:bg-gray-700 rounded text-sm"
+              onClick={() => {/* Save nextCacheSync to backend if needed */}}
+            >
+              Set
+            </button>
+          </div>
+        </div>
+        {cacheSyncResult && (
+          <div className="mt-2 text-sm text-blue-600 dark:text-blue-400">{cacheSyncResult}</div>
+        )}
+        <div className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+          Last sync: {lastCacheSync ? lastCacheSync.toLocaleString() : 'Never'} — Added {lastCacheSyncCount ?? 0} users
+        </div>
       </div>
 
       {/* Migration Progress */}

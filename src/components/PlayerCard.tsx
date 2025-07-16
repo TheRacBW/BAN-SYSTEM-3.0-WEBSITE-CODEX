@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Player, PlayerAccount, AccountRank } from '../types/players';
 import { Kit } from '../types';
 import { useAuth } from '../context/AuthContext';
@@ -75,6 +75,9 @@ interface RobloxProfile {
 const useRobloxProfiles = (playerAccounts: any[]) => {
   const [profiles, setProfiles] = useState<Map<string, RobloxProfile>>(new Map());
   const [loading, setLoading] = useState(false);
+  const pollingRef = useRef<NodeJS.Timeout | null>(null);
+  const pollingAttemptsRef = useRef(0);
+  const MAX_POLL_ATTEMPTS = 10; // 10 x 2s = 20s
 
   const fetchRobloxProfiles = async () => {
     if (!playerAccounts?.length) return;
@@ -86,7 +89,13 @@ const useRobloxProfiles = (playerAccounts: any[]) => {
           .filter(Boolean)
           .filter(username => typeof username === 'string' && username.trim().length > 0)
       )];
-      if (usernames.length === 0) {
+      const userIds = [...new Set(
+        playerAccounts
+          .map(acc => acc.user_id)
+          .filter(Boolean)
+          .map(id => id.toString())
+      )];
+      if (usernames.length === 0 && userIds.length === 0) {
         setProfiles(new Map());
         return;
       }
@@ -94,11 +103,20 @@ const useRobloxProfiles = (playerAccounts: any[]) => {
       const { data: cachedProfiles } = await supabase
         .from('roblox_user_cache')
         .select('username, user_id, profile_picture_url, cached_at')
-        .in('username', usernames);
+        .or(`username.in.(${usernames.join(',')}),user_id.in.(${userIds.join(',')})`);
       const profileMap = new Map<string, RobloxProfile>();
       cachedProfiles?.forEach(profile => {
         if (profile.user_id && profile.username) {
+          // Map by username
           profileMap.set(profile.username, {
+            username: profile.username,
+            user_id: profile.user_id,
+            profile_picture_url: profile.profile_picture_url || undefined,
+            cached_at: profile.cached_at,
+            source: 'cache'
+          });
+          // Map by user_id as string
+          profileMap.set(profile.user_id.toString(), {
             username: profile.username,
             user_id: profile.user_id,
             profile_picture_url: profile.profile_picture_url || undefined,
@@ -125,12 +143,43 @@ const useRobloxProfiles = (playerAccounts: any[]) => {
               cached_at: new Date().toISOString(),
               source: 'status'
             });
+            profileMap.set(profile.user_id.toString(), {
+              username: profile.username,
+              user_id: Number(profile.user_id),
+              profile_picture_url: undefined,
+              cached_at: new Date().toISOString(),
+              source: 'status'
+            });
           }
         });
       }
       setProfiles(profileMap);
+      // --- POLLING LOGIC ---
+      const missingAvatars = [...usernames, ...userIds].filter(key => {
+        const p = profileMap.get(key);
+        return !p || !p.profile_picture_url;
+      });
+      if (missingAvatars.length > 0 && pollingAttemptsRef.current < MAX_POLL_ATTEMPTS) {
+        if (!pollingRef.current) {
+          pollingRef.current = setInterval(() => {
+            pollingAttemptsRef.current += 1;
+            fetchRobloxProfiles();
+          }, 2000);
+        }
+      } else {
+        if (pollingRef.current) {
+          clearInterval(pollingRef.current);
+          pollingRef.current = null;
+          pollingAttemptsRef.current = 0;
+        }
+      }
     } catch (error) {
       setProfiles(new Map());
+      if (pollingRef.current) {
+        clearInterval(pollingRef.current);
+        pollingRef.current = null;
+        pollingAttemptsRef.current = 0;
+      }
     } finally {
       setLoading(false);
     }
@@ -138,7 +187,14 @@ const useRobloxProfiles = (playerAccounts: any[]) => {
 
   useEffect(() => {
     fetchRobloxProfiles();
-  }, [JSON.stringify(playerAccounts?.map(acc => acc.username))]);
+    return () => {
+      if (pollingRef.current) {
+        clearInterval(pollingRef.current);
+        pollingRef.current = null;
+        pollingAttemptsRef.current = 0;
+      }
+    };
+  }, [JSON.stringify(playerAccounts?.map(acc => acc.username)), JSON.stringify(playerAccounts?.map(acc => acc.user_id))]);
 
   return { profiles, loading, refetch: fetchRobloxProfiles };
 };
@@ -219,19 +275,24 @@ const AccountListWithProfiles = ({ accounts, onDeleteAccount, isAdmin, ranks, ha
         )}
       </div>
       {accounts.map((account) => {
-        // Always prefer account.user_id for link and avatar
-        const userId = account.user_id || profiles.get(account.username)?.user_id;
-        const profile = profiles.get(account.username);
+        // Try cache by username first, then by user_id as string
+        let profile = profiles.get(account.username);
+        if (!profile && account.user_id) {
+          profile = profiles.get(account.user_id.toString());
+        }
+        // Avatar src: cache, else API, else default
+        let avatarUrl = '/default-avatar.svg';
+        if (profile?.profile_picture_url) {
+          avatarUrl = profile.profile_picture_url;
+        } else if (account.user_id) {
+          avatarUrl = `https://www.roblox.com/headshot-thumbnail/image?userId=${account.user_id}&width=150&height=150&format=png`;
+        }
         const status = account.status;
         const rank = account.rank && Array.isArray(account.rank) && account.rank.length > 0 ? account.rank[0].account_ranks : null;
         // Display name: username or user_id or ''
         const displayName = account.username || '';
         // Hyperlink if user_id
-        const profileLink = userId ? `https://www.roblox.com/users/${userId}/profile` : undefined;
-        // Avatar src: cache, else API, else default
-        const avatarUrl = profile?.profile_picture_url
-          ? profile.profile_picture_url
-          : (userId ? `https://www.roblox.com/headshot-thumbnail/image?userId=${userId}&width=150&height=150&format=png` : '/default-avatar.svg');
+        const profileLink = account.user_id ? `https://www.roblox.com/users/${account.user_id}/profile` : undefined;
         return (
           <div
             key={account.id}
@@ -241,7 +302,7 @@ const AccountListWithProfiles = ({ accounts, onDeleteAccount, isAdmin, ranks, ha
             <div className="w-12 h-12 rounded-full overflow-hidden bg-gray-200 dark:bg-gray-700 flex items-center justify-center border border-gray-300 dark:border-gray-600">
               <img
                 src={avatarUrl}
-                alt={displayName ? `${displayName}'s Roblox avatar` : 'Roblox avatar'}
+                alt={account.username ? `${account.username}'s Roblox avatar` : 'Roblox avatar'}
                 className="w-full h-full object-cover"
                 onError={e => { e.currentTarget.src = '/default-avatar.svg'; }}
               />
@@ -257,11 +318,11 @@ const AccountListWithProfiles = ({ accounts, onDeleteAccount, isAdmin, ranks, ha
                       target="_blank"
                       rel="noopener noreferrer"
                       className="flex items-center gap-x-2 font-medium text-base truncate hover:underline text-blue-700 dark:text-blue-300 -ml-2"
-                      title={`View ${displayName || userId ? (displayName || userId) : 'Roblox'}'s Roblox profile`}
+                      title={`View ${displayName || account.user_id ? (displayName || account.user_id) : 'Roblox'}'s Roblox profile`}
                     >
                       <span>{displayName}</span>
                       <RobloxStatus 
-                        username={status?.username || displayName || userId}
+                        username={status?.username || displayName || account.user_id}
                         isOnline={status?.isOnline || false}
                         isInGame={status?.isInGame || false}
                         inBedwars={status?.inBedwars || false}
@@ -272,7 +333,7 @@ const AccountListWithProfiles = ({ accounts, onDeleteAccount, isAdmin, ranks, ha
                     <span className="flex items-center gap-x-2 font-medium text-base truncate text-gray-700 dark:text-gray-300 -ml-2">
                       <span>{displayName}</span>
                       <RobloxStatus 
-                        username={status?.username || displayName || userId}
+                        username={status?.username || displayName || account.user_id}
                         isOnline={status?.isOnline || false}
                         isInGame={status?.isInGame || false}
                         inBedwars={status?.inBedwars || false}
@@ -291,17 +352,8 @@ const AccountListWithProfiles = ({ accounts, onDeleteAccount, isAdmin, ranks, ha
                     )}
                   </div>
                 </div>
-                {userId && (
-                  <span className="text-xs text-gray-500">ID: {userId}</span>
-                )}
-                {profile?.source && (
-                  <span className={`px-1 py-0.5 rounded text-xs ${
-                    profile.source === 'cache' 
-                      ? 'bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-300' 
-                      : 'bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300'
-                  }`}>
-                    {profile.source}
-                  </span>
+                {account.user_id && (
+                  <span className="text-xs text-gray-500">ID: {account.user_id}</span>
                 )}
               </div>
               {/* Admin controls (right) */}
