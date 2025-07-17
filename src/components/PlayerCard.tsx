@@ -25,8 +25,11 @@ import {
   RefreshCw,
   Pin,
   Crown,
-  Check
+  Check,
+  Hash,
+  User
 } from 'lucide-react';
+import { useRestrictedUserIds } from '../hooks/useRestrictedUserIds';
 
 const BEDWARS_ICON_URL =
   'https://cdn2.steamgriddb.com/icon/3ad9ecf4b4a26b7671e09283f001d626.png';
@@ -61,6 +64,7 @@ interface PlayerCardProps {
   onNavigateToPlayer?: (playerId: string) => void;
   onClose?: () => void;
   isModal?: boolean;
+  onAccountChange?: () => void;
 }
 
 // --- Safe Roblox Profile Integration ---
@@ -392,7 +396,7 @@ const AccountListWithProfiles = ({ accounts, onDeleteAccount, isAdmin, ranks, ha
   );
 };
 
-function PlayerCard({ player, onDelete, isAdmin, isPinned, onPinToggle, showPinIcon, onTeammateClick, onPlayerUpdate, onNavigateToPlayer, onClose, isModal }: PlayerCardProps) {
+function PlayerCard({ player, onDelete, isAdmin, isPinned, onPinToggle, showPinIcon, onTeammateClick, onPlayerUpdate, onNavigateToPlayer, onClose, isModal, onAccountChange = () => {} }: PlayerCardProps) {
   console.log('🎯 MAIN PlayerCard rendering:', player.alias, {
     hasAccounts: player.accounts?.length || 0,
     hasStatus: player.accounts?.[0]?.status ? 'yes' : 'no',
@@ -431,6 +435,11 @@ function PlayerCard({ player, onDelete, isAdmin, isPinned, onPinToggle, showPinI
   const [showStrategyImages, setShowStrategyImages] = useState(true);
   const [expandedStrategyId, setExpandedStrategyId] = useState<string | null>(null);
   const [availableTeammates, setAvailableTeammates] = useState<Player[]>([]);
+  const [inputMode, setInputMode] = useState<'userId' | 'username'>('userId');
+  const [username, setUsername] = useState('');
+  const [usernameLoading, setUsernameLoading] = useState(false);
+  const { restrictedIds, loading: restrictedLoading } = useRestrictedUserIds();
+  const [submitting, setSubmitting] = useState(false);
 
   const getCommonKits = () => {
     const kitUsage = new Map<string, number>();
@@ -767,30 +776,92 @@ function PlayerCard({ player, onDelete, isAdmin, isPinned, onPinToggle, showPinI
     }
   };
 
-  const handleAddAccount = async () => {
-    if (!newUserId) {
-      setError('Please enter a Roblox User ID');
+  const fetchUserIdFromUsername = async (username: string): Promise<number> => {
+    setUsernameLoading(true);
+    setError(null);
+    try {
+      const { data, error } = await supabase.functions.invoke('find-user-id', {
+        body: { username: username.trim() }
+      });
+      setUsernameLoading(false);
+      if (error) throw new Error(error.message);
+      if (!data?.user_id) throw new Error('Username not found');
+      return data.user_id;
+    } catch (e: any) {
+      setUsernameLoading(false);
+      setError(e.message || 'Failed to look up username');
+      throw e;
+    }
+  };
+
+  const handleAddAccountEnhanced = async () => {
+    let userIdToAdd = newUserId;
+    if (inputMode === 'username') {
+      if (!username) {
+        setError('Please enter a Roblox username');
+        return;
+      }
+      setSubmitting(true);
+      let lookedUpUserId: number;
+      try {
+        lookedUpUserId = await fetchUserIdFromUsername(username.trim());
+      } catch {
+        return;
+      }
+      setSubmitting(false);
+      if (!lookedUpUserId) return;
+      userIdToAdd = String(lookedUpUserId);
+    } else {
+      if (!newUserId) {
+        setError('Please enter a Roblox User ID');
+        return;
+      }
+    }
+    const normalizedInputId = String(userIdToAdd).trim();
+    // Check for restricted ID
+    const isRestricted = restrictedIds.some(restrictedId => String(restrictedId).trim() === normalizedInputId);
+    if (isRestricted) {
+      setError('This account cannot be added.');
       return;
     }
-
+    // Check for duplicate in this player card
+    const alreadyExists = playerData.accounts?.some((acc: PlayerAccount) => String(acc.user_id) === normalizedInputId);
+    if (alreadyExists) {
+      setError('This account is already added to this player.');
+      return;
+    }
+    setSubmitting(true);
     try {
-      const { data, error } = await supabase
+      const { error } = await supabase
         .from('player_accounts')
         .insert({
-          player_id: player.id,
-          user_id: parseInt(newUserId)
-        })
-        .select()
+          player_id: playerData.id,
+          user_id: parseInt(userIdToAdd)
+        });
+      if (error) {
+        if (error.message && error.message.toLowerCase().includes('restricted')) {
+          setError('This account cannot be added.');
+        } else {
+          setError('Failed to add account');
+        }
+        return;
+      }
+      // Fetch the newly added account for optimistic update
+      const { data: newAccount } = await supabase
+        .from('player_accounts')
+        .select('*')
+        .eq('player_id', playerData.id)
+        .eq('user_id', parseInt(userIdToAdd))
+        .order('created_at', { ascending: false })
+        .limit(1)
         .single();
-
-      if (error) throw error;
-
+      if (onAccountChange) onAccountChange();
       setShowAddAccountModal(false);
-      setNewUserId('');
-      setSuccess('Account added successfully');
     } catch (error) {
-      console.error('Error adding account:', error);
       setError('Failed to add account');
+      console.error('Error adding account:', error);
+    } finally {
+      setSubmitting(false);
     }
   };
 
@@ -1434,9 +1505,8 @@ function PlayerCard({ player, onDelete, isAdmin, isPinned, onPinToggle, showPinI
 
   const renderAddAccountModal = () => (
     <div 
-      className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[9999]"
+      className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[9999] p-4"
       onClick={(e) => {
-        // Only close if clicking the overlay, not the modal content
         if (e.target === e.currentTarget) {
           setShowAddAccountModal(false);
         }
@@ -1445,7 +1515,6 @@ function PlayerCard({ player, onDelete, isAdmin, isPinned, onPinToggle, showPinI
       <div 
         className="bg-white dark:bg-gray-800 rounded-lg p-6 max-w-md w-full mx-4 shadow-2xl"
         onClick={(e) => {
-          // Prevent clicks inside modal from bubbling up
           e.stopPropagation();
         }}
       >
@@ -1461,23 +1530,64 @@ function PlayerCard({ player, onDelete, isAdmin, isPinned, onPinToggle, showPinI
             <X size={24} />
           </button>
         </div>
-
-        <div className="space-y-4">
-          <div>
-            <label className="block text-sm font-medium mb-2 text-gray-700 dark:text-gray-300">
-              Roblox User ID
-            </label>
-            <input
-              type="number"
-              value={newUserId}
-              onChange={(e) => setNewUserId(e.target.value)}
-              className="w-full p-3 border rounded-lg dark:bg-gray-700 dark:border-gray-600 dark:text-gray-100 bg-white border-gray-300 text-gray-900 focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400"
-              placeholder="Enter Roblox User ID"
-              onClick={(e) => e.stopPropagation()}
-              onFocus={(e) => e.stopPropagation()}
-            />
+        {error && (
+          <div className="mb-4 p-3 bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-300 rounded">
+            {error}
           </div>
-
+        )}
+        {/* Toggle UI */}
+        <div className="flex items-center justify-center gap-4 mb-4">
+          <button
+            className={`flex items-center gap-1 px-3 py-1 rounded border ${inputMode === 'userId' ? 'bg-blue-500 text-white border-blue-500' : 'bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-200 border-gray-300 dark:border-gray-600'}`}
+            onClick={() => setInputMode('userId')}
+            disabled={inputMode === 'userId'}
+            type="button"
+          >
+            <Hash size={18} /> User ID
+          </button>
+          <button
+            className={`flex items-center gap-1 px-3 py-1 rounded border ${inputMode === 'username' ? 'bg-blue-500 text-white border-blue-500' : 'bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-200 border-gray-300 dark:border-gray-600'}`}
+            onClick={() => setInputMode('username')}
+            disabled={inputMode === 'username'}
+            type="button"
+          >
+            <User size={18} /> Username
+          </button>
+        </div>
+        <div className="space-y-4">
+          {inputMode === 'userId' ? (
+            <div>
+              <label className="block text-sm font-medium mb-2 text-gray-700 dark:text-gray-300">
+                Roblox User ID
+              </label>
+              <input
+                type="number"
+                value={newUserId}
+                onChange={(e) => setNewUserId(e.target.value)}
+                className="w-full p-3 border rounded-lg dark:bg-gray-700 dark:border-gray-600 dark:text-gray-100 bg-white border-gray-300 text-gray-900 focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400"
+                placeholder="Enter Roblox User ID"
+                onClick={(e) => e.stopPropagation()}
+                onFocus={(e) => e.stopPropagation()}
+                disabled={restrictedLoading}
+              />
+            </div>
+          ) : (
+            <div>
+              <label className="block text-sm font-medium mb-2 text-gray-700 dark:text-gray-300">
+                Roblox Username
+              </label>
+              <input
+                type="text"
+                value={username}
+                onChange={(e) => setUsername(e.target.value)}
+                className="w-full p-3 border rounded-lg dark:bg-gray-700 dark:border-gray-600 dark:text-gray-100 bg-white border-gray-300 text-gray-900 focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400"
+                placeholder="Enter Roblox Username"
+                onClick={(e) => e.stopPropagation()}
+                onFocus={(e) => e.stopPropagation()}
+                disabled={restrictedLoading || usernameLoading}
+              />
+            </div>
+          )}
           <div className="flex gap-3 pt-4 border-t">
             <button
               onClick={(e) => {
@@ -1491,11 +1601,12 @@ function PlayerCard({ player, onDelete, isAdmin, isPinned, onPinToggle, showPinI
             <button
               onClick={(e) => {
                 e.stopPropagation();
-                handleAddAccount();
+                handleAddAccountEnhanced();
               }}
               className="btn btn-primary flex-1"
+              disabled={restrictedLoading || submitting || usernameLoading}
             >
-              Add Account
+              {submitting || usernameLoading ? 'Adding...' : 'Add Account'}
             </button>
           </div>
         </div>
@@ -1825,43 +1936,21 @@ function PlayerCard({ player, onDelete, isAdmin, isPinned, onPinToggle, showPinI
   const renderTeammateModal = () => {
     const filteredTeammates = availableTeammates.filter(teammate => {
       const searchLower = teammateSearchQuery.toLowerCase().trim();
-      
       // Search by player alias
       const matchesAlias = teammate.alias.toLowerCase().includes(searchLower);
-      
       // Search by any account username
       const matchesUsername = teammate.accounts?.some(account => 
         account.status?.username?.toLowerCase().includes(searchLower)
       );
-      
       // Don't show players who are already teammates
       const isNotCurrentTeammate = !(playerData.teammates as any)?.some((pt: any) => 
         pt.teammate.id === teammate.id
       );
-      
       return (matchesAlias || matchesUsername) && isNotCurrentTeammate;
     });
-
-    console.log('🔍 Teammate modal debug:', {
-      availableTeammates: availableTeammates.length,
-      filteredTeammates: filteredTeammates.length,
-      currentTeammates: playerData.teammates?.length || 0,
-      searchQuery: teammateSearchQuery
-    });
-
     return (
-      <div 
-        className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[9999]"
-        onClick={(e) => {
-          if (e.target === e.currentTarget) {
-            setShowTeammateModal(false);
-          }
-        }}
-      >
-        <div 
-          className="bg-white dark:bg-gray-800 rounded-lg p-6 max-w-2xl w-full mx-4 max-h-[90vh] overflow-y-auto shadow-2xl"
-          onClick={(e) => e.stopPropagation()}
-        >
+      <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[9999]">
+        <div className="bg-white dark:bg-gray-800 rounded-lg p-6 max-w-2xl w-full mx-4 shadow-2xl">
           <div className="flex justify-between items-center mb-4">
             <h3 className="text-xl font-bold text-gray-900 dark:text-gray-100">Manage Teammates</h3>
             <button
