@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Calculator, TrendingUp, TrendingDown, Target, Award, Shield, AlertCircle, BarChart3, Clock } from 'lucide-react';
+import { Calculator, TrendingUp, TrendingDown, Target, Award, Shield, AlertCircle, BarChart3, Clock, BarChart2 } from 'lucide-react';
 import RankBadge from './leaderboard/RankBadge';
 import { calculateRankFromRP, getRankDisplayName } from '../utils/rankingSystem';
 
@@ -489,249 +489,393 @@ const BedWarsMMRCalculator = () => {
   else if (playerData.matchHistory.length <= 2) confidence = 'Low';
   if (symmetryWarning) confidence = 'Low';
 
+  const MAIN_TABS = [
+    { key: 'calculator', label: 'MMR & RP Calculator', icon: <Calculator size={18} /> },
+    { key: 'advanced', label: 'Advanced RP Prediction', icon: <BarChart2 size={18} /> },
+  ];
+  const [mainTab, setMainTab] = useState<'calculator' | 'advanced'>('calculator');
+
   return (
-    <div className="max-w-5xl mx-auto py-8 px-2">
-      <div className="bg-white dark:bg-gray-900 rounded-2xl shadow-xl border border-gray-200 dark:border-gray-800 p-6 md:p-10 mb-8 animate-fade-in">
-        <div className="flex items-center gap-3 mb-8">
-          <Calculator className="w-9 h-9 text-primary-600 dark:text-primary-400" />
-          <h1 className="text-3xl md:text-4xl font-extrabold text-gray-900 dark:text-gray-100 tracking-tight">BedWars MMR & RP Calculator</h1>
+    <div className="max-w-7xl mx-auto py-12 px-4 flex flex-col gap-8 animate-fade-in">
+      {/* Mini Header like Leaderboard/Strat Picker */}
+      <div className="mb-6">
+        <div className="flex flex-col gap-2">
+          <h1 className="text-3xl font-semibold text-gray-900 dark:text-white tracking-wide mb-1" style={{letterSpacing: '0.01em'}}>MMR Calculator</h1>
         </div>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-          {/* Player Info Input */}
-          <div className="space-y-6 bg-gray-50 dark:bg-gray-800 rounded-xl p-5 border border-gray-100 dark:border-gray-700 shadow-sm">
-            <h2 className="text-lg font-bold text-gray-800 dark:text-gray-100 flex items-center gap-2 mb-2">
-              <Target className="w-5 h-5" /> Player Information
-            </h2>
-            <div>
-              <label className="block text-xs font-semibold text-gray-600 dark:text-gray-300 mb-1">Current Rank</label>
-              <div className="flex items-center gap-2">
-                <select
-                  value={playerData.currentRank}
-                  onChange={(e) => setPlayerData(prev => ({ ...prev, currentRank: e.target.value }))}
-                  className="w-full p-2 bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-md focus:ring-2 focus:ring-primary-500 focus:border-primary-500 dark:focus:ring-primary-400 dark:focus:border-primary-400 transition"
-                >
-                  {RANK_NAMES.map(rank => (
-                    <option key={rank} value={rank}>
-                      {rank.replace('_', ' ')}
-                    </option>
-                  ))}
-                </select>
-                <RankBadge
-                  rankTitle={playerData.currentRank.replace('_', ' ')}
-                  rp={playerData.currentRP}
-                  size="small"
-                  className="ml-2"
-                />
-              </div>
-            </div>
-            <div>
-              <label className="block text-xs font-semibold text-gray-600 dark:text-gray-300 mb-1">Current RP</label>
-              <input
-                type="number"
-                value={playerData.currentRP}
-                onChange={(e) => setPlayerData(prev => ({ ...prev, currentRP: parseInt(e.target.value) || 0 }))}
-                className="w-full p-2 bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-md focus:ring-2 focus:ring-primary-500 focus:border-primary-500 dark:focus:ring-primary-400 dark:focus:border-primary-400 transition"
-                min="0"
-                max="99"
-              />
-              <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                RP within the current rank (0-99)
-              </p>
-            </div>
-            <div>
-              <label className="block text-xs font-semibold text-gray-600 dark:text-gray-300 mb-1">Total Wins (Season)</label>
-              <input
-                type="number"
-                value={playerData.totalWins}
-                onChange={(e) => setPlayerData(prev => ({ ...prev, totalWins: parseInt(e.target.value) || 0 }))}
-                className="w-full p-2 bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-md focus:ring-2 focus:ring-primary-500 focus:border-primary-500 dark:focus:ring-primary-400 dark:focus:border-primary-400 transition"
-                min="0"
-                placeholder="Total ranked wins this season"
-              />
-            </div>
-            <div>
-              <label className="block text-xs font-semibold text-gray-600 dark:text-gray-300 mb-1">Shield Games Used (0-3)</label>
-              <input
-                type="number"
-                value={playerData.shieldGamesUsed || 0}
-                onChange={(e) => setPlayerData(prev => ({ ...prev, shieldGamesUsed: Math.min(3, Math.max(0, parseInt(e.target.value) || 0)) }))}
-                className="w-full p-2 bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-md focus:ring-2 focus:ring-primary-500 focus:border-primary-500 dark:focus:ring-primary-400 dark:focus:border-primary-400 transition"
-                min="0"
-                max="3"
-                placeholder="How many shield games used?"
-              />
-              <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                Games played at 0 RP without demoting (max 3)
-              </p>
-            </div>
-            <div className="flex items-center gap-2">
-              <input
-                type="checkbox"
-                id="newSeason"
-                checked={playerData.isNewSeason}
-                onChange={(e) => setPlayerData(prev => ({ ...prev, isNewSeason: e.target.checked }))}
-                className="w-4 h-4 text-primary-600 dark:text-primary-400 border-gray-300 dark:border-gray-700 rounded focus:ring-primary-500 dark:focus:ring-primary-400"
-              />
-              <label htmlFor="newSeason" className="text-xs font-semibold text-gray-600 dark:text-gray-300">
-                New Season (rank reset)
-              </label>
-            </div>
-            {playerData.isNewSeason && (
+      </div>
+      {/* Main Tabs - Leaderboard style, full width, rectangle with rounded corners */}
+      <div className="w-full mb-0">
+        <div className="flex w-full bg-gray-100 dark:bg-gray-700 p-1 rounded-lg shadow-md">
+          {MAIN_TABS.map(tab => (
+            <button
+              key={tab.key}
+              onClick={() => setMainTab(tab.key as 'calculator' | 'advanced')}
+              className={`flex-1 flex items-center justify-center gap-2 px-4 py-2 rounded-md text-base font-medium transition-all duration-200 focus:outline-none ${
+                mainTab === tab.key
+                  ? 'bg-white dark:bg-gray-900 text-primary-900 dark:text-primary-100 shadow-sm'
+                  : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100 hover:bg-gray-200 dark:hover:bg-gray-800'
+              }`}
+              style={{ minWidth: 0 }}
+            >
+              {tab.icon}
+              <span className="hidden sm:inline">{tab.label}</span>
+            </button>
+          ))}
+        </div>
+      </div>
+      {/* Main Content */}
+      <div className="rounded-3xl shadow-2xl border border-gray-200 dark:border-gray-800 bg-white/80 dark:bg-gray-900/80 p-10 animate-fade-in backdrop-blur-md">
+        {mainTab === 'calculator' && (
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-10 animate-slide-up">
+            {/* Player Info */}
+            <div className="bg-gray-50 dark:bg-gray-800/80 rounded-2xl p-8 border border-gray-100 dark:border-gray-700 shadow-md flex flex-col gap-6 animate-fade-in">
+              <h2 className="text-lg font-bold text-gray-800 dark:text-gray-100 flex items-center gap-2 mb-2">
+                <Target className="w-5 h-5" /> Player Information
+              </h2>
               <div>
-                <label className="block text-xs font-semibold text-gray-600 dark:text-gray-300 mb-1">Previous Season MMR</label>
+                <label className="block text-xs font-semibold text-gray-600 dark:text-gray-300 mb-1">Current Rank</label>
+                <div className="flex items-center gap-2">
+                  <select
+                    value={playerData.currentRank}
+                    onChange={(e) => setPlayerData(prev => ({ ...prev, currentRank: e.target.value }))}
+                    className="w-full p-2 bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-md focus:ring-2 focus:ring-primary-500 focus:border-primary-500 dark:focus:ring-primary-400 dark:focus:border-primary-400 transition"
+                  >
+                    {RANK_NAMES.map(rank => (
+                      <option key={rank} value={rank}>
+                        {rank.replace('_', ' ')}
+                      </option>
+                    ))}
+                  </select>
+                  <RankBadge
+                    rankTitle={playerData.currentRank.replace('_', ' ')}
+                    rp={playerData.currentRP}
+                    size="small"
+                    className="ml-2"
+                  />
+                </div>
+              </div>
+              <div>
+                <label className="block text-xs font-semibold text-gray-600 dark:text-gray-300 mb-1">Current RP</label>
                 <input
                   type="number"
-                  value={playerData.previousSeasonMMR || ''}
-                  onChange={(e) => setPlayerData(prev => ({ ...prev, previousSeasonMMR: parseInt(e.target.value) || undefined }))}
+                  value={playerData.currentRP}
+                  onChange={(e) => setPlayerData(prev => ({ ...prev, currentRP: parseInt(e.target.value) || 0 }))}
                   className="w-full p-2 bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-md focus:ring-2 focus:ring-primary-500 focus:border-primary-500 dark:focus:ring-primary-400 dark:focus:border-primary-400 transition"
-                  placeholder="Enter if known"
+                  min="0"
+                  max="99"
+                />
+                <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                  RP within the current rank (0-99)
+                </p>
+              </div>
+              <div>
+                <label className="block text-xs font-semibold text-gray-600 dark:text-gray-300 mb-1">Total Wins (Season)</label>
+                <input
+                  type="number"
+                  value={playerData.totalWins}
+                  onChange={(e) => setPlayerData(prev => ({ ...prev, totalWins: parseInt(e.target.value) || 0 }))}
+                  className="w-full p-2 bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-md focus:ring-2 focus:ring-primary-500 focus:border-primary-500 dark:focus:ring-primary-400 dark:focus:border-primary-400 transition"
+                  min="0"
+                  placeholder="Total ranked wins this season"
                 />
               </div>
-            )}
-          </div>
-          {/* MMR Results */}
-          <div className="space-y-6 bg-gray-50 dark:bg-gray-800 rounded-xl p-5 border border-gray-100 dark:border-gray-700 shadow-sm flex flex-col justify-between">
-            <h2 className="text-lg font-bold text-gray-800 dark:text-gray-100 flex items-center gap-2 mb-2">
-              <BarChart3 className="w-5 h-5" /> MMR Analysis
-            </h2>
-            {calculatedMMR && (
-              <div className="space-y-4">
-                <div className="bg-primary-50 dark:bg-primary-900/20 border border-primary-200 dark:border-primary-700 rounded-lg p-4 flex flex-col items-center">
-                  <span className="text-xs font-semibold text-primary-700 dark:text-primary-300 mb-1">Estimated Glicko</span>
-                  <span className="text-3xl font-extrabold text-primary-900 dark:text-primary-100 tracking-tight">{calculatedMMR.rating}</span>
-                  <div className="text-xs text-primary-600 dark:text-primary-400 mt-1">RD: {calculatedMMR.rd} | Volatility: {calculatedMMR.vol}</div>
+              <div>
+                <label className="block text-xs font-semibold text-gray-600 dark:text-gray-300 mb-1">Shield Games Used (0-3)</label>
+                <input
+                  type="number"
+                  value={playerData.shieldGamesUsed || 0}
+                  onChange={(e) => setPlayerData(prev => ({ ...prev, shieldGamesUsed: Math.min(3, Math.max(0, parseInt(e.target.value) || 0)) }))}
+                  className="w-full p-2 bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-md focus:ring-2 focus:ring-primary-500 focus:border-primary-500 dark:focus:ring-primary-400 dark:focus:border-primary-400 transition"
+                  min="0"
+                  max="3"
+                  placeholder="How many shield games used?"
+                />
+                <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                  Games played at 0 RP without demoting (max 3)
+                </p>
+              </div>
+              <div className="flex items-center gap-2">
+                <input
+                  type="checkbox"
+                  id="newSeason"
+                  checked={playerData.isNewSeason}
+                  onChange={(e) => setPlayerData(prev => ({ ...prev, isNewSeason: e.target.checked }))}
+                  className="w-4 h-4 text-primary-600 dark:text-primary-400 border-gray-300 dark:border-gray-700 rounded focus:ring-primary-500 dark:focus:ring-primary-400"
+                />
+                <label htmlFor="newSeason" className="text-xs font-semibold text-gray-600 dark:text-gray-300">
+                  New Season (rank reset)
+                </label>
+              </div>
+              {playerData.isNewSeason && (
+                <div>
+                  <label className="block text-xs font-semibold text-gray-600 dark:text-gray-300 mb-1">Previous Season MMR</label>
+                  <input
+                    type="number"
+                    value={playerData.previousSeasonMMR || ''}
+                    onChange={(e) => setPlayerData(prev => ({ ...prev, previousSeasonMMR: parseInt(e.target.value) || undefined }))}
+                    className="w-full p-2 bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-md focus:ring-2 focus:ring-primary-500 focus:border-primary-500 dark:focus:ring-primary-400 dark:focus:border-primary-400 transition"
+                    placeholder="Enter if known"
+                  />
                 </div>
-                <div className="bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-700 rounded-lg p-4 flex flex-col items-center">
-                  <span className="text-xs font-semibold text-green-700 dark:text-green-300 mb-1">Current RP</span>
-                  <span className="text-2xl font-bold text-green-900 dark:text-green-100">{playerData.currentRP}</span>
-                </div>
-                <div className="bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-700 rounded-lg p-4 flex flex-col items-center">
-                  <span className="text-xs font-semibold text-green-700 dark:text-green-300 mb-1">Expected RP Gain</span>
-                  <span className="text-2xl font-bold text-green-900 dark:text-green-100">+{projectedRP}</span>
-                </div>
-                <div className={`border rounded-lg p-4 flex flex-col items-center ${getAccuracyColor(accuracyScore)}`}>
-                  <span className="text-xs font-semibold mb-1">Accuracy Score</span>
-                  <span className="text-lg font-bold">{accuracyScore}</span>
-                  <span className="text-xs">{accuracyPercentage}%</span>
-                  <div className="text-xs mt-1 text-center">
-                    {accuracyPercentage < 50 && "Add more recent matches for better accuracy"}
-                    {accuracyPercentage >= 50 && accuracyPercentage < 75 && "Good data quality - results are reliable"}
-                    {accuracyPercentage >= 75 && "Excellent data quality - highly accurate results"}
+              )}
+            </div>
+            {/* MMR Analysis */}
+            <div className="bg-gray-50 dark:bg-gray-800/80 rounded-2xl p-8 border border-gray-100 dark:border-gray-700 shadow-md flex flex-col gap-6 animate-fade-in">
+              <h2 className="text-lg font-bold text-gray-800 dark:text-gray-100 flex items-center gap-2 mb-2">
+                <BarChart3 className="w-5 h-5" /> MMR Analysis
+              </h2>
+              {calculatedMMR && (
+                <div className="space-y-4">
+                  <div className="bg-primary-50 dark:bg-primary-900/20 border border-primary-200 dark:border-primary-700 rounded-lg p-4 flex flex-col items-center">
+                    <span className="text-xs font-semibold text-primary-700 dark:text-primary-300 mb-1">Estimated Glicko</span>
+                    <span className="text-3xl font-extrabold text-primary-900 dark:text-primary-100 tracking-tight">{calculatedMMR.rating}</span>
+                    <div className="text-xs text-primary-600 dark:text-primary-400 mt-1">RD: {calculatedMMR.rd} | Volatility: {calculatedMMR.vol}</div>
                   </div>
-                </div>
-                {ratingDiff.status !== 'aligned' && (
-                  <div className={`border rounded-lg p-3 flex flex-col items-center mt-2 ${
-                    ratingDiff.status === 'underranked' 
+                  <div className="bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-700 rounded-lg p-4 flex flex-col items-center">
+                    <span className="text-xs font-semibold text-green-700 dark:text-green-300 mb-1">Current RP</span>
+                    <span className="text-2xl font-bold text-green-900 dark:text-green-100">{playerData.currentRP}</span>
+                  </div>
+                  <div className="bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-700 rounded-lg p-4 flex flex-col items-center">
+                    <span className="text-xs font-semibold text-green-700 dark:text-green-300 mb-1">Expected RP Gain</span>
+                    <span className="text-2xl font-bold text-green-900 dark:text-green-100">+{projectedRP}</span>
+                  </div>
+                  {/* Fix accuracy score coloring: */}
+                  <div className={`border rounded-lg p-4 flex flex-col items-center mt-2 ${
+                    accuracyScore === 'High'
                       ? 'bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-700 text-green-700 dark:text-green-300'
+                      : accuracyScore === 'Medium'
+                      ? 'bg-yellow-50 dark:bg-yellow-900/20 border-yellow-200 dark:border-yellow-700 text-yellow-700 dark:text-yellow-300'
                       : 'bg-red-50 dark:bg-red-900/20 border-red-200 dark:border-red-700 text-red-700 dark:text-red-300'
                   }`}>
-                    <div className="flex items-center gap-2">
-                      {ratingDiff.status === 'underranked' ? 
-                        <TrendingUp className="w-4 h-4" /> : 
-                        <TrendingDown className="w-4 h-4" />
-                      }
-                      <span className="text-sm font-medium">
-                        {ratingDiff.status === 'underranked' ? 'Underranked' : 'Overranked'}
-                      </span>
-                    </div>
-                    <div className="text-xs mt-1">
-                      Glicko is {Math.abs(ratingDiff.diff)} points {ratingDiff.status === 'underranked' ? 'above' : 'below'} expected
+                    <span className="text-xs font-semibold mb-1">Accuracy Score</span>
+                    <span className="text-lg font-bold">{accuracyScore}</span>
+                    <span className="text-xs">{accuracyPercentage}%</span>
+                    <div className="text-xs mt-1 text-center">
+                      {accuracyPercentage < 50 && "Add more recent matches for better accuracy"}
+                      {accuracyPercentage >= 50 && accuracyPercentage < 75 && "Good data quality - results are reliable"}
+                      {accuracyPercentage >= 75 && "Excellent data quality - highly accurate results"}
                     </div>
                   </div>
-                )}
-                {shieldStatus.active && (
-                  <div className={`border rounded-lg p-3 flex flex-col items-center mt-2 ${
-                    shieldStatus.warning 
-                      ? 'bg-red-50 dark:bg-red-900/20 border-red-200 dark:border-red-700 text-red-700 dark:text-red-300'
-                      : 'bg-yellow-50 dark:bg-yellow-900/20 border-yellow-200 dark:border-yellow-700 text-yellow-700 dark:text-yellow-300'
-                  }`}>
-                    <div className="flex items-center gap-2">
-                      <Shield className="w-5 h-5" />
-                      <span className="text-sm font-medium">
-                        Demotion Shield {shieldStatus.warning ? 'CRITICAL' : 'Active'}
-                      </span>
-                    </div>
-                    <div className="text-xs mt-1">
-                      {shieldStatus.gamesUsed}/3 shield games used
-                      {shieldStatus.warning && " - demotion imminent!"}
-                    </div>
-                    {shieldStatus.active && (
-                      <div className="text-xs mt-2 p-2 bg-white/50 dark:bg-gray-900/50 rounded">
-                        ⚠️ Your Glicko is still dropping during shield games, even though your RP stays at 0
+                  {ratingDiff.status !== 'aligned' && (
+                    <div className={`border rounded-lg p-3 flex flex-col items-center mt-2 ${
+                      ratingDiff.status === 'underranked' 
+                        ? 'bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-700 text-green-700 dark:text-green-300'
+                        : 'bg-red-50 dark:bg-red-900/20 border-red-200 dark:border-red-700 text-red-700 dark:text-red-300'
+                    }`}>
+                      <div className="flex items-center gap-2">
+                        {ratingDiff.status === 'underranked' ? 
+                          <TrendingUp className="w-4 h-4" /> : 
+                          <TrendingDown className="w-4 h-4" />
+                        }
+                        <span className="text-sm font-medium">
+                          {ratingDiff.status === 'underranked' ? 'Underranked' : 'Overranked'}
+                        </span>
                       </div>
-                    )}
-                  </div>
-                )}
+                      <div className="text-xs mt-1">
+                        Glicko is {Math.abs(ratingDiff.diff)} points {ratingDiff.status === 'underranked' ? 'above' : 'below'} expected
+                      </div>
+                    </div>
+                  )}
+                  {shieldStatus.active && (
+                    <div className={`border rounded-lg p-3 flex flex-col items-center mt-2 ${
+                      shieldStatus.warning 
+                        ? 'bg-red-50 dark:bg-red-900/20 border-red-200 dark:border-red-700 text-red-700 dark:text-red-300'
+                        : 'bg-yellow-50 dark:bg-yellow-900/20 border-yellow-200 dark:border-yellow-700 text-yellow-700 dark:text-yellow-300'
+                    }`}>
+                      <div className="flex items-center gap-2">
+                        <Shield className="w-5 h-5" />
+                        <span className="text-sm font-medium">
+                          Demotion Shield {shieldStatus.warning ? 'CRITICAL' : 'Active'}
+                        </span>
+                      </div>
+                      <div className="text-xs mt-1">
+                        {shieldStatus.gamesUsed}/3 shield games used
+                        {shieldStatus.warning && " - demotion imminent!"}
+                      </div>
+                      {shieldStatus.active && (
+                        <div className="text-xs mt-2 p-2 bg-white/50 dark:bg-gray-900/50 rounded">
+                          ⚠️ Your Glicko is still dropping during shield games, even though your RP stays at 0
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+            {/* Recent Matches */}
+            <div className="bg-gray-50 dark:bg-gray-800/80 rounded-2xl p-8 border border-gray-100 dark:border-gray-700 shadow-md flex flex-col gap-6 animate-fade-in">
+              <div className="flex justify-between items-center mb-2">
+                <h2 className="text-lg font-bold text-gray-800 dark:text-gray-100 flex items-center gap-2">
+                  <Clock className="w-5 h-5" /> Recent Matches
+                </h2>
+                <button
+                  onClick={addMatch}
+                  className="px-3 py-1 bg-primary-600 dark:bg-primary-500 text-white rounded-md hover:bg-primary-700 dark:hover:bg-primary-400 text-xs font-semibold shadow transition"
+                >
+                  Add Match
+                </button>
               </div>
-            )}
+              <div className="space-y-2 max-h-96 overflow-y-auto scrollbar-thin scrollable-section">
+                {playerData.matchHistory.map((match, index) => (
+                  <div key={match.id} className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg p-3 flex flex-col md:flex-row md:items-center gap-2 shadow-sm hover:shadow-md transition">
+                    <div className="flex items-center gap-2 mb-1 md:mb-0">
+                      <span className="text-xs text-gray-500 dark:text-gray-400 font-mono">#{index + 1}</span>
+                      <select
+                        value={match.outcome}
+                        onChange={(e) => updateMatch(match.id, 'outcome', e.target.value)}
+                        className="text-xs px-2 py-1 bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded focus:ring-primary-500 dark:focus:ring-primary-400"
+                      >
+                        <option value="win">Win</option>
+                        <option value="loss">Loss</option>
+                        <option value="draw">Draw</option>
+                      </select>
+                      {match.outcome === 'loss' && (
+                        <label className="flex items-center gap-1 text-xs">
+                          <input
+                            type="checkbox"
+                            checked={match.wasShielded || false}
+                            onChange={(e) => updateMatch(match.id, 'wasShielded', e.target.checked)}
+                            className="w-3 h-3 accent-yellow-500"
+                          />
+                          <Shield className="w-3 h-3 text-yellow-600 dark:text-yellow-400" />
+                        </label>
+                      )}
+                      <button
+                        onClick={() => removeMatch(match.id)}
+                        className="text-red-500 hover:text-red-700 dark:text-red-400 dark:hover:text-red-300 text-xs ml-auto"
+                      >
+                        Remove
+                      </button>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs text-gray-600 dark:text-gray-300">RP:</span>
+                      <input
+                        type="number"
+                        value={match.wasShielded ? 0 : match.rpChange}
+                        onChange={(e) => updateMatch(match.id, 'rpChange', parseInt(e.target.value) || 0)}
+                        className="text-xs px-2 py-1 bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded w-16 focus:ring-primary-500 dark:focus:ring-primary-400"
+                        disabled={match.wasShielded}
+                      />
+                      <span className={`text-xs font-medium ${
+                        match.wasShielded ? 'text-yellow-600 dark:text-yellow-400' : 
+                        match.rpChange > 0 ? 'text-green-600 dark:text-green-400' : 
+                        match.rpChange < 0 ? 'text-red-600 dark:text-red-400' : 'text-gray-600 dark:text-gray-300'
+                      }`}>
+                        {match.wasShielded ? '🛡️ 0 (shielded)' : 
+                         match.rpChange > 0 ? '+' + match.rpChange : match.rpChange}
+                      </span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+              {playerData.matchHistory.length === 0 && (
+                <div className="text-center text-gray-500 dark:text-gray-400 py-8">
+                  <AlertCircle className="w-8 h-8 mx-auto mb-2 opacity-50" />
+                  <p className="text-sm">No matches recorded</p>
+                  <p className="text-xs">Add matches to improve accuracy</p>
+                </div>
+              )}
+            </div>
           </div>
-          {/* Advanced RP Prediction Section */}
-          <div className="mt-10 bg-white dark:bg-gray-900 rounded-2xl shadow-xl border border-gray-200 dark:border-gray-800 p-6 md:p-10">
-            <h2 className="text-2xl font-bold mb-4 flex items-center gap-2">
-              <BarChart3 className="w-6 h-6 text-primary-600 dark:text-primary-400" />
+        )}
+        {mainTab === 'calculator' && (
+          <div className="mt-12 pt-8 border-t border-gray-200 dark:border-gray-700 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8 text-sm animate-fade-in">
+            {/* System Insights Panel (unchanged, but more spacing and modern card style) */}
+            <div className="bg-primary-50 dark:bg-primary-900/20 p-6 rounded-2xl flex flex-col items-center border border-primary-100 dark:border-primary-700 shadow-md">
+              <div className="font-semibold text-primary-900 dark:text-primary-100">Match Sample</div>
+              <div className="text-2xl font-extrabold text-primary-700 dark:text-primary-300">{playerData.matchHistory.length}/10</div>
+              <div className="text-xs text-primary-600 dark:text-primary-400">matches tracked</div>
+            </div>
+            <div className="bg-green-50 dark:bg-green-900/20 p-6 rounded-2xl flex flex-col items-center border border-green-100 dark:border-green-700 shadow-md">
+              <div className="font-semibold text-green-900 dark:text-green-100">Sample Win Rate</div>
+              <div className="text-2xl font-extrabold text-green-700 dark:text-green-300">
+                {playerData.matchHistory.length > 0 
+                  ? Math.round((playerData.matchHistory.filter(m => m.outcome === 'win').length / playerData.matchHistory.length) * 100)
+                  : 0
+                }%
+              </div>
+              <div className="text-xs text-green-600 dark:text-green-400">from recent matches</div>
+            </div>
+            <div className="bg-red-50 dark:bg-red-900/20 p-6 rounded-2xl flex flex-col items-center border border-red-100 dark:border-red-700 shadow-md">
+              <div className="font-semibold text-red-900 dark:text-red-100">Avg RP/Win</div>
+              <div className="text-2xl font-extrabold text-red-700 dark:text-red-300">
+                {playerData.matchHistory.length > 0 
+                  ? Math.round(playerData.matchHistory.filter(m => m.outcome === 'win').reduce((sum, m) => sum + m.rpChange, 0) / playerData.matchHistory.filter(m => m.outcome === 'win').length) || 0
+                  : 0
+                }
+              </div>
+              <div className="text-xs text-red-600 dark:text-red-400">recent average</div>
+            </div>
+            <div className="bg-yellow-50 dark:bg-yellow-900/20 p-6 rounded-2xl flex flex-col items-center border border-yellow-100 dark:border-yellow-700 shadow-md">
+              <div className="font-semibold text-yellow-900 dark:text-yellow-100">Avg RP/Loss</div>
+              <div className="text-2xl font-extrabold text-yellow-700 dark:text-yellow-300">
+                {playerData.matchHistory.length > 0 
+                  ? Math.round(playerData.matchHistory.filter(m => m.outcome === 'loss').reduce((sum, m) => sum + m.rpChange, 0) / playerData.matchHistory.filter(m => m.outcome === 'loss').length) || 0
+                  : 0
+                }
+              </div>
+              <div className="text-xs text-yellow-600 dark:text-yellow-400">recent average</div>
+            </div>
+          </div>
+        )}
+        {mainTab === 'advanced' && (
+          <section className="advanced-prediction mt-8 p-8 bg-white dark:bg-gray-900 rounded-2xl shadow-xl animate-fade-in max-w-5xl mx-auto">
+            <h2 className="text-2xl font-bold mb-8 flex items-center gap-2">
+              <BarChart3 className="w-7 h-7 text-primary-600 dark:text-primary-400" />
               Advanced RP Prediction
             </h2>
-            <div className="mb-4 flex gap-2">
+            {/* Modern tab bar for prediction modes */}
+            <div className="prediction-tabs flex gap-2 mb-8 border-b-2 border-gray-200 dark:border-gray-700">
               {TABS.map(tab => (
                 <button
                   key={tab.key}
                   onClick={() => setPredictionTab(tab.key)}
-                  className={`px-4 py-2 rounded-t-lg font-semibold transition border-b-2 ${predictionTab === tab.key ? 'border-primary-600 dark:border-primary-400 bg-primary-50 dark:bg-primary-900/20 text-primary-900 dark:text-primary-100' : 'border-transparent bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-300'}`}
+                  className={`tab-button px-6 py-3 font-semibold text-base transition-all duration-200 border-b-2 ${predictionTab === tab.key ? 'border-primary-600 dark:border-primary-400 bg-primary-50 dark:bg-primary-900/20 text-primary-900 dark:text-primary-100' : 'border-transparent bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700'}`}
+                  style={{ minWidth: 140 }}
                 >
                   {tab.label}
                 </button>
               ))}
             </div>
-            <div className="flex flex-col md:flex-row gap-6">
-              <div className="flex-1 space-y-4">
+            {/* Input Form Grid */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mb-8">
+              <div className="space-y-6">
                 <div>
-                  <label className="block text-xs font-semibold text-gray-600 dark:text-gray-300 mb-1">
-                    Games to simulate
-                    <Tooltip text="How many future games to predict using your win/loss pattern and Glicko-2 math." >
-                      <span className="ml-1 text-primary-500">?</span>
-                    </Tooltip>
-                  </label>
+                  <label className="block text-sm font-semibold text-gray-700 dark:text-gray-200 mb-1">Games to simulate</label>
                   <input
                     type="number"
                     min={1}
                     max={100}
                     value={simGames}
                     onChange={e => setSimGames(Math.max(1, Math.min(100, parseInt(e.target.value) || 1)))}
-                    className="w-32 p-2 bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-md focus:ring-2 focus:ring-primary-500 focus:border-primary-500 dark:focus:ring-primary-400 dark:focus:border-primary-400 transition"
+                    className="w-full p-3 border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-primary-500 focus:border-primary-500 dark:focus:ring-primary-400 dark:focus:border-primary-400 transition"
                   />
+                  <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">How many future games to predict using your win/loss pattern and Glicko-2 math.</p>
                 </div>
                 {predictionTab === 'win' && (
                   <div>
-                    <label className="block text-xs font-semibold text-gray-600 dark:text-gray-300 mb-1">
-                      Average RP per Win
-                      <Tooltip text="Your recent average RP gain per win. Used to estimate opponent skill and predict loss RP using Glicko-2 relationships." >
-                        <span className="ml-1 text-primary-500">?</span>
-                      </Tooltip>
-                    </label>
+                    <label className="block text-sm font-semibold text-gray-700 dark:text-gray-200 mb-1">Average RP per Win</label>
                     <input
                       type="number"
                       value={avgRPWin}
                       onChange={e => setAvgRPWin(parseInt(e.target.value) || 0)}
-                      className="w-32 p-2 bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-md focus:ring-2 focus:ring-primary-500 focus:border-primary-500 dark:focus:ring-primary-400 dark:focus:border-primary-400 transition"
+                      className="w-full p-3 border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-primary-500 focus:border-primary-500 dark:focus:ring-primary-400 dark:focus:border-primary-400 transition"
                       placeholder={String(getAvgRP(playerData.matchHistory, 'win')) || 'Auto'}
                     />
+                    <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">Your recent average RP gain per win. Used to estimate opponent skill and predict loss RP using Glicko-2 relationships.</p>
                   </div>
                 )}
                 {predictionTab === 'loss' && (
                   <div>
-                    <label className="block text-xs font-semibold text-gray-600 dark:text-gray-300 mb-1">
-                      Average RP per Loss
-                      <Tooltip text="Your recent average RP loss per defeat. Used to estimate opponent skill and predict win RP using Glicko-2 relationships." >
-                        <span className="ml-1 text-primary-500">?</span>
-                      </Tooltip>
-                    </label>
+                    <label className="block text-sm font-semibold text-gray-700 dark:text-gray-200 mb-1">Average RP per Loss</label>
                     <input
                       type="number"
                       value={avgRPLoss}
                       onChange={e => setAvgRPLoss(parseInt(e.target.value) || 0)}
-                      className="w-32 p-2 bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-md focus:ring-2 focus:ring-primary-500 focus:border-primary-500 dark:focus:ring-primary-400 dark:focus:border-primary-400 transition"
+                      className="w-full p-3 border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-primary-500 focus:border-primary-500 dark:focus:ring-primary-400 dark:focus:border-primary-400 transition"
                       placeholder={String(getAvgRP(playerData.matchHistory, 'loss')) || 'Auto'}
                     />
+                    <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">Your recent average RP loss per defeat. Used to estimate opponent skill and predict win RP using Glicko-2 relationships.</p>
                   </div>
                 )}
                 {predictionTab === 'auto' && (
@@ -740,214 +884,106 @@ const BedWarsMMRCalculator = () => {
                   </div>
                 )}
               </div>
-              <div className="flex-1 space-y-2">
-                <div className="bg-gray-50 dark:bg-gray-800 rounded-lg p-4 border border-gray-100 dark:border-gray-700">
-                  <div className="font-semibold text-gray-800 dark:text-gray-100 mb-2">Prediction Results</div>
-                  <div className="text-sm text-gray-700 dark:text-gray-300 space-y-2">
+              {/* Results Cards Grid */}
+              <div className="grid grid-cols-1 gap-6 mt-0 lg:mt-6">
+                <div className="bg-gray-50 dark:bg-gray-800 rounded-lg p-6 shadow-md">
+                  <h3 className="text-lg font-semibold mb-4 flex items-center gap-2"><BarChart3 className="w-5 h-5 text-primary-600 dark:text-primary-400" />Prediction Results</h3>
+                  <div className="space-y-2 text-base">
                     {predictionTab === 'win' && usedAvgWin && (
-                      <div>
-                        <div>Input Win RP: <span className="font-bold">+{usedAvgWin}</span></div>
-                        <div>Predicted Loss RP: <span className="font-bold">{predictedLoss !== null ? predictedLoss : 'N/A'}</span></div>
+                      <div className="flex items-center gap-4">
+                        <span>Input Win RP: <span className="font-mono font-bold text-green-600">+{usedAvgWin}</span></span>
+                        <span>Predicted Loss RP: <span className="font-mono font-bold text-red-600">{predictedLoss !== null ? predictedLoss : 'N/A'}</span></span>
                       </div>
                     )}
                     {predictionTab === 'loss' && usedAvgLoss && (
-                      <div>
-                        <div>Input Loss RP: <span className="font-bold">{usedAvgLoss}</span></div>
-                        <div>Predicted Win RP: <span className="font-bold">+{predictedWin !== null ? predictedWin : 'N/A'}</span></div>
+                      <div className="flex items-center gap-4">
+                        <span>Input Loss RP: <span className="font-mono font-bold text-red-600">{usedAvgLoss}</span></span>
+                        <span>Predicted Win RP: <span className="font-mono font-bold text-green-600">+{predictedWin !== null ? predictedWin : 'N/A'}</span></span>
                       </div>
                     )}
                     {predictionTab === 'auto' && (
-                      <div>
-                        <div>Avg Win RP: <span className="font-bold">+{usedAvgWin}</span></div>
-                        <div>Avg Loss RP: <span className="font-bold">{usedAvgLoss}</span></div>
-                        <div>Predicted Loss RP: <span className="font-bold">{predictedLoss !== null ? predictedLoss : 'N/A'}</span></div>
-                        <div>Predicted Win RP: <span className="font-bold">+{predictedWin !== null ? predictedWin : 'N/A'}</span></div>
+                      <div className="flex items-center gap-4">
+                        <span>Avg Win RP: <span className="font-mono font-bold text-green-600">+{usedAvgWin}</span></span>
+                        <span>Avg Loss RP: <span className="font-mono font-bold text-red-600">{usedAvgLoss}</span></span>
+                        <span>Predicted Loss RP: <span className="font-mono font-bold text-red-600">{predictedLoss !== null ? predictedLoss : 'N/A'}</span></span>
+                        <span>Predicted Win RP: <span className="font-mono font-bold text-green-600">+{predictedWin !== null ? predictedWin : 'N/A'}</span></span>
                       </div>
                     )}
                     {opponentSkill && (
-                      <div>Opponent Skill Estimate: <span className="font-bold">{opponentSkill} Glicko</span></div>
+                      <div className="mt-2">Opponent Skill Estimate: <span className="font-bold text-blue-700 dark:text-blue-300">{opponentSkill} Glicko</span></div>
                     )}
                     {symmetryWarning && (
-                      <div className="text-red-600 dark:text-red-400 font-semibold">{symmetryWarning}</div>
+                      <div className="text-red-600 dark:text-red-400 font-semibold mt-2 flex items-center gap-2"><AlertCircle className="w-4 h-4" />{symmetryWarning}</div>
                     )}
                     {!usedAvgWin && !usedAvgLoss && (
                       <span className="italic text-gray-400">Prediction results will appear here as you enter data.</span>
                     )}
                   </div>
                 </div>
-                <div className="mt-4">
-                  <div className="font-semibold text-gray-800 dark:text-gray-100 mb-1 flex items-center gap-2">
-                    Simulation Results
-                    <Tooltip text="Simulates your RP and Glicko progression over the next N games, including promotions and demotions, using your win/loss pattern and Glicko-2 math."><span className="ml-1 text-primary-500">?</span></Tooltip>
+                <div className="bg-gray-50 dark:bg-gray-800 rounded-lg p-6 shadow-md">
+                  <h3 className="text-lg font-semibold mb-4 flex items-center gap-2"><BarChart2 className="w-5 h-5 text-primary-600 dark:text-primary-400" />Simulation Results</h3>
+                  <div className="space-y-2 text-base">
+                    <div>Final RP: <span className="font-bold text-primary-700 dark:text-primary-300">{simResult.finalRP}</span></div>
+                    <div>Final Rank: <span className="font-bold text-primary-900 dark:text-primary-100">{simResult.finalRank.replace('_', ' ')}</span></div>
+                    <div>Final Glicko: <span className="font-bold text-blue-700 dark:text-blue-300">{simResult.finalGlicko}</span></div>
+                    <div>Promotions: <span className="font-bold text-green-700 dark:text-green-300">{simResult.promotions}</span> | Demotions: <span className="font-bold text-red-700 dark:text-red-300">{simResult.demotions}</span></div>
                   </div>
-                  <div className="text-xs text-gray-600 dark:text-gray-300 mb-2">
-                    Assumes 50% win rate for demonstration. (Custom win rate coming soon!)
-                  </div>
-                  <div className="bg-gray-100 dark:bg-gray-800 rounded p-3 mb-2">
-                    <div>Final RP: <span className="font-bold">{simResult.finalRP}</span></div>
-                    <div>Final Rank: <span className="font-bold">{simResult.finalRank.replace('_', ' ')}</span></div>
-                    <div>Final Glicko: <span className="font-bold">{simResult.finalGlicko}</span></div>
-                    <div>Promotions: <span className="font-bold">{simResult.promotions}</span> | Demotions: <span className="font-bold">{simResult.demotions}</span></div>
-                  </div>
-                  <div className="overflow-x-auto max-h-40">
-                    <table className="text-xs w-full">
-                      <thead>
-                        <tr className="bg-gray-200 dark:bg-gray-700">
-                          <th className="px-2 py-1">Game</th>
-                          <th className="px-2 py-1">Result</th>
-                          <th className="px-2 py-1">RP</th>
-                          <th className="px-2 py-1">Rank</th>
-                          <th className="px-2 py-1">Glicko</th>
-                          <th className="px-2 py-1">ΔRP</th>
+                  {/* Enhanced Table Design */}
+                  <div className="overflow-x-auto mt-4">
+                    <table className="w-full border-collapse bg-white dark:bg-gray-900 rounded-lg overflow-hidden shadow-sm text-sm">
+                      <thead className="bg-gray-100 dark:bg-gray-800">
+                        <tr>
+                          <th className="px-4 py-3 text-left font-medium text-gray-700 dark:text-gray-200">Game</th>
+                          <th className="px-4 py-3 text-left font-medium text-gray-700 dark:text-gray-200">Result</th>
+                          <th className="px-4 py-3 text-left font-medium text-gray-700 dark:text-gray-200">RP</th>
+                          <th className="px-4 py-3 text-left font-medium text-gray-700 dark:text-gray-200">Rank</th>
+                          <th className="px-4 py-3 text-left font-medium text-gray-700 dark:text-gray-200">Glicko</th>
+                          <th className="px-4 py-3 text-left font-medium text-gray-700 dark:text-gray-200">ΔRP</th>
                         </tr>
                       </thead>
                       <tbody>
-                        {simResult.history.map(row => (
-                          <tr key={row.game} className="even:bg-gray-50 dark:even:bg-gray-900">
-                            <td className="px-2 py-1 text-center">{row.game}</td>
-                            <td className="px-2 py-1 text-center">{row.win ? 'Win' : 'Loss'}</td>
-                            <td className="px-2 py-1 text-center">{row.rp}</td>
-                            <td className="px-2 py-1 text-center">{row.rank.replace('_', ' ')}</td>
-                            <td className="px-2 py-1 text-center">{row.glicko}</td>
-                            <td className="px-2 py-1 text-center">{row.rpChange > 0 ? '+' : ''}{row.rpChange}</td>
+                        {simResult.history.map((row, idx) => (
+                          <tr key={row.game} className={idx % 2 === 0 ? 'bg-gray-50 dark:bg-gray-800' : 'bg-white dark:bg-gray-900'}>
+                            <td className="px-4 py-2 text-left">{row.game}</td>
+                            <td className={`px-4 py-2 text-left font-bold ${row.win ? 'text-green-600' : 'text-red-600'}`}>{row.win ? 'Win' : 'Loss'}</td>
+                            <td className="px-4 py-2 text-left font-mono">{row.rp}</td>
+                            <td className="px-4 py-2 text-left">{row.rank.replace('_', ' ')}</td>
+                            <td className="px-4 py-2 text-left font-mono">{row.glicko}</td>
+                            <td className={`px-4 py-2 text-left font-mono font-bold ${row.rpChange > 0 ? 'text-green-600' : row.rpChange < 0 ? 'text-red-600' : 'text-gray-600'}`}>{row.rpChange > 0 ? '+' : ''}{row.rpChange}</td>
                           </tr>
                         ))}
                       </tbody>
                     </table>
                   </div>
                 </div>
-                <div className="mt-4 flex flex-wrap gap-4 items-center">
-                  <div className="bg-primary-50 dark:bg-primary-900/20 border border-primary-200 dark:border-primary-700 rounded p-2 text-xs">
-                    Prediction Confidence: <span className="font-bold">{confidence}</span>
-                  </div>
-                  <div className="bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-700 rounded p-2 text-xs">
-                    RP Symmetry Check: <span className="font-bold">{symmetry.warning ? '⚠️ ' + symmetry.warning : 'OK'}</span>
-                  </div>
-                  <div className="bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-700 rounded p-2 text-xs">
-                    Opponent Skill Estimate: <span className="font-bold">{opponentSkill ? opponentSkill + ' Glicko' : 'N/A'}</span>
-                  </div>
-                </div>
-                <div className="text-xs text-gray-500 dark:text-gray-400 mt-2">
-                  <Tooltip text="Glicko-2 is a rating system that predicts your expected win/loss RP based on your skill and your opponent's skill. This tool uses those relationships for advanced predictions.">
-                    <span className="underline cursor-help">What is Glicko-2?</span>
-                  </Tooltip>
+                <div className="flex flex-wrap gap-4 items-center mt-6">
+                  <span className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium ${
+                    confidence === 'High' ? 'bg-green-100 text-green-800' :
+                    confidence === 'Medium' ? 'bg-yellow-100 text-yellow-800' :
+                    'bg-red-100 text-red-800'
+                  }`}>
+                    {confidence} Confidence
+                  </span>
+                  <span className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium ${
+                    symmetry.warning ? 'bg-yellow-100 text-yellow-800 border border-yellow-300' : 'bg-green-100 text-green-800 border border-green-300'
+                  }`}>
+                    {symmetry.warning ? <AlertCircle className="w-4 h-4 mr-1" /> : null}
+                    {symmetry.warning ? symmetry.warning : 'RP Symmetry OK'}
+                  </span>
+                  <span className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-blue-100 text-blue-800 border border-blue-300">
+                    <BarChart3 className="w-4 h-4 mr-1" />
+                    Opponent Skill: {opponentSkill ? opponentSkill + ' Glicko' : 'N/A'}
+                  </span>
                 </div>
               </div>
             </div>
-          </div>
-          {/* Match History */}
-          <div className="space-y-6 bg-gray-50 dark:bg-gray-800 rounded-xl p-5 border border-gray-100 dark:border-gray-700 shadow-sm">
-            <div className="flex justify-between items-center mb-2">
-              <h2 className="text-lg font-bold text-gray-800 dark:text-gray-100 flex items-center gap-2">
-                <Clock className="w-5 h-5" /> Recent Matches
-              </h2>
-              <button
-                onClick={addMatch}
-                className="px-3 py-1 bg-primary-600 dark:bg-primary-500 text-white rounded-md hover:bg-primary-700 dark:hover:bg-primary-400 text-xs font-semibold shadow transition"
-              >
-                Add Match
-              </button>
+            <div className="mt-8 text-xs text-gray-500 dark:text-gray-400">
+              <Tooltip text="Glicko-2 is a rating system that predicts your expected win/loss RP based on your skill and your opponent's skill. This tool uses those relationships for advanced predictions.">
+                <span className="underline cursor-help">What is Glicko-2?</span>
+              </Tooltip>
             </div>
-            <div className="space-y-2 max-h-96 overflow-y-auto scrollbar-thin scrollable-section">
-              {playerData.matchHistory.map((match, index) => (
-                <div key={match.id} className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg p-3 flex flex-col md:flex-row md:items-center gap-2 shadow-sm hover:shadow-md transition">
-                  <div className="flex items-center gap-2 mb-1 md:mb-0">
-                    <span className="text-xs text-gray-500 dark:text-gray-400 font-mono">#{index + 1}</span>
-                    <select
-                      value={match.outcome}
-                      onChange={(e) => updateMatch(match.id, 'outcome', e.target.value)}
-                      className="text-xs px-2 py-1 bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded focus:ring-primary-500 dark:focus:ring-primary-400"
-                    >
-                      <option value="win">Win</option>
-                      <option value="loss">Loss</option>
-                      <option value="draw">Draw</option>
-                    </select>
-                    {match.outcome === 'loss' && (
-                      <label className="flex items-center gap-1 text-xs">
-                        <input
-                          type="checkbox"
-                          checked={match.wasShielded || false}
-                          onChange={(e) => updateMatch(match.id, 'wasShielded', e.target.checked)}
-                          className="w-3 h-3 accent-yellow-500"
-                        />
-                        <Shield className="w-3 h-3 text-yellow-600 dark:text-yellow-400" />
-                      </label>
-                    )}
-                    <button
-                      onClick={() => removeMatch(match.id)}
-                      className="text-red-500 hover:text-red-700 dark:text-red-400 dark:hover:text-red-300 text-xs ml-auto"
-                    >
-                      Remove
-                    </button>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <span className="text-xs text-gray-600 dark:text-gray-300">RP:</span>
-                    <input
-                      type="number"
-                      value={match.wasShielded ? 0 : match.rpChange}
-                      onChange={(e) => updateMatch(match.id, 'rpChange', parseInt(e.target.value) || 0)}
-                      className="text-xs px-2 py-1 bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded w-16 focus:ring-primary-500 dark:focus:ring-primary-400"
-                      disabled={match.wasShielded}
-                    />
-                    <span className={`text-xs font-medium ${
-                      match.wasShielded ? 'text-yellow-600 dark:text-yellow-400' : 
-                      match.rpChange > 0 ? 'text-green-600 dark:text-green-400' : 
-                      match.rpChange < 0 ? 'text-red-600 dark:text-red-400' : 'text-gray-600 dark:text-gray-300'
-                    }`}>
-                      {match.wasShielded ? '🛡️ 0 (shielded)' : 
-                       match.rpChange > 0 ? '+' + match.rpChange : match.rpChange}
-                    </span>
-                  </div>
-                </div>
-              ))}
-            </div>
-            {playerData.matchHistory.length === 0 && (
-              <div className="text-center text-gray-500 dark:text-gray-400 py-8">
-                <AlertCircle className="w-8 h-8 mx-auto mb-2 opacity-50" />
-                <p className="text-sm">No matches recorded</p>
-                <p className="text-xs">Add matches to improve accuracy</p>
-              </div>
-            )}
-          </div>
-        </div>
-        {/* Additional Insights */}
-        <div className="mt-10 pt-8 border-t border-gray-200 dark:border-gray-700 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 text-sm">
-          <div className="bg-primary-50 dark:bg-primary-900/20 p-4 rounded-lg flex flex-col items-center border border-primary-100 dark:border-primary-700">
-            <div className="font-semibold text-primary-900 dark:text-primary-100">Match Sample</div>
-            <div className="text-2xl font-extrabold text-primary-700 dark:text-primary-300">{playerData.matchHistory.length}/10</div>
-            <div className="text-xs text-primary-600 dark:text-primary-400">matches tracked</div>
-          </div>
-          <div className="bg-green-50 dark:bg-green-900/20 p-4 rounded-lg flex flex-col items-center border border-green-100 dark:border-green-700">
-            <div className="font-semibold text-green-900 dark:text-green-100">Sample Win Rate</div>
-            <div className="text-2xl font-extrabold text-green-700 dark:text-green-300">
-              {playerData.matchHistory.length > 0 
-                ? Math.round((playerData.matchHistory.filter(m => m.outcome === 'win').length / playerData.matchHistory.length) * 100)
-                : 0
-              }%
-            </div>
-            <div className="text-xs text-green-600 dark:text-green-400">from recent matches</div>
-          </div>
-          <div className="bg-red-50 dark:bg-red-900/20 p-4 rounded-lg flex flex-col items-center border border-red-100 dark:border-red-700">
-            <div className="font-semibold text-red-900 dark:text-red-100">Avg RP/Win</div>
-            <div className="text-2xl font-extrabold text-red-700 dark:text-red-300">
-              {playerData.matchHistory.length > 0 
-                ? Math.round(playerData.matchHistory.filter(m => m.outcome === 'win').reduce((sum, m) => sum + m.rpChange, 0) / playerData.matchHistory.filter(m => m.outcome === 'win').length) || 0
-                : 0
-              }
-            </div>
-            <div className="text-xs text-red-600 dark:text-red-400">recent average</div>
-          </div>
-          <div className="bg-yellow-50 dark:bg-yellow-900/20 p-4 rounded-lg flex flex-col items-center border border-yellow-100 dark:border-yellow-700">
-            <div className="font-semibold text-yellow-900 dark:text-yellow-100">Avg RP/Loss</div>
-            <div className="text-2xl font-extrabold text-yellow-700 dark:text-yellow-300">
-              {playerData.matchHistory.length > 0 
-                ? Math.round(playerData.matchHistory.filter(m => m.outcome === 'loss').reduce((sum, m) => sum + m.rpChange, 0) / playerData.matchHistory.filter(m => m.outcome === 'loss').length) || 0
-                : 0
-              }
-            </div>
-            <div className="text-xs text-yellow-600 dark:text-yellow-400">recent average</div>
-          </div>
-        </div>
+          </section>
+        )}
       </div>
     </div>
   );
