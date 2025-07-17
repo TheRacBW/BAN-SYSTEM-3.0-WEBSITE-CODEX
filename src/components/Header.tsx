@@ -1,6 +1,6 @@
 import React from 'react';
-import { Link, useNavigate } from 'react-router-dom';
-import { Moon, Sun, User, LogOut, Plus, TrendingUp, Settings, Home, Users, Trophy, Compass } from 'lucide-react';
+import { Link, NavLink, useNavigate } from 'react-router-dom';
+import { Moon, Sun, User, LogOut, Plus, TrendingUp, Settings, Home, Users, Trophy, Compass, Calculator } from 'lucide-react';
 import { useTheme } from '../context/ThemeContext';
 import { useAuth } from '../context/AuthContext';
 
@@ -27,39 +27,61 @@ const Header: React.FC = () => {
           </Link>
           
           <div className="flex items-center gap-4">
-            <Link
+            <NavLink
               to="/"
-              className="text-gray-600 dark:text-gray-300 hover:text-primary-600 dark:hover:text-primary-400"
+              className={({ isActive }) =>
+                `nav-icon-link ${isActive ? 'active' : ''}`
+              }
               title="Home"
+              data-page="home"
             >
               <Home size={20} />
-            </Link>
+            </NavLink>
 
-            <Link
+            <NavLink
               to="/strat-picker"
-              className="text-gray-600 dark:text-gray-300 hover:text-primary-600 dark:hover:text-primary-400"
+              className={({ isActive }) =>
+                `nav-icon-link ${isActive ? 'active' : ''}`
+              }
               title="Strat Picker"
+              data-page="strat-picker"
             >
               <Compass size={20} />
-            </Link>
+            </NavLink>
             
-            <Link
+            <NavLink
               to="/leaderboard"
-              className="text-gray-600 dark:text-gray-300 hover:text-primary-600 dark:hover:text-primary-400"
+              className={({ isActive }) =>
+                `nav-icon-link ${isActive ? 'active' : ''}`
+              }
               title="Leaderboard"
+              data-page="leaderboard"
             >
               <Trophy size={20} />
-            </Link>
+            </NavLink>
+            <NavLink
+              to="/mmr-calculator"
+              className={({ isActive }) =>
+                `nav-icon-link ${isActive ? 'active' : ''}`
+              }
+              title="MMR Calculator"
+              data-page="calculator"
+            >
+              <Calculator size={20} />
+            </NavLink>
             
             {user && (
               <>
-                <Link
+                <NavLink
                   to="/players"
-                  className="text-gray-600 dark:text-gray-300 hover:text-primary-600 dark:hover:text-primary-400"
+                  className={({ isActive }) =>
+                    `nav-icon-link ${isActive ? 'active' : ''}`
+                  }
                   title="Player Tracking"
+                  data-page="players"
                 >
                   <Users size={20} />
-                </Link>
+                </NavLink>
               </>
             )}
             

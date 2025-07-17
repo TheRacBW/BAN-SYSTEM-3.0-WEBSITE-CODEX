@@ -843,3 +843,110 @@
     text-align: center;
   }
 }
+
+.nav-icon-link {
+  @apply relative flex items-center justify-center transition-all duration-200 ease-out text-gray-600 dark:text-gray-300;
+}
+
+.nav-icon-link:hover {
+  @apply text-primary-600 dark:text-primary-400;
+  transform: scale(1.18) translateY(-2px);
+}
+
+.nav-icon-link.active {
+  @apply text-primary-700 dark:text-primary-300;
+}
+
+.nav-icon-link.active::after {
+  content: '';
+  position: absolute;
+  left: 50%;
+  bottom: -6px;
+  transform: translateX(-50%);
+  width: 2.2rem;
+  height: 4px;
+  border-radius: 2px;
+  background: linear-gradient(90deg, #38bdf8 0%, #6366f1 100%);
+  box-shadow: 0 0 8px 2px #38bdf8cc, 0 0 16px 4px #6366f1cc;
+  opacity: 1;
+  transition: all 0.25s cubic-bezier(0.4,0,0.2,1);
+  z-index: 1;
+}
+
+.dark .nav-icon-link.active::after {
+  background: linear-gradient(90deg, #818cf8 0%, #38bdf8 100%);
+  box-shadow: 0 0 10px 2px #818cf8cc, 0 0 18px 4px #38bdf8cc;
+}
+
+/* Home: Red gradient underline and solid red icon */
+.nav-icon-link.active[data-page="home"]::after {
+  background: linear-gradient(90deg, #ef4444 0%, #f87171 100%);
+  box-shadow: 0 0 4px 1px #ef444488, 0 0 8px 2px #f8717188;
+}
+.dark .nav-icon-link.active[data-page="home"]::after {
+  background: linear-gradient(90deg, #f87171 0%, #ef4444 100%);
+  box-shadow: 0 0 5px 1px #f8717188, 0 0 10px 2px #ef444488;
+}
+.nav-icon-link.active[data-page="home"] svg {
+  color: #ef4444 !important; /* Red-500 */
+}
+
+/* Strat Picker: Blue gradient underline, solid blue icon */
+.nav-icon-link.active[data-page="strat-picker"]::after {
+  background: linear-gradient(90deg, #38bdf8 0%, #6366f1 100%);
+  box-shadow: 0 0 4px 1px #38bdf888, 0 0 8px 2px #6366f188;
+}
+.dark .nav-icon-link.active[data-page="strat-picker"]::after {
+  background: linear-gradient(90deg, #818cf8 0%, #38bdf8 100%);
+  box-shadow: 0 0 5px 1px #818cf888, 0 0 10px 2px #38bdf888;
+}
+.nav-icon-link.active[data-page="strat-picker"] svg {
+  color: #38bdf8 !important; /* Sky-400 */
+}
+
+/* Leaderboard: Gold gradient underline, solid gold icon */
+.nav-icon-link.active[data-page="leaderboard"]::after {
+  background: linear-gradient(90deg, #ffd700 0%, #ffb300 100%);
+  box-shadow: 0 0 4px 1px #ffd70088, 0 0 8px 2px #ffb30088;
+}
+.dark .nav-icon-link.active[data-page="leaderboard"]::after {
+  background: linear-gradient(90deg, #ffe066 0%, #ffb300 100%);
+  box-shadow: 0 0 5px 1px #ffe06688, 0 0 10px 2px #ffb30088;
+}
+.nav-icon-link.active[data-page="leaderboard"] svg {
+  color: #ffd700 !important; /* Gold */
+}
+
+/* Calculator: Orange gradient underline, solid orange icon */
+.nav-icon-link.active[data-page="calculator"]::after {
+  background: linear-gradient(90deg, #ff8800 0%, #ff5e00 100%);
+  box-shadow: 0 0 4px 1px #ff880088, 0 0 8px 2px #ff5e0088;
+}
+.dark .nav-icon-link.active[data-page="calculator"]::after {
+  background: linear-gradient(90deg, #ffb86b 0%, #ff8800 100%);
+  box-shadow: 0 0 5px 1px #ffb86b88, 0 0 10px 2px #ff880088;
+}
+.nav-icon-link.active[data-page="calculator"] svg {
+  color: #ff8800 !important; /* Orange */
+}
+
+/* Players: Green gradient underline, solid green icon */
+.nav-icon-link.active[data-page="players"]::after {
+  background: linear-gradient(90deg, #34d399 0%, #059669 100%);
+  box-shadow: 0 0 4px 1px #34d39988, 0 0 8px 2px #05966988;
+}
+.dark .nav-icon-link.active[data-page="players"]::after {
+  background: linear-gradient(90deg, #6ee7b7 0%, #059669 100%);
+  box-shadow: 0 0 5px 1px #6ee7b788, 0 0 10px 2px #05966988;
+}
+.nav-icon-link.active[data-page="players"] svg {
+  color: #34d399 !important; /* Emerald-400 */
+}
+
+/* Remove previous gradient icon coloring */
+.nav-icon-link.active svg {
+  background: none !important;
+  -webkit-background-clip: initial !important;
+  -webkit-text-fill-color: initial !important;
+  background-clip: initial !important;
+}
