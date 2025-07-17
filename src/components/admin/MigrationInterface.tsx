@@ -704,6 +704,27 @@ const MigrationInterface: React.FC = () => {
           </div>
         )}
       </div>
+
+      {/* Info Tab Visibility Toggle */}
+      <div className="bg-white rounded-lg shadow-sm border border-gray-200 mt-8 p-6 flex flex-col gap-2">
+        <h2 className="text-lg font-semibold text-gray-900 mb-2">MMR Calculator Info Tab Visibility</h2>
+        <p className="text-sm text-gray-600 mb-2">Control whether the Info tab in the MMR Calculator is visible to everyone or only to admins. This is useful if you want to keep the system a secret until your video is released.</p>
+        <div className="flex items-center gap-3">
+          <label className="flex items-center gap-2 cursor-pointer">
+            <input
+              type="checkbox"
+              checked={localStorage.getItem('mmrInfoTabAdminOnly') !== 'false'}
+              onChange={e => {
+                localStorage.setItem('mmrInfoTabAdminOnly', e.target.checked ? 'true' : 'false');
+                window.dispatchEvent(new Event('mmrInfoTabAdminOnlyChanged'));
+              }}
+              className="form-checkbox h-5 w-5 text-blue-600"
+            />
+            <span className="text-gray-800">Restrict Info tab to admins only</span>
+          </label>
+          <span className="text-xs text-gray-500">(Uncheck to make it public for all users)</span>
+        </div>
+      </div>
     </div>
   );
 };

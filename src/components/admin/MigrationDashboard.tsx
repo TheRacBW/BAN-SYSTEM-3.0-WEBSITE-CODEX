@@ -63,6 +63,16 @@ const MigrationDashboard: React.FC<MigrationDashboardProps> = ({ className = '' 
   const [autoCacheSyncEnabled, setAutoCacheSyncEnabled] = useState(false);
   const [nextCacheSync, setNextCacheSync] = useState<string>(""); // ISO string
 
+  // --- Info Tab Visibility Toggle State ---
+  const [infoTabAdminOnly, setInfoTabAdminOnly] = useState(
+    localStorage.getItem('mmrInfoTabAdminOnly') !== 'false'
+  );
+  useEffect(() => {
+    const handler = () => setInfoTabAdminOnly(localStorage.getItem('mmrInfoTabAdminOnly') !== 'false');
+    window.addEventListener('mmrInfoTabAdminOnlyChanged', handler);
+    return () => window.removeEventListener('mmrInfoTabAdminOnlyChanged', handler);
+  }, []);
+
   // Callbacks for coordinator
   const handleStateChange = useCallback((state: MigrationCoordinatorState) => {
     setCoordinatorState(state);
@@ -663,6 +673,33 @@ const MigrationDashboard: React.FC<MigrationDashboardProps> = ({ className = '' 
           </div>
         </div>
       )}
+
+      {/* Info Tab Visibility Toggle (Always at the very bottom) */}
+      <div className="bg-white dark:bg-gray-800 rounded-lg shadow-lg border border-blue-300 dark:border-blue-700 mt-10 p-6 flex flex-col gap-2">
+        <h2 className="text-lg font-bold text-blue-900 dark:text-blue-200 mb-2">MMR Calculator Info Tab Visibility</h2>
+        <p className="text-sm text-gray-700 dark:text-gray-300 mb-4">Choose who can see the Info tab in the MMR Calculator. If set to public, everyone (including admins) can see it. If set to admin-only, only admins can see it.</p>
+        <div className="flex items-center gap-4">
+          {/* Toggle Switch */}
+          <label className="flex items-center cursor-pointer">
+            <span className={`mr-3 text-sm font-medium ${!infoTabAdminOnly ? 'text-green-700 dark:text-green-300' : 'text-gray-700 dark:text-gray-300'}`}>Visible to public and admins</span>
+            <span className="relative">
+              <input
+                type="checkbox"
+                checked={infoTabAdminOnly}
+                onChange={e => {
+                  setInfoTabAdminOnly(e.target.checked);
+                  localStorage.setItem('mmrInfoTabAdminOnly', e.target.checked ? 'true' : 'false');
+                  window.dispatchEvent(new Event('mmrInfoTabAdminOnlyChanged'));
+                }}
+                className="sr-only peer"
+              />
+              <div className="w-11 h-6 bg-gray-200 dark:bg-gray-700 rounded-full peer peer-focus:ring-2 peer-focus:ring-blue-500 dark:peer-focus:ring-blue-400 transition-all duration-200"></div>
+              <div className={`absolute left-1 top-1 w-4 h-4 rounded-full transition-all duration-200 ${infoTabAdminOnly ? 'bg-blue-600 dark:bg-blue-400 translate-x-5' : 'bg-gray-400 dark:bg-gray-500 translate-x-0'}`}></div>
+            </span>
+            <span className={`ml-3 text-sm font-medium ${infoTabAdminOnly ? 'text-blue-900 dark:text-blue-200' : 'text-gray-700 dark:text-gray-300'}`}>Visible only to admins</span>
+          </label>
+        </div>
+      </div>
     </div>
   );
 };

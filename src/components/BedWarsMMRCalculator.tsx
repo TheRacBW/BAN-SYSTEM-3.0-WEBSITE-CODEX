@@ -680,10 +680,25 @@ const BedWarsMMRCalculator = () => {
   else if (playerData.matchHistory.length <= 2) confidence = 'Low';
   if (symmetryWarning) confidence = 'Low';
 
+  // --- Info Tab Visibility Control ---
+  // TODO: Replace with real admin check
+  const isAdmin = window.localStorage.getItem('isAdmin') === 'true';
+  const [infoTabAdminOnly, setInfoTabAdminOnly] = useState(
+    localStorage.getItem('mmrInfoTabAdminOnly') !== 'false'
+  );
+  useEffect(() => {
+    const handler = () => setInfoTabAdminOnly(localStorage.getItem('mmrInfoTabAdminOnly') !== 'false');
+    window.addEventListener('mmrInfoTabAdminOnlyChanged', handler);
+    return () => window.removeEventListener('mmrInfoTabAdminOnlyChanged', handler);
+  }, []);
+
   const MAIN_TABS = [
     { key: 'calculator', label: 'MMR Calculator', icon: <Calculator size={18} /> },
     { key: 'advanced', label: 'Advanced RP Prediction', icon: <BarChart2 size={18} /> },
-    { key: 'info', label: 'Info', icon: <BookOpen size={18} /> },
+    // Only show Info tab if allowed
+    ...((!infoTabAdminOnly || isAdmin) ? [
+      { key: 'info', label: 'Info', icon: <BookOpen size={18} /> }
+    ] : [])
   ];
   const [mainTab, setMainTab] = useState<'calculator' | 'advanced' | 'info'>('calculator');
 
@@ -1603,7 +1618,7 @@ const BedWarsMMRCalculator = () => {
             </div>
           </section>
         )}
-        {mainTab === 'info' && (
+        {mainTab === 'info' && (!infoTabAdminOnly || isAdmin) && (
           <GlickoGuide />
         )}
       </div>
