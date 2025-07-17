@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Calculator, TrendingUp, TrendingDown, Target, Award, Shield, AlertCircle, BarChart3, Clock, BarChart2 } from 'lucide-react';
 import RankBadge from './leaderboard/RankBadge';
 import { calculateRankFromRP, getRankDisplayName } from '../utils/rankingSystem';
-import { ResponsiveContainer, LineChart, Line, XAxis, YAxis, CartesianGrid, ReferenceLine, Tooltip as RechartsTooltip } from 'recharts';
+import { ResponsiveContainer, LineChart, Line, XAxis, YAxis, CartesianGrid, ReferenceLine, Tooltip as RechartsTooltip, ReferenceArea } from 'recharts';
 
 // Rank system definitions based on your decompiled code
 const RANK_DIVISIONS = {
@@ -689,6 +689,125 @@ const BedWarsMMRCalculator = () => {
     calculatedMMR?.rating || 1500
   );
 
+  // --- Rank color and zone helpers (moved inside component for access to playerData/simulation) ---
+  const RANK_COLORS: Record<string, string> = {
+    BRONZE: '#CD7F32',
+    SILVER: '#C0C0C0',
+    GOLD: '#FFD700',
+    PLATINUM: '#00CED1',
+    DIAMOND: '#4169E1',
+    EMERALD: '#50C878',
+    NIGHTMARE: '#8A2BE2'
+  };
+  const RANK_ZONES = [
+    { name: 'BRONZE', min: 0, max: 399, color: '#CD7F32' },
+    { name: 'SILVER', min: 400, max: 799, color: '#C0C0C0' },
+    { name: 'GOLD', min: 800, max: 1199, color: '#FFD700' },
+    { name: 'PLATINUM', min: 1200, max: 1599, color: '#00CED1' },
+    { name: 'DIAMOND', min: 1600, max: 1999, color: '#4169E1' },
+    { name: 'EMERALD', min: 2000, max: 2399, color: '#50C878' },
+    { name: 'NIGHTMARE', min: 2400, max: 3000, color: '#8A2BE2' }
+  ];
+  function getRankBase(rank: string): string {
+    if (rank.startsWith('BRONZE')) return 'BRONZE';
+    if (rank.startsWith('SILVER')) return 'SILVER';
+    if (rank.startsWith('GOLD')) return 'GOLD';
+    if (rank.startsWith('PLATINUM')) return 'PLATINUM';
+    if (rank.startsWith('DIAMOND')) return 'DIAMOND';
+    if (rank.startsWith('EMERALD')) return 'EMERALD';
+    if (rank.startsWith('NIGHTMARE')) return 'NIGHTMARE';
+    return 'BRONZE';
+  }
+  function getRankFromRP(rp: number): string {
+    for (let i = RANK_ZONES.length - 1; i >= 0; i--) {
+      if (rp >= RANK_ZONES[i].min) return RANK_ZONES[i].name;
+    }
+    return 'BRONZE';
+  }
+  function formatYAxis(value: number): string {
+    const rank = getRankFromRP(value + (playerData.currentRP || 0));
+    if (value % 100 === 0) {
+      return `${value} (${rank})`;
+    }
+    return value.toString();
+  }
+  // --- Promotion/demotion detection for summary and lines ---
+  function detectPromotions(simData: any[]): { game: number; rp: number; fromRank: string; toRank: string; type: 'promotion' | 'demotion' }[] {
+    const promotions: { game: number; rp: number; fromRank: string; toRank: string; type: 'promotion' | 'demotion' }[] = [];
+    for (let i = 1; i < simData.length; i++) {
+      const prev = simData[i - 1];
+      const current = simData[i];
+      if (getRankTier(current.rank) > getRankTier(prev.rank)) {
+        promotions.push({
+          game: current.game,
+          rp: current.rp,
+          fromRank: prev.rank,
+          toRank: current.rank,
+          type: 'promotion'
+        });
+      }
+      if (getRankTier(current.rank) < getRankTier(prev.rank)) {
+        promotions.push({
+          game: current.game,
+          rp: current.rp,
+          fromRank: prev.rank,
+          toRank: current.rank,
+          type: 'demotion'
+        });
+      }
+    }
+    return promotions;
+  }
+  const promotions = detectPromotions(simulation.data);
+  // --- Rank-based line coloring (no segmenting, just color transitions) ---
+  // We'll use a single Line with a gradient stroke for smooth transitions
+  function getLineGradientStops(data: any[]): { offset: number; color: string }[] {
+    const stops: { offset: number; color: string }[] = [];
+    const n = data.length;
+    for (let i = 0; i < n; i++) {
+      const base = getRankBase(data[i].rank);
+      const color = RANK_COLORS[base];
+      const offset = (i / (n - 1)) * 100;
+      stops.push({ offset, color });
+    }
+    // Remove consecutive duplicates
+    return stops.filter((s, i, arr) => i === 0 || s.color !== arr[i - 1].color);
+  }
+  // --- Custom dot for promotions/demotions ---
+  const PromotionDot = (props: any) => {
+    const { cx, cy, payload } = props;
+    if (!payload.promoted && !payload.demoted) return null;
+    const isPromotion = payload.promoted;
+    const color = isPromotion ? '#10B981' : '#EF4444';
+    const icon = isPromotion ? '🎉' : '💔';
+    return (
+      <g>
+        <circle cx={cx} cy={cy} r={12} fill={color} opacity={0.2} />
+        <circle cx={cx} cy={cy} r={6} fill={color} stroke="#fff" strokeWidth={2} />
+        <text x={cx} y={cy - 15} textAnchor="middle" fontSize="12">{icon}</text>
+      </g>
+    );
+  };
+  // --- Enhanced Tooltip ---
+  const EnhancedTooltip = ({ active, payload, label }: { active?: boolean; payload?: any[]; label?: string | number }) => {
+    if (active && payload && payload.length) {
+      const data = payload[0].payload;
+      return (
+        <div className="bg-white p-3 border rounded-lg shadow-lg max-w-xs">
+          <p className="font-semibold text-gray-800">Match {label}</p>
+          <div className="mt-2">
+            <p className={`font-medium ${data.result === 'Win' ? 'text-green-600' : 'text-red-600'}`}>{data.result}: {data.rpChange > 0 ? '+' : ''}{data.rpChange} RP</p>
+            <p className="text-sm text-gray-600">RP: {data.rp} ({data.rank.replace('_', ' ')})</p>
+            {data.promoted && (<p className="text-green-600 font-bold text-sm">🎉 PROMOTED!</p>)}
+            {data.demoted && (<p className="text-red-600 font-bold text-sm">💔 DEMOTED</p>)}
+            <p className="text-xs text-gray-500 mt-1">Glicko: {Math.round(data.glicko)}</p>
+          </div>
+        </div>
+      );
+    }
+    return null;
+  };
+
   return (
     <div className="max-w-7xl mx-auto py-12 px-4 flex flex-col gap-8 animate-fade-in">
       {/* Mini Header like Leaderboard/Strat Picker */}
@@ -1018,6 +1137,17 @@ const BedWarsMMRCalculator = () => {
               <BarChart3 className="w-7 h-7 text-primary-600 dark:text-primary-400" />
               Advanced RP Prediction
             </h2>
+            {/* --- Rank Progression Summary --- */}
+            <div className="mb-4 p-3 bg-gray-50 rounded-lg">
+              <h4 className="font-semibold text-gray-800 mb-2">Rank Progression Summary</h4>
+              <div className="flex flex-wrap gap-2">
+                {promotions.map((promo, index) => (
+                  <span key={index} className={`px-2 py-1 rounded text-xs font-medium ${promo.type === 'promotion' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
+                    Match {promo.game}: {promo.fromRank.replace('_', ' ')} → {promo.toRank.replace('_', ' ')}
+                  </span>
+                ))}
+              </div>
+            </div>
             {/* Simplified Input Interface */}
             <div className="space-y-4">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -1092,43 +1222,38 @@ const BedWarsMMRCalculator = () => {
               <div className="h-72 w-full">
                 <ResponsiveContainer width="100%" height="100%">
                   <LineChart data={simulation.data}>
+                    <defs>
+                      <linearGradient id="rankLineGradient" x1="0" y1="0" x2="1" y2="0">
+                        {getLineGradientStops(simulation.data).map((stop, i) => (
+                          <stop key={i} offset={`${stop.offset}%`} stopColor={stop.color} />
+                        ))}
+                      </linearGradient>
+                    </defs>
+                    {/* Rank background zones */}
+                    {RANK_ZONES.map((zone, index) => (
+                      <ReferenceArea key={`zone-${index}`} y1={zone.min} y2={zone.max} fill={zone.color} fillOpacity={0.05} />
+                    ))}
                     <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
                     <XAxis dataKey="game" label={{ value: 'Match Number', position: 'insideBottom', offset: -5, fill: '#6b7280' }} tick={{ fill: '#6b7280' }} />
-                    <YAxis yAxisId="rp" dataKey="rp" label={{ value: 'RP', angle: -90, position: 'insideLeft', fill: '#6b7280' }} tick={{ fill: '#6b7280' }} />
+                    <YAxis yAxisId="rp" dataKey="rp" label={{ value: 'RP', angle: -90, position: 'insideLeft', fill: '#6b7280' }} tickFormatter={formatYAxis} domain={['dataMin - 10', 'dataMax + 10']} tick={{ fill: '#6b7280' }} />
                     <YAxis yAxisId="glicko" orientation="right" dataKey="glicko" label={{ value: 'Glicko', angle: 90, position: 'insideRight', fill: '#8B5CF6' }} tick={{ fill: '#8B5CF6' }} />
-                    <RechartsTooltip 
-                      content={({ active, payload, label }: { active?: boolean; payload?: any[]; label?: string | number }) => {
-                        if (active && payload && payload.length) {
-                          const point = payload[0].payload;
-                          return (
-                            <div className="rounded-lg shadow-lg p-3 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-xs min-w-[180px]">
-                              <div className="font-semibold mb-1">Match {label}</div>
-                              <div className="flex items-center gap-2 mb-1">
-                                <span className={point.rpChange > 0 ? 'text-green-600 dark:text-green-400' : point.rpChange < 0 ? 'text-red-600 dark:text-red-400' : 'text-gray-600 dark:text-gray-300'}>
-                                  {point.rpChange > 0 ? `+${point.rpChange}` : point.rpChange}
-                                </span>
-                                <span className="ml-1">RP {point.rpChange > 0 ? 'gain' : 'loss'}</span>
-                              </div>
-                              <div>Result: <span className={point.result === 'Win' ? 'text-green-700 dark:text-green-300' : 'text-red-700 dark:text-red-300'}>{point.result}</span></div>
-                              <div>RP after match: <span className="font-mono">{point.rp}</span></div>
-                              <div>Rank: <span className="font-mono">{point.rank.replace('_', ' ')}</span></div>
-                              <div>Glicko: <span className="font-mono text-purple-700 dark:text-purple-300">{point.glicko}</span></div>
-                              {point.promoted && <div className="text-purple-600 dark:text-purple-400 font-semibold mt-1">Rank Up!</div>}
-                              {point.demoted && <div className="text-red-600 dark:text-red-400 font-semibold mt-1">Rank Drop!</div>}
-                            </div>
-                          );
-                        }
-                        return null;
-                      }}
-                    />
-                    <Line yAxisId="rp" type="monotone" dataKey="rp" stroke="#3B82F6" strokeWidth={3} dot={{ r: 3, stroke: '#3B82F6', strokeWidth: 2, fill: '#fff' }} activeDot={{ r: 5, fill: '#3B82F6' }} />
+                    <RechartsTooltip content={EnhancedTooltip} />
+                    {/* RP line with gradient coloring */}
+                    <Line yAxisId="rp" type="monotone" dataKey="rp" stroke="url(#rankLineGradient)" strokeWidth={3} dot={<PromotionDot />} activeDot={{ r: 5 }} connectNulls={false} />
+                    {/* Glicko line */}
                     <Line yAxisId="glicko" type="monotone" dataKey="glicko" stroke="#8B5CF6" strokeWidth={2} strokeDasharray="5 5" dot={false} />
-                    {/* Add vertical lines for rank promotions and drops */}
-                    {simulation.data.filter((point: any) => point.promoted).map((point: any) => (
-                      <ReferenceLine key={`rankup-${point.game}`} x={point.game} stroke="#10B981" strokeDasharray="5 5" />
+                    {/* Promotion/demotion reference lines and labels */}
+                    {promotions.map((promo, index) => (
+                      <ReferenceLine key={`promo-${index}`} x={promo.game} stroke={promo.type === 'promotion' ? '#10B981' : '#EF4444'} strokeWidth={2} strokeDasharray="5 5" />
                     ))}
-                    {simulation.data.filter(point => point.demoted).map(point => (
-                      <ReferenceLine key={`rankdrop-${point.game}`} x={point.game} stroke="#EF4444" strokeDasharray="5 5" />
+                    {promotions.map((promo, index) => (
+                      <text key={`label-${index}`} x={(() => {
+                        // Find the x position for the label
+                        const idx = simulation.data.findIndex((d: any) => d.game === promo.game);
+                        return idx !== -1 ? `${(idx * 100) / (simulation.data.length - 1)}%` : '0%';
+                      })()} y={30} textAnchor="middle" fill={promo.type === 'promotion' ? '#10B981' : '#EF4444'} fontSize="10" fontWeight="bold">
+                        {promo.type === 'promotion' ? '↗️' : '↘️'} {promo.toRank.replace('_', ' ')}
+                      </text>
                     ))}
                   </LineChart>
                 </ResponsiveContainer>
