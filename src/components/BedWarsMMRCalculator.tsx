@@ -1114,6 +1114,7 @@ const BedWarsMMRCalculator = () => {
                               <div>Rank: <span className="font-mono">{point.rank.replace('_', ' ')}</span></div>
                               <div>Glicko: <span className="font-mono text-purple-700 dark:text-purple-300">{point.glicko}</span></div>
                               {point.promoted && <div className="text-purple-600 dark:text-purple-400 font-semibold mt-1">Rank Up!</div>}
+                              {point.demoted && <div className="text-red-600 dark:text-red-400 font-semibold mt-1">Rank Drop!</div>}
                             </div>
                           );
                         }
@@ -1122,11 +1123,41 @@ const BedWarsMMRCalculator = () => {
                     />
                     <Line yAxisId="rp" type="monotone" dataKey="rp" stroke="#3B82F6" strokeWidth={3} dot={{ r: 3, stroke: '#3B82F6', strokeWidth: 2, fill: '#fff' }} activeDot={{ r: 5, fill: '#3B82F6' }} />
                     <Line yAxisId="glicko" type="monotone" dataKey="glicko" stroke="#8B5CF6" strokeWidth={2} strokeDasharray="5 5" dot={false} />
-                    {simulation.rankPromotions.map(promotion => (
-                      <ReferenceLine key={promotion.game} x={promotion.game} stroke="#10B981" strokeDasharray="5 5" />
+                    {/* Add vertical lines for rank promotions and drops */}
+                    {simulation.data.filter((point: any) => point.promoted).map((point: any) => (
+                      <ReferenceLine key={`rankup-${point.game}`} x={point.game} stroke="#10B981" strokeDasharray="5 5" />
+                    ))}
+                    {simulation.data.filter(point => point.demoted).map(point => (
+                      <ReferenceLine key={`rankdrop-${point.game}`} x={point.game} stroke="#EF4444" strokeDasharray="5 5" />
                     ))}
                   </LineChart>
                 </ResponsiveContainer>
+              </div>
+              {/* Simulation Calculation Summary */}
+              <div className="mt-3 text-xs text-gray-700 dark:text-gray-300 bg-blue-50 dark:bg-blue-900/20 rounded-lg p-3">
+                <strong>Simulation includes:</strong> Glicko-2 skill progression (Glicko, RD, volatility), RP gain/loss based on evolving skill gap, immediate effects of promotions/demotions, and rank difficulty multipliers for each tier. All calculations shown in the graph and table reflect these effects.
+              </div>
+            </div>
+            {/* Insights/Results Display */}
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mt-6">
+              <div className="bg-green-50 dark:bg-green-900/20 p-4 rounded-lg text-center border border-green-100 dark:border-green-700">
+                <div className="text-2xl font-bold text-green-700 dark:text-green-300">{simulation.finalRP}</div>
+                <div className="text-sm text-green-600 dark:text-green-400">Final RP</div>
+              </div>
+              <div className="bg-blue-50 dark:bg-blue-900/20 p-4 rounded-lg text-center border border-blue-100 dark:border-blue-700">
+                <div className="text-2xl font-bold text-blue-700 dark:text-blue-300">{simulation.finalRank.replace('_', ' ')}</div>
+                <div className="text-sm text-blue-600 dark:text-blue-400">Final Rank</div>
+              </div>
+              <div className="bg-purple-50 dark:bg-purple-900/20 p-4 rounded-lg text-center border border-purple-100 dark:border-purple-700">
+                <div className="text-2xl font-bold text-purple-700 dark:text-purple-300">+{simulation.promotions}</div>
+                <div className="text-sm text-purple-600 dark:text-purple-400">Rank Ups</div>
+              </div>
+              <div className="bg-gray-50 dark:bg-gray-800/80 p-4 rounded-lg text-center border border-gray-100 dark:border-gray-700">
+                <div className="text-lg font-bold text-gray-700 dark:text-gray-200 mb-1">RP Insights</div>
+                <div className="text-sm">
+                  <span className="block">Total RP gain: <span className="text-green-700 dark:text-green-400 font-semibold">{simulation.finalRP - playerData.currentRP >= 0 ? '+' : ''}{simulation.finalRP - playerData.currentRP}</span></span>
+                  <span className="block">Avg RP per match: <span className={((simulation.finalRP - playerData.currentRP) / gamesToPredict) >= 0 ? 'text-green-700 dark:text-green-400' : 'text-red-700 dark:text-red-400'}>{((simulation.finalRP - playerData.currentRP) / gamesToPredict).toFixed(2)}</span></span>
+                </div>
               </div>
             </div>
             {/* Skill Evolution Table */}
