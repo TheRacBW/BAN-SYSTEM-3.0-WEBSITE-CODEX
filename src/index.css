@@ -950,3 +950,28 @@
   -webkit-text-fill-color: initial !important;
   background-clip: initial !important;
 }
+
+.nav-icon-link svg {
+  transition: color 0.2s cubic-bezier(0.4,0,0.2,1);
+  color: #4b5563; /* gray-600 */
+}
+.dark .nav-icon-link svg {
+  color: #d1d5db; /* gray-300 */
+}
+
+/* Page-specific hover color for nav icons */
+.nav-icon-link[data-page="home"]:hover svg {
+  color: #ef4444 !important; /* Red-500 */
+}
+.nav-icon-link[data-page="strat-picker"]:hover svg {
+  color: #38bdf8 !important; /* Sky-400 */
+}
+.nav-icon-link[data-page="leaderboard"]:hover svg {
+  color: #ffd700 !important; /* Gold */
+}
+.nav-icon-link[data-page="calculator"]:hover svg {
+  color: #ff8800 !important; /* Orange */
+}
+.nav-icon-link[data-page="players"]:hover svg {
+  color: #34d399 !important; /* Emerald-400 */
+}

@@ -30,7 +30,7 @@ const Header: React.FC = () => {
             <NavLink
               to="/"
               className={({ isActive }) =>
-                `nav-icon-link ${isActive ? 'active' : ''}`
+                `nav-icon-link${isActive ? ' active' : ''}`
               }
               title="Home"
               data-page="home"
@@ -41,7 +41,7 @@ const Header: React.FC = () => {
             <NavLink
               to="/strat-picker"
               className={({ isActive }) =>
-                `nav-icon-link ${isActive ? 'active' : ''}`
+                `nav-icon-link${isActive ? ' active' : ''}`
               }
               title="Strat Picker"
               data-page="strat-picker"
@@ -52,7 +52,7 @@ const Header: React.FC = () => {
             <NavLink
               to="/leaderboard"
               className={({ isActive }) =>
-                `nav-icon-link ${isActive ? 'active' : ''}`
+                `nav-icon-link${isActive ? ' active' : ''}`
               }
               title="Leaderboard"
               data-page="leaderboard"
@@ -62,7 +62,7 @@ const Header: React.FC = () => {
             <NavLink
               to="/mmr-calculator"
               className={({ isActive }) =>
-                `nav-icon-link ${isActive ? 'active' : ''}`
+                `nav-icon-link${isActive ? ' active' : ''}`
               }
               title="MMR Calculator"
               data-page="calculator"
@@ -75,7 +75,7 @@ const Header: React.FC = () => {
                 <NavLink
                   to="/players"
                   className={({ isActive }) =>
-                    `nav-icon-link ${isActive ? 'active' : ''}`
+                    `nav-icon-link${isActive ? ' active' : ''}`
                   }
                   title="Player Tracking"
                   data-page="players"
