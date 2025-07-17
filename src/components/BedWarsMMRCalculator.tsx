@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Calculator, TrendingUp, TrendingDown, Target, Award, Shield, AlertCircle, BarChart3, Clock, BarChart2 } from 'lucide-react';
+import { Calculator, TrendingUp, TrendingDown, Target, Award, Shield, AlertCircle, BarChart3, Clock, BarChart2, BookOpen, Brain, HelpCircle } from 'lucide-react';
 import RankBadge from './leaderboard/RankBadge';
 import { calculateRankFromRP, getRankDisplayName } from '../utils/rankingSystem';
 import { ResponsiveContainer, LineChart, Line, XAxis, YAxis, CartesianGrid, ReferenceLine, Tooltip as RechartsTooltip, ReferenceArea } from 'recharts';
@@ -165,6 +165,241 @@ function adjustRPForRankChange(baseRP: number, playerGlicko: number, newRank: st
     return Math.round(baseRP * recoveryBonus);
   }
   return baseRP;
+}
+
+// Info Tab Component
+function GlickoGuide() {
+  return (
+    <div className="max-w-4xl mx-auto p-6 bg-gray-50 dark:bg-gray-900 min-h-screen">
+      <div className="bg-white dark:bg-gray-800 rounded-xl shadow-lg p-8">
+        <div className="flex items-center gap-3 mb-6">
+          <BookOpen className="w-8 h-8 text-blue-600 dark:text-blue-400" />
+          <h1 className="text-3xl font-bold text-gray-900 dark:text-gray-100">Understanding Glicko Rating</h1>
+        </div>
+        <div className="prose max-w-none dark:prose-invert">
+          {/* Section 1: What is Glicko Rating? */}
+          <section className="mb-8">
+            <h2 className="text-2xl font-semibold text-gray-800 dark:text-gray-100 mb-4 flex items-center gap-2">
+              <Brain className="w-6 h-6 text-purple-600 dark:text-purple-400" />
+              What is Glicko Rating?
+            </h2>
+            <div className="bg-purple-50 dark:bg-purple-900/30 border-l-4 border-purple-400 dark:border-purple-600 p-4 mb-4">
+              <p className="text-lg text-gray-700 dark:text-gray-200 leading-relaxed">
+                <strong>Glicko Rating is your hidden "true skill" number</strong> that BedWars uses behind the scenes 
+                to determine how much RP you gain or lose each match. Think of it as your actual skill level, 
+                while RP is just what you see on your rank badge.
+              </p>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-6">
+              <div className="bg-blue-50 dark:bg-blue-900/30 rounded-lg p-4">
+                <h3 className="font-semibold text-blue-800 dark:text-blue-200 mb-2">🎮 What You See (RP System)</h3>
+                <ul className="text-sm text-blue-700 dark:text-blue-200 space-y-1">
+                  <li>• "Silver 2, 45 RP"</li>
+                  <li>• Resets to 0 when you rank up</li>
+                  <li>• Goes from 0-99 in each rank</li>
+                  <li>• Visible on your profile</li>
+                </ul>
+              </div>
+              <div className="bg-green-50 dark:bg-green-900/30 rounded-lg p-4">
+                <h3 className="font-semibold text-green-800 dark:text-green-200 mb-2">🧠 Hidden System (Glicko)</h3>
+                <ul className="text-sm text-green-700 dark:text-green-200 space-y-1">
+                  <li>• Your actual skill rating (e.g., 1650)</li>
+                  <li>• Never resets, always tracking</li>
+                  <li>• Ranges from ~800 to 2500+</li>
+                  <li>• Used for matchmaking & RP calculation</li>
+                </ul>
+              </div>
+            </div>
+          </section>
+          {/* Section 2: The Three Numbers Explained */}
+          <section className="mb-8">
+            <h2 className="text-2xl font-semibold text-gray-800 dark:text-gray-100 mb-4 flex items-center gap-2">
+              <Calculator className="w-6 h-6 text-blue-600 dark:text-blue-400" />
+              The Three Numbers That Control Your RP
+            </h2>
+            <div className="space-y-6">
+              {/* MMR (Glicko) Rating */}
+              <div className="border rounded-lg p-6 border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900">
+                <div className="flex items-center gap-3 mb-3">
+                  <div className="w-8 h-8 bg-blue-500 dark:bg-blue-700 rounded-full flex items-center justify-center text-white font-bold">1</div>
+                  <h3 className="text-xl font-semibold text-gray-800 dark:text-gray-100">MMR (Your Skill Level)</h3>
+                </div>
+                <p className="text-gray-700 dark:text-gray-200 mb-4">
+                  This is your main skill number. Higher = more skilled player. The game compares your MMR 
+                  to your opponents' to decide how much RP you should gain or lose.
+                </p>
+                <div className="bg-gray-50 dark:bg-gray-800 rounded-lg p-4">
+                  <h4 className="font-semibold text-gray-800 dark:text-gray-100 mb-2">Skill Levels:</h4>
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-sm">
+                    <div><span className="font-medium">800-1200:</span> Learning</div>
+                    <div><span className="font-medium">1200-1500:</span> Beginner</div>
+                    <div><span className="font-medium">1500-1800:</span> Skilled</div>
+                    <div><span className="font-medium">1800-2100:</span> Advanced</div>
+                    <div><span className="font-medium">2100-2400:</span> Expert</div>
+                    <div><span className="font-medium">2400+:</span> Elite</div>
+                  </div>
+                </div>
+                <div className="mt-4 p-3 bg-blue-50 dark:bg-blue-900/30 rounded">
+                  <p className="text-sm text-blue-800 dark:text-blue-200">
+                    <strong>Example:</strong> If you have 1650 MMR but you're only Silver 3, you're "underranked" 
+                    and will gain more RP per win until you reach Gold/Platinum where you belong.
+                  </p>
+                </div>
+              </div>
+              {/* Rating Deviation */}
+              <div className="border rounded-lg p-6 border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900">
+                <div className="flex items-center gap-3 mb-3">
+                  <div className="w-8 h-8 bg-green-500 dark:bg-green-700 rounded-full flex items-center justify-center text-white font-bold">2</div>
+                  <h3 className="text-xl font-semibold text-gray-800 dark:text-gray-100">RD - Rating Deviation (Confidence)</h3>
+                </div>
+                <p className="text-gray-700 dark:text-gray-200 mb-4">
+                  This shows how "sure" the system is about your skill level. Lower RD = more confident in your rating.
+                </p>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <div className="bg-green-50 dark:bg-green-900/30 rounded p-3 text-center">
+                    <div className="font-bold text-green-800 dark:text-green-200">RD: 0.8-1.2</div>
+                    <div className="text-sm text-green-600 dark:text-green-300">Very Confident</div>
+                    <div className="text-xs text-gray-600 dark:text-gray-400">Stable RP changes</div>
+                  </div>
+                  <div className="bg-yellow-50 dark:bg-yellow-900/30 rounded p-3 text-center">
+                    <div className="font-bold text-yellow-800 dark:text-yellow-200">RD: 1.2-2.0</div>
+                    <div className="text-sm text-yellow-600 dark:text-yellow-300">Moderate Confidence</div>
+                    <div className="text-xs text-gray-600 dark:text-gray-400">Normal RP swings</div>
+                  </div>
+                  <div className="bg-red-50 dark:bg-red-900/30 rounded p-3 text-center">
+                    <div className="font-bold text-red-800 dark:text-red-200">RD: 2.0+</div>
+                    <div className="text-sm text-red-600 dark:text-red-300">Low Confidence</div>
+                    <div className="text-xs text-gray-600 dark:text-gray-400">Large RP changes</div>
+                  </div>
+                </div>
+                <div className="mt-4 p-3 bg-green-50 dark:bg-green-900/30 rounded">
+                  <p className="text-sm text-green-800 dark:text-green-200">
+                    <strong>What this means:</strong> New players or those returning after a break have high RD, 
+                    causing bigger RP swings. As you play more, RD decreases and RP changes become more predictable.
+                  </p>
+                </div>
+              </div>
+              {/* Volatility */}
+              <div className="border rounded-lg p-6 border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900">
+                <div className="flex items-center gap-3 mb-3">
+                  <div className="w-8 h-8 bg-orange-500 dark:bg-orange-700 rounded-full flex items-center justify-center text-white font-bold">3</div>
+                  <h3 className="text-xl font-semibold text-gray-800 dark:text-gray-100">Volatility (Consistency)</h3>
+                </div>
+                <p className="text-gray-700 dark:text-gray-200 mb-4">
+                  This measures how consistent your performance is. Do you play at the same level every game, 
+                  or do you have "pop-off" games and "off" days?
+                </p>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="bg-blue-50 dark:bg-blue-900/30 rounded p-4">
+                    <h4 className="font-semibold text-blue-800 dark:text-blue-200 mb-2">Low Volatility (0.04-0.06)</h4>
+                    <ul className="text-sm text-blue-700 dark:text-blue-200 space-y-1">
+                      <li>• Consistent performance</li>
+                      <li>• Predictable RP changes</li>
+                      <li>• Steady improvement</li>
+                      <li>• More stable rating</li>
+                    </ul>
+                  </div>
+                  <div className="bg-orange-50 dark:bg-orange-900/30 rounded p-4">
+                    <h4 className="font-semibold text-orange-800 dark:text-orange-200 mb-2">High Volatility (0.08+)</h4>
+                    <ul className="text-sm text-orange-700 dark:text-orange-200 space-y-1">
+                      <li>• Inconsistent performance</li>
+                      <li>• Unpredictable RP swings</li>
+                      <li>• Hot streaks and cold streaks</li>
+                      <li>• Rating adjusts more quickly</li>
+                    </ul>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </section>
+          {/* Section 3: How It Affects Your RP */}
+          <section className="mb-8">
+            <h2 className="text-2xl font-semibold text-gray-800 dark:text-gray-100 mb-4 flex items-center gap-2">
+              <TrendingUp className="w-6 h-6 text-green-600 dark:text-green-400" />
+              How MMR Determines Your RP Gains/Losses
+            </h2>
+            <div className="bg-yellow-50 dark:bg-yellow-900/30 border-l-4 border-yellow-400 dark:border-yellow-600 p-4 mb-6">
+              <h3 className="font-semibold text-yellow-800 dark:text-yellow-200 mb-2">💡 The Key Formula</h3>
+              <p className="text-yellow-700 dark:text-yellow-100">
+                Your RP change = Base RP × (How surprising the result was) × (Rank difficulty) × (Confidence adjustments)
+              </p>
+            </div>
+            <div className="space-y-4">
+              <div className="border rounded-lg p-4 border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900">
+                <h3 className="font-semibold text-gray-800 dark:text-gray-100 mb-2">🎯 Scenario 1: You're Underranked</h3>
+                <div className="bg-green-50 dark:bg-green-900/30 p-3 rounded text-sm">
+                  <p><strong>Situation:</strong> Your MMR (1750) is higher than your rank expects (Silver 3 ≈ 1550)</p>
+                  <p><strong>Result:</strong> Higher RP gains (+18-22 per win) because you "should" be ranking up</p>
+                  <p><strong>Why:</strong> The system wants to move you to your "correct" rank quickly</p>
+                </div>
+              </div>
+              <div className="border rounded-lg p-4 border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900">
+                <h3 className="font-semibold text-gray-800 dark:text-gray-100 mb-2">🎯 Scenario 2: You're Overranked</h3>
+                <div className="bg-red-50 dark:bg-red-900/30 p-3 rounded text-sm">
+                  <p><strong>Situation:</strong> Your MMR (1400) is lower than your rank expects (Gold 2 ≈ 1800)</p>
+                  <p><strong>Result:</strong> Lower RP gains (+8-12 per win) and higher losses (-15-20 per loss)</p>
+                  <p><strong>Why:</strong> The system thinks you got "lucky" and wants to move you down</p>
+                </div>
+              </div>
+              <div className="border rounded-lg p-4 border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900">
+                <h3 className="font-semibold text-gray-800 dark:text-gray-100 mb-2">🎯 Scenario 3: You're Perfectly Ranked</h3>
+                <div className="bg-blue-50 dark:bg-blue-900/30 p-3 rounded text-sm">
+                  <p><strong>Situation:</strong> Your MMR matches your rank's expectation</p>
+                  <p><strong>Result:</strong> Standard RP changes (+15 wins, -12 losses)</p>
+                  <p><strong>Why:</strong> You're where you belong, so changes are predictable</p>
+                </div>
+              </div>
+            </div>
+          </section>
+          {/* Section 4: Common Questions */}
+          <section className="mb-8">
+            <h2 className="text-2xl font-semibold text-gray-800 dark:text-gray-100 mb-4 flex items-center gap-2">
+              <HelpCircle className="w-6 h-6 text-blue-600 dark:text-blue-400" />
+              Common Questions
+            </h2>
+            <div className="space-y-4">
+              <details className="border rounded-lg border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900">
+                <summary className="p-4 cursor-pointer font-semibold hover:bg-gray-50 dark:hover:bg-gray-800">
+                  Why do I gain different RP amounts each game?
+                </summary>
+                <div className="p-4 pt-0 text-gray-700 dark:text-gray-200">
+                  Because your opponents have different MMRs! Beating a 2000-rated player gives more RP 
+                  than beating a 1400-rated player. The system also considers how "expected" your win was.
+                </div>
+              </details>
+              <details className="border rounded-lg border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900">
+                <summary className="p-4 cursor-pointer font-semibold hover:bg-gray-50 dark:hover:bg-gray-800">
+                  Why did my RP gains decrease after ranking up?
+                </summary>
+                <div className="p-4 pt-0 text-gray-700 dark:text-gray-200">
+                  When you rank up, your expected skill level increases. If your MMR doesn't match the new rank's 
+                  expectation, you'll gain less RP until your skill "catches up" to your new rank.
+                </div>
+              </details>
+              <details className="border rounded-lg border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900">
+                <summary className="p-4 cursor-pointer font-semibold hover:bg-gray-50 dark:hover:bg-gray-800">
+                  Can I see my exact MMR in-game?
+                </summary>
+                <div className="p-4 pt-0 text-gray-700 dark:text-gray-200">
+                  No, MMR is hidden. This calculator estimates your MMR based on your RP patterns, 
+                  current rank, and match history. It's an educated guess, not the exact number.
+                </div>
+              </details>
+              <details className="border rounded-lg border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900">
+                <summary className="p-4 cursor-pointer font-semibold hover:bg-gray-50 dark:hover:bg-gray-800">
+                  Does MMR reset each season?
+                </summary>
+                <div className="p-4 pt-0 text-gray-700 dark:text-gray-200">
+                  No! Your MMR carries over between seasons. However, your RD (confidence) might increase 
+                  slightly due to the time gap, causing bigger RP swings in your first few games.
+                </div>
+              </details>
+            </div>
+          </section>
+        </div>
+      </div>
+    </div>
+  );
 }
 
 const BedWarsMMRCalculator = () => {
@@ -446,10 +681,11 @@ const BedWarsMMRCalculator = () => {
   if (symmetryWarning) confidence = 'Low';
 
   const MAIN_TABS = [
-    { key: 'calculator', label: 'MMR & RP Calculator', icon: <Calculator size={18} /> },
+    { key: 'calculator', label: 'MMR Calculator', icon: <Calculator size={18} /> },
     { key: 'advanced', label: 'Advanced RP Prediction', icon: <BarChart2 size={18} /> },
+    { key: 'info', label: 'Info', icon: <BookOpen size={18} /> },
   ];
-  const [mainTab, setMainTab] = useState<'calculator' | 'advanced'>('calculator');
+  const [mainTab, setMainTab] = useState<'calculator' | 'advanced' | 'info'>('calculator');
 
   // In the BedWarsMMRCalculator component, add state for simplified prediction:
   const [gamesToPredict, setGamesToPredict] = useState(10);
@@ -853,7 +1089,7 @@ const BedWarsMMRCalculator = () => {
           {MAIN_TABS.map(tab => (
             <button
               key={tab.key}
-              onClick={() => setMainTab(tab.key as 'calculator' | 'advanced')}
+              onClick={() => setMainTab(tab.key as 'calculator' | 'advanced' | 'info')}
               className={`flex-1 flex items-center justify-center gap-2 px-4 py-2 rounded-md text-base font-medium transition-all duration-200 focus:outline-none ${
                 mainTab === tab.key
                   ? 'bg-white dark:bg-gray-900 text-primary-900 dark:text-primary-100 shadow-sm'
@@ -1366,6 +1602,9 @@ const BedWarsMMRCalculator = () => {
               </table>
             </div>
           </section>
+        )}
+        {mainTab === 'info' && (
+          <GlickoGuide />
         )}
       </div>
     </div>
