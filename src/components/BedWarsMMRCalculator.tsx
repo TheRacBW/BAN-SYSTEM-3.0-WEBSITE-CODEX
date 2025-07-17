@@ -514,7 +514,21 @@ const BedWarsMMRCalculator = () => {
     return currentGlicko - expectedGlickoAtThisRP;
   }
 
-  // --- Dynamic RP Calculation (continuous, with within-rank scaling) ---
+  // --- Enhanced Glicko Update Function (with volatility and skill gap sensitivity) ---
+  function updateGlickoAfterMatch(currentGlicko: number, currentRD: number, currentVol: number, matchResult: 'win' | 'loss', skillGap: number) {
+    // Glicko changes based on match outcome, volatility, and skill gap
+    const baseChange = matchResult === 'win' ? 25 : -18; // Slightly larger for more visible effect
+    const rdFactor = Math.max(0.5, currentRD / 2.0);
+    const skillFactor = 1 + Math.abs(skillGap) / 200; // More sensitive to skill gap
+    const ratingChange = baseChange * rdFactor * skillFactor * (matchResult === 'win' ? 1 : -1);
+    return {
+      rating: currentGlicko + ratingChange,
+      rd: Math.max(0.8, currentRD - 0.03),
+      vol: Math.max(0.04, currentVol + Math.abs(ratingChange) * 0.001)
+    };
+  }
+
+  // --- Dynamic RP Calculation (continuous, with stronger within-rank scaling) ---
   function calculateDynamicRP(currentGlicko: number, currentRank: string, currentRP: number, matchResult: 'win' | 'loss') {
     const baseRP = matchResult === 'win' ? 15 : -12;
     // 1. Skill gap multiplier (continuous within ranks)
@@ -528,23 +542,10 @@ const BedWarsMMRCalculator = () => {
     // 2. Rank difficulty multiplier
     const rankTier = getRankTier(currentRank);
     const difficultyMultiplier = RANK_DIFFICULTY_MULTIPLIERS[rankTier];
-    // 3. Within-rank difficulty progression
+    // 3. Within-rank difficulty progression (now 15% harder at 99 RP)
     const rpProgress = currentRP / 100;
-    const withinRankMultiplier = 1.0 - (rpProgress * 0.05); // 5% harder at 99 RP vs 0 RP
+    const withinRankMultiplier = 1.0 - (rpProgress * 0.15); // 15% harder at 99 RP vs 0 RP
     return Math.round(baseRP * skillMultiplier * difficultyMultiplier * withinRankMultiplier);
-  }
-
-  // --- Enhanced Glicko Update Function (with volatility) ---
-  function updateGlickoAfterMatch(currentGlicko: number, currentRD: number, currentVol: number, matchResult: 'win' | 'loss') {
-    // Glicko changes based on match outcome and volatility
-    const baseChange = matchResult === 'win' ? 20 : -15;
-    const rdFactor = Math.max(0.5, currentRD / 2.0);
-    const ratingChange = baseChange * rdFactor;
-    return {
-      rating: currentGlicko + ratingChange,
-      rd: Math.max(0.8, currentRD - 0.03),
-      vol: Math.max(0.04, currentVol + Math.abs(ratingChange) * 0.001)
-    };
   }
 
   // --- Promotion/Demotion RP Adjustment (using new rank's interpolated Glicko) ---
@@ -657,10 +658,11 @@ const BedWarsMMRCalculator = () => {
         rpChange = adjustRPForRankChange(rpChange, currentGlicko, newRank, newRP, promoted);
         newRP = promoted ? Math.max(0, newRP) : Math.min(99, newRP);
       }
-      // Glicko update (use actual MMR effect, not shielded RP)
-      const glickoUpdate = updateGlickoAfterMatch(currentGlicko, currentRD, currentVol, matchResult);
-      // Debug output
+      // Calculate skill gap for Glicko update
       const skillGap = calculateSkillGap(currentGlicko, currentRank, currentRP);
+      // Glicko update (use actual MMR effect, not shielded RP, and pass skillGap)
+      const glickoUpdate = updateGlickoAfterMatch(currentGlicko, currentRD, currentVol, matchResult, skillGap);
+      // Debug output
       // eslint-disable-next-line no-console
       console.log('Match simulation debug:', {
         game: i,
