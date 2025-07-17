@@ -793,14 +793,14 @@ const BedWarsMMRCalculator = () => {
     if (active && payload && payload.length) {
       const data = payload[0].payload;
       return (
-        <div className="bg-white p-3 border rounded-lg shadow-lg max-w-xs">
-          <p className="font-semibold text-gray-800">Match {label}</p>
+        <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg max-w-xs p-3">
+          <p className="font-semibold text-gray-800 dark:text-gray-100">Match {label}</p>
           <div className="mt-2">
-            <p className={`font-medium ${data.result === 'Win' ? 'text-green-600' : 'text-red-600'}`}>{data.result}: {data.rpChange > 0 ? '+' : ''}{data.rpChange} RP</p>
-            <p className="text-sm text-gray-600">RP: {data.rp} ({data.rank.replace('_', ' ')})</p>
-            {data.promoted && (<p className="text-green-600 font-bold text-sm">🎉 PROMOTED!</p>)}
-            {data.demoted && (<p className="text-red-600 font-bold text-sm">💔 DEMOTED</p>)}
-            <p className="text-xs text-gray-500 mt-1">Glicko: {Math.round(data.glicko)}</p>
+            <p className={`font-medium ${data.result === 'Win' ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>{data.result}: {data.rpChange > 0 ? '+' : ''}{data.rpChange} RP</p>
+            <p className="text-sm text-gray-600 dark:text-gray-300">RP: {data.rp} ({data.rank.replace('_', ' ')})</p>
+            {data.promoted && (<p className="text-green-600 dark:text-green-400 font-bold text-sm">🎉 PROMOTED!</p>)}
+            {data.demoted && (<p className="text-red-600 dark:text-red-400 font-bold text-sm">💔 DEMOTED</p>)}
+            <p className="text-xs mt-1 font-bold text-purple-700 dark:text-purple-300">Glicko: {Math.round(data.glicko)}</p>
           </div>
         </div>
       );
@@ -1138,11 +1138,11 @@ const BedWarsMMRCalculator = () => {
               Advanced RP Prediction
             </h2>
             {/* --- Rank Progression Summary --- */}
-            <div className="mb-4 p-3 bg-gray-50 rounded-lg">
-              <h4 className="font-semibold text-gray-800 mb-2">Rank Progression Summary</h4>
+            <div className="mb-4 p-3 rounded-lg bg-gray-50 dark:bg-gray-800/80 border border-gray-200 dark:border-gray-700">
+              <h4 className="font-semibold text-gray-800 dark:text-gray-100 mb-2">Rank Progression Summary</h4>
               <div className="flex flex-wrap gap-2">
                 {promotions.map((promo, index) => (
-                  <span key={index} className={`px-2 py-1 rounded text-xs font-medium ${promo.type === 'promotion' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
+                  <span key={index} className={`px-2 py-1 rounded text-xs font-medium border ${promo.type === 'promotion' ? 'bg-green-100 dark:bg-green-900/40 text-green-800 dark:text-green-200 border-green-200 dark:border-green-700' : 'bg-red-100 dark:bg-red-900/40 text-red-800 dark:text-red-200 border-red-200 dark:border-red-700'}`}>
                     Match {promo.game}: {promo.fromRank.replace('_', ' ')} → {promo.toRank.replace('_', ' ')}
                   </span>
                 ))}
