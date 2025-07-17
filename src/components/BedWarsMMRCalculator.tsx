@@ -126,79 +126,6 @@ function validateRPSymmetry(rpWin: number, rpLoss: number, playerGlicko: number,
   return { predLoss, predWin, warning };
 }
 
-// --- Simulation Engine for RP Progression ---
-function simulateRPProgression({
-  games,
-  winRate,
-  avgRPWin,
-  avgRPLoss,
-  startRP,
-  startRank,
-  startGlicko,
-  kFactor = 32,
-  rankDivisions = RANK_DIVISIONS,
-  glickoRatings = GLICKO_RATINGS,
-  rankNames = RANK_NAMES
-}: {
-  games: number;
-  winRate: number;
-  avgRPWin: number;
-  avgRPLoss: number;
-  startRP: number;
-  startRank: string;
-  startGlicko: number;
-  kFactor?: number;
-  rankDivisions?: typeof RANK_DIVISIONS;
-  glickoRatings?: typeof GLICKO_RATINGS;
-  rankNames?: string[];
-}) {
-  let rp = startRP;
-  let glicko = startGlicko;
-  let division = rankDivisions[startRank as keyof typeof rankDivisions];
-  let history = [];
-  let rank = startRank;
-  let promotions = 0;
-  let demotions = 0;
-  for (let i = 0; i < games; i++) {
-    const win = Math.random() < winRate;
-    let rpChange = win ? avgRPWin : avgRPLoss;
-    // Diminishing returns: as Glicko increases, RP gain shrinks
-    if (win && glicko > glickoRatings[division]) {
-      rpChange = Math.max(1, Math.round(rpChange * (1 - (glicko - glickoRatings[division]) / 2000)));
-    }
-    if (!win && glicko < glickoRatings[division]) {
-      rpChange = Math.min(-1, Math.round(rpChange * (1 - (glickoRatings[division] - glicko) / 2000)));
-    }
-    rp += rpChange;
-    // Promotion
-    if (rp >= 100) {
-      rp -= 100;
-      division = Math.min(division + 1, rankNames.length - 1);
-      rank = rankNames[division];
-      promotions++;
-    }
-    // Demotion
-    if (rp < 0) {
-      rp += 100;
-      division = Math.max(division - 1, 0);
-      rank = rankNames[division];
-      demotions++;
-    }
-    // Glicko update (simple model)
-    const expected = 0.5; // Assume even matchups for simulation
-    glicko += kFactor * ((win ? 1 : 0) - expected);
-    history.push({
-      game: i + 1,
-      win,
-      rp: Math.max(0, Math.min(99, rp)),
-      rank,
-      glicko: Math.round(glicko),
-      rpChange
-    });
-  }
-  return { finalRP: Math.max(0, Math.min(99, rp)), finalRank: rank, finalGlicko: Math.round(glicko), promotions, demotions, history };
-}
-
 // --- Rank Difficulty Multipliers ---
 const RANK_DIFFICULTY_MULTIPLIERS: Record<string, number> = {
   'BRONZE': 1.0,
@@ -227,17 +154,17 @@ function applyRankDifficultyScaling(rpChange: number, rank: string) {
 }
 
 function adjustRPForRankChange(baseRP: number, playerGlicko: number, newRank: string, wasPromoted: boolean) {
-  const newRankBaseline = GLICKO_RATINGS[RANK_DIVISIONS[newRank as keyof typeof RANK_DIVISIONS]];
+  const newRankDivision = RANK_DIVISIONS[newRank as keyof typeof RANK_DIVISIONS];
+  const newRankBaseline = GLICKO_RATINGS[newRankDivision];
   const skillGap = playerGlicko - newRankBaseline;
   if (wasPromoted) {
-    // After promotion: Harder to gain RP, easier to lose RP
     const difficultyIncrease = Math.max(0.7, 1.0 - (skillGap / 300));
     return Math.round(baseRP * difficultyIncrease);
-  } else {
-    // After demotion: Easier to gain RP, harder to lose RP
+  } else if (wasPromoted === false) {
     const recoveryBonus = Math.min(1.3, 1.0 + Math.abs(skillGap) / 400);
     return Math.round(baseRP * recoveryBonus);
   }
+  return baseRP;
 }
 
 const BedWarsMMRCalculator = () => {
@@ -512,19 +439,6 @@ const BedWarsMMRCalculator = () => {
 
   // --- Simulation Inputs ---
   const winRate = 0.5; // For now, assume 50% win rate (could be user input)
-  const simResult = simulateRPProgression({
-    games: simGames,
-    winRate,
-    avgRPWin: usedAvgWin,
-    avgRPLoss: usedAvgLoss,
-    startRP: playerData.currentRP,
-    startRank: playerData.currentRank,
-    startGlicko: playerGlicko,
-    kFactor,
-    rankDivisions: RANK_DIVISIONS,
-    glickoRatings: GLICKO_RATINGS,
-    rankNames: RANK_NAMES
-  });
   // --- Confidence Calculation ---
   let confidence = 'Medium';
   if (playerData.matchHistory.length >= 8) confidence = 'High';
@@ -590,82 +504,186 @@ const BedWarsMMRCalculator = () => {
     return { newRP: currentRP, newRank: rankOrder[division], promoted };
   }
 
-  // --- Glicko-2 Update (simplified for simulation) ---
-  function updateGlickoRating(rating: number, rd: number, vol: number, matchResult: 'win' | 'loss') {
-    const baseChange = matchResult === 'win' ? 15 : -10;
-    const confidenceMultiplier = Math.max(0.5, rd / 2.0);
-    const ratingChange = baseChange * confidenceMultiplier;
+  // --- Skill Gap Calculation (interpolated within rank) ---
+  function calculateSkillGap(currentGlicko: number, currentRank: string, currentRP: number) {
+    const rankDivision = RANK_DIVISIONS[currentRank as keyof typeof RANK_DIVISIONS];
+    const rankBaselineGlicko = GLICKO_RATINGS[rankDivision];
+    const nextRankGlicko = GLICKO_RATINGS[rankDivision + 1] !== undefined ? GLICKO_RATINGS[rankDivision + 1] : rankBaselineGlicko + 100;
+    const rpProgress = currentRP / 100;
+    const expectedGlickoAtThisRP = rankBaselineGlicko + (nextRankGlicko - rankBaselineGlicko) * rpProgress;
+    return currentGlicko - expectedGlickoAtThisRP;
+  }
+
+  // --- Dynamic RP Calculation (continuous, with within-rank scaling) ---
+  function calculateDynamicRP(currentGlicko: number, currentRank: string, currentRP: number, matchResult: 'win' | 'loss') {
+    const baseRP = matchResult === 'win' ? 15 : -12;
+    // 1. Skill gap multiplier (continuous within ranks)
+    const skillGap = calculateSkillGap(currentGlicko, currentRank, currentRP);
+    let skillMultiplier = 1.0;
+    if (matchResult === 'win') {
+      skillMultiplier = Math.max(0.6, 1.0 - (skillGap / 400));
+    } else {
+      skillMultiplier = Math.min(1.4, 1.0 + Math.abs(skillGap) / 500);
+    }
+    // 2. Rank difficulty multiplier
+    const rankTier = getRankTier(currentRank);
+    const difficultyMultiplier = RANK_DIFFICULTY_MULTIPLIERS[rankTier];
+    // 3. Within-rank difficulty progression
+    const rpProgress = currentRP / 100;
+    const withinRankMultiplier = 1.0 - (rpProgress * 0.05); // 5% harder at 99 RP vs 0 RP
+    return Math.round(baseRP * skillMultiplier * difficultyMultiplier * withinRankMultiplier);
+  }
+
+  // --- Enhanced Glicko Update Function (with volatility) ---
+  function updateGlickoAfterMatch(currentGlicko: number, currentRD: number, currentVol: number, matchResult: 'win' | 'loss') {
+    // Glicko changes based on match outcome and volatility
+    const baseChange = matchResult === 'win' ? 20 : -15;
+    const rdFactor = Math.max(0.5, currentRD / 2.0);
+    const ratingChange = baseChange * rdFactor;
     return {
-      rating: rating + ratingChange,
-      rd: Math.max(0.8, rd - 0.03),
-      vol: Math.max(0.04, vol + Math.abs(ratingChange) * 0.001)
+      rating: currentGlicko + ratingChange,
+      rd: Math.max(0.8, currentRD - 0.03),
+      vol: Math.max(0.04, currentVol + Math.abs(ratingChange) * 0.001)
     };
   }
 
-  function calculateRPChange(currentGlicko: number, currentRank: string, matchResult: 'win' | 'loss', skillGap: number) {
-    const baseRP = matchResult === 'win' ? 15 : -12;
-    let skillMultiplier = 1.0;
-    if (matchResult === 'win') {
-      skillMultiplier = Math.max(0.7, 1.0 - (skillGap / 400));
+  // --- Promotion/Demotion RP Adjustment (using new rank's interpolated Glicko) ---
+  function adjustRPForRankChange(baseRP: number, playerGlicko: number, newRank: string, newRP: number, wasPromoted: boolean) {
+    const newRankDivision = RANK_DIVISIONS[newRank as keyof typeof RANK_DIVISIONS];
+    const newRankBaseline = GLICKO_RATINGS[newRankDivision];
+    const nextRankGlicko = GLICKO_RATINGS[newRankDivision + 1] !== undefined ? GLICKO_RATINGS[newRankDivision + 1] : newRankBaseline + 100;
+    const rpProgress = newRP / 100;
+    const expectedGlickoAtNewRank = newRankBaseline + (nextRankGlicko - newRankBaseline) * rpProgress;
+    const skillGapAtNewRank = playerGlicko - expectedGlickoAtNewRank;
+    if (wasPromoted) {
+      const difficultyIncrease = Math.max(0.7, 1.0 - (skillGapAtNewRank / 300));
+      return Math.round(baseRP * difficultyIncrease);
     } else {
-      skillMultiplier = Math.min(1.3, 1.0 + (skillGap / 500));
+      const recoveryBonus = Math.min(1.3, 1.0 + Math.abs(skillGapAtNewRank) / 400);
+      return Math.round(baseRP * recoveryBonus);
     }
-    return Math.round(baseRP * skillMultiplier);
   }
 
-  function generateSimulationData(
-    games: number,
-    winRate: number,
-    avgRPWin: number,
-    avgRPLoss: number,
-    startingRP: number,
-    startingRank: string,
-    startingGlicko: number,
-    startingRD: number = 1.8,
-    startingVol: number = 0.06
-  ) {
-    const data = [];
-    let currentRP = startingRP;
-    let currentRank = startingRank;
-    let currentGlicko = startingGlicko;
-    let currentRD = startingRD;
-    let currentVol = startingVol;
-    let promotions = 0;
-    const rankPromotions = [];
-    let division = RANK_DIVISIONS[startingRank as keyof typeof RANK_DIVISIONS];
-    let lastRankChange = null as null | { promoted: boolean, newRank: string };
+  // --- Shield System Effects ---
+  function applyShieldEffects(rpChange: number, matchResult: 'win' | 'loss', isShielded: boolean, currentRP: number) {
+    if (isShielded && matchResult === 'loss' && currentRP === 0) {
+      // RP doesn't drop but MMR still decreases
+      return {
+        visibleRPChange: 0,
+        actualMMREffect: rpChange // Still process the loss for MMR
+      };
+    }
+    return {
+      visibleRPChange: rpChange,
+      actualMMREffect: rpChange
+    };
+  }
+
+  // --- Simulation Engine for RP Progression (full dynamic, all factors) ---
+  function simulateRPProgression({
+    games,
+    winRate,
+    startRP,
+    startRank,
+    startGlicko,
+    startRD = 1.8,
+    startVol = 0.08,
+    avgRPWin = 15,
+    avgRPLoss = -12,
+    shieldGamesUsed = 0,
+    rankDivisions = RANK_DIVISIONS,
+    glickoRatings = GLICKO_RATINGS,
+    rankNames = RANK_NAMES
+  }: {
+    games: number;
+    winRate: number;
+    startRP: number;
+    startRank: string;
+    startGlicko: number;
+    startRD?: number;
+    startVol?: number;
+    avgRPWin?: number;
+    avgRPLoss?: number;
+    shieldGamesUsed?: number;
+    rankDivisions?: typeof RANK_DIVISIONS;
+    glickoRatings?: typeof GLICKO_RATINGS;
+    rankNames?: string[];
+  }) {
+    let currentRP = startRP;
+    let currentRank = startRank;
+    let currentGlicko = startGlicko;
+    let currentRD = startRD;
+    let currentVol = startVol;
+    let currentShieldGames = shieldGamesUsed || 0;
+    let promotions: any[] = [];
+    let demotions: any[] = [];
+    let data: any[] = [];
+    let division = rankDivisions[startRank as keyof typeof rankDivisions];
     for (let i = 1; i <= games; i++) {
       const isWin = Math.random() < (winRate / 100);
       const matchResult = isWin ? 'win' : 'loss';
-      const divisionGlicko = GLICKO_RATINGS[division];
-      const skillGap = currentGlicko - divisionGlicko;
-      // Dynamic RP calculation based on evolving Glicko
-      let rpChange = calculateRPChange(currentGlicko, currentRank, matchResult, skillGap);
-      // Apply rank difficulty scaling
-      rpChange = applyRankDifficultyScaling(rpChange, currentRank);
-      // Apply new RP and check for rank progression
-      let newRP = currentRP + rpChange;
-      const { newRP: checkedRP, newRank, promoted } = handleRankProgression(newRP, currentRank);
-      let rankChanged = newRank !== currentRank;
-      // If rank changed, adjust RP for the rank change effect
-      if (rankChanged) {
-        rpChange = adjustRPForRankChange(rpChange, currentGlicko, newRank, promoted);
-        newRP = checkedRP;
+      // Dynamic RP calculation
+      let rpChange = calculateDynamicRP(currentGlicko, currentRank, currentRP, matchResult);
+      // Shield logic (simulate only, not full BedWars logic)
+      let isShielded = false;
+      if (matchResult === 'loss' && currentRP === 0 && currentShieldGames < 3) {
+        isShielded = true;
+        currentShieldGames++;
       }
-      // Update Glicko rating
-      const glickoUpdate = updateGlickoRating(currentGlicko, currentRD, currentVol, matchResult);
+      const shieldEffects = applyShieldEffects(rpChange, matchResult, isShielded, currentRP);
+      let newRP = currentRP + shieldEffects.visibleRPChange;
+      let promoted = false;
+      let demoted = false;
+      let newRank = currentRank;
+      let newDivision = division;
+      // Promotion
+      if (newRP >= 100) {
+        newRP -= 100;
+        newDivision = Math.min(division + 1, rankNames.length - 1);
+        newRank = rankNames[newDivision];
+        promoted = true;
+        promotions.push({ game: i, fromRank: currentRank, toRank: newRank });
+      }
+      // Demotion
+      if (newRP < 0) {
+        newRP += 100;
+        newDivision = Math.max(division - 1, 0);
+        newRank = rankNames[newDivision];
+        demoted = true;
+        demotions.push({ game: i, fromRank: currentRank, toRank: newRank });
+      }
+      // Promotion/demotion effects
+      if (promoted || demoted) {
+        rpChange = adjustRPForRankChange(rpChange, currentGlicko, newRank, newRP, promoted);
+        newRP = promoted ? Math.max(0, newRP) : Math.min(99, newRP);
+      }
+      // Glicko update (use actual MMR effect, not shielded RP)
+      const glickoUpdate = updateGlickoAfterMatch(currentGlicko, currentRD, currentVol, matchResult);
+      // Debug output
+      const skillGap = calculateSkillGap(currentGlicko, currentRank, currentRP);
+      // eslint-disable-next-line no-console
+      console.log('Match simulation debug:', {
+        game: i,
+        currentGlicko,
+        currentRank,
+        currentRP,
+        skillGap,
+        rpChange,
+        visibleRPChange: shieldEffects.visibleRPChange,
+        promoted,
+        demoted
+      });
       data.push({
         game: i,
         result: matchResult === 'win' ? 'Win' : 'Loss',
-        rp: newRP,
+        rp: Math.max(0, Math.min(99, newRP)),
         rank: newRank,
         glicko: Math.round(glickoUpdate.rating),
-        rpChange: rpChange,
-        promoted: promoted,
-        demoted: !promoted && rankChanged,
+        rpChange: shieldEffects.visibleRPChange,
+        promoted,
+        demoted,
         skillGap: Math.round(skillGap),
-        rd: glickoUpdate.rd,
-        vol: glickoUpdate.vol
+        rd: glickoUpdate.rd
       });
       // Carry forward for next match
       currentGlicko = glickoUpdate.rating;
@@ -673,21 +691,32 @@ const BedWarsMMRCalculator = () => {
       currentVol = glickoUpdate.vol;
       currentRP = newRP;
       currentRank = newRank;
-      division = RANK_DIVISIONS[currentRank as keyof typeof RANK_DIVISIONS];
-      if (promoted) rankPromotions.push({ game: i, rank: newRank });
+      division = newDivision;
     }
-    return { data, promotions: rankPromotions.length, finalRP: Math.round(currentRP), finalRank: currentRank, rankPromotions, finalGlicko: Math.round(currentGlicko), startingGlicko: Math.round(startingGlicko) };
+    return {
+      data,
+      promotions,
+      demotions,
+      finalRP: Math.round(currentRP),
+      finalRank: currentRank,
+      startingGlicko: Math.round(startGlicko),
+      finalGlicko: Math.round(currentGlicko)
+    };
   }
 
-  const simulation = generateSimulationData(
-    gamesToPredict,
-    expectedWinRate,
-    avgRPWin,
-    avgRPLoss,
-    playerData.currentRP,
-    playerData.currentRank,
-    calculatedMMR?.rating || 1500
-  );
+  // --- Simulation and segments ---
+  const simulation = simulateRPProgression({
+    games: gamesToPredict,
+    winRate: expectedWinRate,
+    startRP: playerData.currentRP,
+    startRank: playerData.currentRank,
+    startGlicko: calculatedMMR?.rating || 1500,
+    startRD: calculatedMMR?.rd || 1.8,
+    startVol: calculatedMMR?.vol || 0.08,
+    avgRPWin: avgRPWin,
+    avgRPLoss: avgRPLoss,
+    shieldGamesUsed: playerData.shieldGamesUsed || 0
+  });
 
   // --- Rank color and zone helpers (moved inside component for access to playerData/simulation) ---
   const RANK_COLORS: Record<string, string> = {
@@ -1141,7 +1170,7 @@ const BedWarsMMRCalculator = () => {
             <div className="mb-4 p-3 rounded-lg bg-gray-50 dark:bg-gray-800/80 border border-gray-200 dark:border-gray-700">
               <h4 className="font-semibold text-gray-800 dark:text-gray-100 mb-2">Rank Progression Summary</h4>
               <div className="flex flex-wrap gap-2">
-                {promotions.map((promo, index) => (
+                {simulation.promotions.map((promo, index) => (
                   <span key={index} className={`px-2 py-1 rounded text-xs font-medium border ${promo.type === 'promotion' ? 'bg-green-100 dark:bg-green-900/40 text-green-800 dark:text-green-200 border-green-200 dark:border-green-700' : 'bg-red-100 dark:bg-red-900/40 text-red-800 dark:text-red-200 border-red-200 dark:border-red-700'}`}>
                     Match {promo.game}: {promo.fromRank.replace('_', ' ')} → {promo.toRank.replace('_', ' ')}
                   </span>
@@ -1243,10 +1272,10 @@ const BedWarsMMRCalculator = () => {
                     {/* Glicko line */}
                     <Line yAxisId="glicko" type="monotone" dataKey="glicko" stroke="#8B5CF6" strokeWidth={2} strokeDasharray="5 5" dot={false} />
                     {/* Promotion/demotion reference lines and labels */}
-                    {promotions.map((promo, index) => (
+                    {simulation.promotions.map((promo, index) => (
                       <ReferenceLine key={`promo-${index}`} x={promo.game} stroke={promo.type === 'promotion' ? '#10B981' : '#EF4444'} strokeWidth={2} strokeDasharray="5 5" />
                     ))}
-                    {promotions.map((promo, index) => (
+                    {simulation.promotions.map((promo, index) => (
                       <text key={`label-${index}`} x={(() => {
                         // Find the x position for the label
                         const idx = simulation.data.findIndex((d: any) => d.game === promo.game);
@@ -1274,7 +1303,7 @@ const BedWarsMMRCalculator = () => {
                 <div className="text-sm text-blue-600 dark:text-blue-400">Final Rank</div>
               </div>
               <div className="bg-purple-50 dark:bg-purple-900/20 p-4 rounded-lg text-center border border-purple-100 dark:border-purple-700">
-                <div className="text-2xl font-bold text-purple-700 dark:text-purple-300">+{simulation.promotions}</div>
+                <div className="text-2xl font-bold text-purple-700 dark:text-purple-300">+{simulation.promotions.length}</div>
                 <div className="text-sm text-purple-600 dark:text-purple-400">Rank Ups</div>
               </div>
               <div className="bg-gray-50 dark:bg-gray-800/80 p-4 rounded-lg text-center border border-gray-100 dark:border-gray-700">
@@ -1341,4 +1370,4 @@ const BedWarsMMRCalculator = () => {
   );
 };
 
-export default BedWarsMMRCalculator; 
+export default BedWarsMMRCalculator;
