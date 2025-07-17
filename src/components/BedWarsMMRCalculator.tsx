@@ -500,8 +500,36 @@ const BedWarsMMRCalculator = () => {
   const [gamesToPredict, setGamesToPredict] = useState(10);
   const recentWinRate = playerData.matchHistory.length > 0 ? Math.round((playerData.matchHistory.filter(m => m.outcome === 'win').length / playerData.matchHistory.length) * 100) : 50;
   const [expectedWinRate, setExpectedWinRate] = useState(recentWinRate);
-  const avgRPWin = playerData.matchHistory.length > 0 ? Math.round(playerData.matchHistory.filter(m => m.outcome === 'win').reduce((sum, m) => sum + m.rpChange, 0) / playerData.matchHistory.filter(m => m.outcome === 'win').length) || 0 : 15;
-  const avgRPLoss = playerData.matchHistory.length > 0 ? Math.round(playerData.matchHistory.filter(m => m.outcome === 'loss').reduce((sum, m) => sum + m.rpChange, 0) / playerData.matchHistory.filter(m => m.outcome === 'loss').length) || 0 : -12;
+  // Instead of redeclaring avgRPWin and avgRPLoss, update them when playerData.matchHistory changes:
+  useEffect(() => {
+    if (playerData.matchHistory.length > 0) {
+      const winMatches = playerData.matchHistory.filter(m => m.outcome === 'win');
+      const lossMatches = playerData.matchHistory.filter(m => m.outcome === 'loss');
+      const avgWin = winMatches.length > 0 ? Math.round(winMatches.reduce((sum, m) => sum + m.rpChange, 0) / winMatches.length) : 15;
+      const avgLoss = lossMatches.length > 0 ? Math.round(lossMatches.reduce((sum, m) => sum + m.rpChange, 0) / lossMatches.length) : -12;
+      setAvgRPWin(avgWin);
+      setAvgRPLoss(avgLoss);
+    } else {
+      setAvgRPWin(15);
+      setAvgRPLoss(-12);
+    }
+  }, [playerData.matchHistory]);
+
+  // Add state for winrate input mode
+  const [winRateMode, setWinRateMode] = useState<'percent' | 'count'>('percent');
+  const [expectedWins, setExpectedWins] = useState(Math.round((expectedWinRate / 100) * gamesToPredict));
+
+  // Keep expectedWins and expectedWinRate in sync
+  useEffect(() => {
+    if (winRateMode === 'percent') {
+      setExpectedWins(Math.round((expectedWinRate / 100) * gamesToPredict));
+    }
+  }, [expectedWinRate, gamesToPredict, winRateMode]);
+  useEffect(() => {
+    if (winRateMode === 'count') {
+      setExpectedWinRate(Math.round((expectedWins / gamesToPredict) * 100));
+    }
+  }, [expectedWins, gamesToPredict, winRateMode]);
 
   // Generate simulation data for the graph
   function handleRankProgression(currentRP: number, currentRank: string) {
@@ -536,22 +564,41 @@ const BedWarsMMRCalculator = () => {
     let currentGlicko = startingGlicko;
     let promotions = 0;
     const rankPromotions = [];
+    let division = RANK_DIVISIONS[startingRank as keyof typeof RANK_DIVISIONS];
     for (let i = 1; i <= games; i++) {
       const isWin = Math.random() < (winRate / 100);
-      const rpChange = isWin ? avgRPWin : avgRPLoss;
+      // Always use the current Glicko for RP gain/loss calculation
+      const divisionGlicko = GLICKO_RATINGS[division];
+      let baseRP = isWin ? avgRPWin : avgRPLoss;
+      // Diminishing returns: as Glicko increases, RP gain shrinks for wins, increases for losses
+      if (isWin && currentGlicko > divisionGlicko) {
+        baseRP = Math.max(1, Math.round(baseRP * (1 - (currentGlicko - divisionGlicko) / 2000)));
+      }
+      if (!isWin && currentGlicko < divisionGlicko) {
+        baseRP = Math.min(-1, Math.round(baseRP * (1 - (divisionGlicko - currentGlicko) / 2000)));
+      }
+      let rpChange = baseRP;
       currentRP += rpChange;
+      // Handle promotion/demotion
       const { newRP, newRank, promoted } = handleRankProgression(currentRP, currentRank);
       if (promoted) {
         promotions++;
         rankPromotions.push({ game: i, rank: newRank });
+        // When promoted, RP gain/loss is further reduced (simulate harder climb)
+        if (isWin) rpChange = Math.max(1, Math.round(rpChange * 0.85));
+        else rpChange = Math.round(rpChange * 1.1); // Losses can be harsher after promotion
       }
       currentRP = newRP;
       currentRank = newRank;
+      division = RANK_DIVISIONS[currentRank as keyof typeof RANK_DIVISIONS];
+      // Glicko update (simple model)
+      const expected = 0.5; // Assume even matchups for simulation
+      currentGlicko += 32 * ((isWin ? 1 : 0) - expected);
       data.push({
         game: i,
         rp: Math.max(0, Math.min(99, currentRP)),
         rank: currentRank,
-        glicko: Math.round(currentGlicko + (rpChange * 0.8)),
+        glicko: Math.round(currentGlicko),
         result: isWin ? 'Win' : 'Loss',
         rpChange: rpChange,
         promoted: promoted
@@ -902,28 +949,69 @@ const BedWarsMMRCalculator = () => {
             {/* Simplified Input Interface */}
             <div className="space-y-4">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium mb-1">Games to Predict</label>
-                  <input type="number" min="1" max="100" value={gamesToPredict}
+                <div className="bg-gray-50 dark:bg-gray-800/80 rounded-xl p-5 border border-gray-200 dark:border-gray-700 shadow flex flex-col gap-3">
+                  <label className="block text-sm font-semibold text-gray-700 dark:text-gray-200 mb-1">Games to Predict</label>
+                  <input
+                    type="number"
+                    min="1"
+                    max="100"
+                    value={gamesToPredict}
                     onChange={e => setGamesToPredict(Math.max(1, Math.min(100, parseInt(e.target.value) || 1)))}
-                    className="w-full p-2 border rounded-md bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100" />
+                    className="w-full px-4 py-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-blue-400 dark:focus:ring-blue-600 focus:border-blue-400 dark:focus:border-blue-600 transition shadow-sm text-base"
+                  />
                 </div>
-                <div>
-                  <label className="block text-sm font-medium mb-1">Expected Win Rate %</label>
-                  <input type="number" min="0" max="100" value={expectedWinRate}
-                    onChange={e => setExpectedWinRate(Math.max(0, Math.min(100, parseInt(e.target.value) || 0)))}
-                    className="w-full p-2 border rounded-md bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100" />
-                  <p className="text-xs text-gray-500">Based on your recent matches: {recentWinRate}%</p>
+                <div className="bg-gray-50 dark:bg-gray-800/80 rounded-xl p-5 border border-gray-200 dark:border-gray-700 shadow flex flex-col gap-3">
+                  <label className="block text-sm font-semibold text-gray-700 dark:text-gray-200 mb-1">Expected Win Rate</label>
+                  <div className="flex items-center gap-2 mb-2">
+                    <button
+                      type="button"
+                      className={`px-3 py-1 rounded-lg text-xs font-semibold border transition-colors duration-150 focus:outline-none focus:ring-2 focus:ring-blue-400 dark:focus:ring-blue-600 ${winRateMode === 'percent' ? 'bg-blue-100 dark:bg-blue-700 border-blue-400 text-blue-800 dark:text-blue-200 shadow' : 'bg-gray-100 dark:bg-gray-700 border-gray-400 text-gray-700 dark:text-gray-200'}`}
+                      onClick={() => setWinRateMode('percent')}
+                    >
+                      %
+                    </button>
+                    <button
+                      type="button"
+                      className={`px-3 py-1 rounded-lg text-xs font-semibold border transition-colors duration-150 focus:outline-none focus:ring-2 focus:ring-blue-400 dark:focus:ring-blue-600 ${winRateMode === 'count' ? 'bg-blue-100 dark:bg-blue-700 border-blue-400 text-blue-800 dark:text-blue-200 shadow' : 'bg-gray-100 dark:bg-gray-700 border-gray-400 text-gray-700 dark:text-gray-200'}`}
+                      onClick={() => setWinRateMode('count')}
+                    >
+                      Games Won
+                    </button>
+                  </div>
+                  {winRateMode === 'percent' ? (
+                    <input
+                      type="number"
+                      min="0"
+                      max="100"
+                      value={expectedWinRate}
+                      onChange={e => setExpectedWinRate(Math.max(0, Math.min(100, parseInt(e.target.value) || 0)))}
+                      className="w-full px-4 py-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-blue-400 dark:focus:ring-blue-600 focus:border-blue-400 dark:focus:border-blue-600 transition shadow-sm text-base"
+                    />
+                  ) : (
+                    <input
+                      type="number"
+                      min="0"
+                      max={gamesToPredict}
+                      value={expectedWins}
+                      onChange={e => setExpectedWins(Math.max(0, Math.min(gamesToPredict, parseInt(e.target.value) || 0)))}
+                      className="w-full px-4 py-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-blue-400 dark:focus:ring-blue-600 focus:border-blue-400 dark:focus:border-blue-600 transition shadow-sm text-base"
+                    />
+                  )}
+                  <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                    {winRateMode === 'percent'
+                      ? `Based on your recent matches: ${recentWinRate}%`
+                      : `Out of ${gamesToPredict} games, ${expectedWins} wins (${Math.round((expectedWins / gamesToPredict) * 100)}%)`}
+                  </p>
                   <div className="flex gap-2 mt-2">
-                    <button type="button" className="px-2 py-1 rounded bg-gray-100 dark:bg-gray-700 text-xs" onClick={() => setExpectedWinRate(40)}>Conservative (40%)</button>
-                    <button type="button" className="px-2 py-1 rounded bg-blue-100 dark:bg-blue-700 text-xs" onClick={() => setExpectedWinRate(recentWinRate)}>Current Rate ({recentWinRate}%)</button>
-                    <button type="button" className="px-2 py-1 rounded bg-green-100 dark:bg-green-700 text-xs" onClick={() => setExpectedWinRate(70)}>Optimistic (70%)</button>
+                    <button type="button" className="px-3 py-1 rounded-lg bg-gray-100 dark:bg-gray-700 text-xs font-semibold hover:bg-gray-200 dark:hover:bg-gray-600 transition" onClick={() => { setWinRateMode('percent'); setExpectedWinRate(40); }}>Conservative (40%)</button>
+                    <button type="button" className="px-3 py-1 rounded-lg bg-blue-100 dark:bg-blue-700 text-xs font-semibold hover:bg-blue-200 dark:hover:bg-blue-600 transition" onClick={() => { setWinRateMode('percent'); setExpectedWinRate(recentWinRate); }}>Current Rate ({recentWinRate}%)</button>
+                    <button type="button" className="px-3 py-1 rounded-lg bg-green-100 dark:bg-green-700 text-xs font-semibold hover:bg-green-200 dark:hover:bg-green-600 transition" onClick={() => { setWinRateMode('percent'); setExpectedWinRate(70); }}>Optimistic (70%)</button>
                   </div>
                 </div>
               </div>
               <div className="bg-blue-50 dark:bg-blue-900/20 p-3 rounded-lg text-sm">
-                <p><strong>Using your averages:</strong> +{avgRPWin} per win, {avgRPLoss} per loss</p>
-                <p className="text-xs text-gray-600">From your recent {playerData.matchHistory.length} matches</p>
+                <p><strong>Using your averages:</strong> <span className="text-green-700 dark:text-green-400">+{avgRPWin}</span> per win, <span className="text-red-700 dark:text-red-400">{avgRPLoss}</span> per loss</p>
+                <p className="text-xs text-gray-600 dark:text-gray-400">From your recent {playerData.matchHistory.length} matches</p>
               </div>
             </div>
             {/* RP Progression Graph */}
@@ -932,14 +1020,33 @@ const BedWarsMMRCalculator = () => {
               <div className="h-64 w-full">
                 <ResponsiveContainer width="100%" height="100%">
                   <LineChart data={simulation.data}>
-                    <CartesianGrid strokeDasharray="3 3" />
-                    <XAxis dataKey="game" label={{ value: 'Match Number', position: 'insideBottom', offset: -5 }} />
-                    <YAxis dataKey="rp" label={{ value: 'RP', angle: -90, position: 'insideLeft' }} />
+                    <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
+                    <XAxis dataKey="game" label={{ value: 'Match Number', position: 'insideBottom', offset: -5, fill: '#6b7280' }} tick={{ fill: '#6b7280' }} />
+                    <YAxis dataKey="rp" label={{ value: 'RP', angle: -90, position: 'insideLeft', fill: '#6b7280' }} tick={{ fill: '#6b7280' }} />
                     <RechartsTooltip 
-                      formatter={(value, name) => [value, name]}
-                      labelFormatter={(label) => `Match ${label}`}
+                      content={({ active, payload, label }) => {
+                        if (active && payload && payload.length) {
+                          const point = payload[0].payload;
+                          return (
+                            <div className="rounded-lg shadow-lg p-3 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-xs">
+                              <div className="font-semibold mb-1">Match {label}</div>
+                              <div className="flex items-center gap-2">
+                                <span className={point.rpChange > 0 ? 'text-green-600 dark:text-green-400' : point.rpChange < 0 ? 'text-red-600 dark:text-red-400' : 'text-gray-600 dark:text-gray-300'}>
+                                  {point.rpChange > 0 ? `+${point.rpChange}` : point.rpChange}
+                                </span>
+                                <span className="ml-1">RP {point.rpChange > 0 ? 'gain' : 'loss'}</span>
+                              </div>
+                              <div>Result: <span className={point.result === 'Win' ? 'text-green-700 dark:text-green-300' : 'text-red-700 dark:text-red-300'}>{point.result}</span></div>
+                              <div>RP after match: <span className="font-mono">{point.rp}</span></div>
+                              <div>Rank: <span className="font-mono">{point.rank.replace('_', ' ')}</span></div>
+                              {point.promoted && <div className="text-purple-600 dark:text-purple-400 font-semibold">Rank Up!</div>}
+                            </div>
+                          );
+                        }
+                        return null;
+                      }}
                     />
-                    <Line type="monotone" dataKey="rp" stroke="#3B82F6" strokeWidth={2} />
+                    <Line type="monotone" dataKey="rp" stroke="#3B82F6" strokeWidth={2} dot={{ r: 3, stroke: '#3B82F6', strokeWidth: 2, fill: '#fff' }} activeDot={{ r: 5, fill: '#3B82F6' }} />
                     {/* Add vertical lines for rank promotions */}
                     {simulation.rankPromotions.map(promotion => (
                       <ReferenceLine key={promotion.game} x={promotion.game} stroke="#10B981" strokeDasharray="5 5" />
@@ -948,19 +1055,26 @@ const BedWarsMMRCalculator = () => {
                 </ResponsiveContainer>
               </div>
             </div>
-            {/* Simplified Results Display */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-4">
-              <div className="bg-green-50 p-4 rounded-lg text-center">
-                <div className="text-2xl font-bold text-green-700">{simulation.finalRP}</div>
-                <div className="text-sm text-green-600">Final RP</div>
+            {/* Insights/Results Display */}
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mt-4">
+              <div className="bg-green-50 dark:bg-green-900/20 p-4 rounded-lg text-center border border-green-100 dark:border-green-700">
+                <div className="text-2xl font-bold text-green-700 dark:text-green-300">{simulation.finalRP}</div>
+                <div className="text-sm text-green-600 dark:text-green-400">Final RP</div>
               </div>
-              <div className="bg-blue-50 p-4 rounded-lg text-center">
-                <div className="text-2xl font-bold text-blue-700">{simulation.finalRank.replace('_', ' ')}</div>
-                <div className="text-sm text-blue-600">Final Rank</div>
+              <div className="bg-blue-50 dark:bg-blue-900/20 p-4 rounded-lg text-center border border-blue-100 dark:border-blue-700">
+                <div className="text-2xl font-bold text-blue-700 dark:text-blue-300">{simulation.finalRank.replace('_', ' ')}</div>
+                <div className="text-sm text-blue-600 dark:text-blue-400">Final Rank</div>
               </div>
-              <div className="bg-purple-50 p-4 rounded-lg text-center">
-                <div className="text-2xl font-bold text-purple-700">+{simulation.promotions}</div>
-                <div className="text-sm text-purple-600">Rank Ups</div>
+              <div className="bg-purple-50 dark:bg-purple-900/20 p-4 rounded-lg text-center border border-purple-100 dark:border-purple-700">
+                <div className="text-2xl font-bold text-purple-700 dark:text-purple-300">+{simulation.promotions}</div>
+                <div className="text-sm text-purple-600 dark:text-purple-400">Rank Ups</div>
+              </div>
+              <div className="bg-gray-50 dark:bg-gray-800/80 p-4 rounded-lg text-center border border-gray-100 dark:border-gray-700">
+                <div className="text-lg font-bold text-gray-700 dark:text-gray-200 mb-1">RP Insights</div>
+                <div className="text-sm">
+                  <span className="block">Total RP gain: <span className="text-green-700 dark:text-green-400 font-semibold">{simulation.finalRP - playerData.currentRP >= 0 ? '+' : ''}{simulation.finalRP - playerData.currentRP}</span></span>
+                  <span className="block">Avg RP per match: <span className={((simulation.finalRP - playerData.currentRP) / gamesToPredict) >= 0 ? 'text-green-700 dark:text-green-400' : 'text-red-700 dark:text-red-400'}>{((simulation.finalRP - playerData.currentRP) / gamesToPredict).toFixed(2)}</span></span>
+                </div>
               </div>
             </div>
           </section>
