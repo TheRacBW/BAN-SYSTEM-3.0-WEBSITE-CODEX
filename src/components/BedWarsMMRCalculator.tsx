@@ -199,6 +199,47 @@ function simulateRPProgression({
   return { finalRP: Math.max(0, Math.min(99, rp)), finalRank: rank, finalGlicko: Math.round(glicko), promotions, demotions, history };
 }
 
+// --- Rank Difficulty Multipliers ---
+const RANK_DIFFICULTY_MULTIPLIERS: Record<string, number> = {
+  'BRONZE': 1.0,
+  'SILVER': 0.95,
+  'GOLD': 0.90,
+  'PLATINUM': 0.85,
+  'DIAMOND': 0.80,
+  'EMERALD': 0.75,
+  'NIGHTMARE': 0.70
+};
+
+function getRankTier(rank: string) {
+  if (rank.startsWith('BRONZE')) return 'BRONZE';
+  if (rank.startsWith('SILVER')) return 'SILVER';
+  if (rank.startsWith('GOLD')) return 'GOLD';
+  if (rank.startsWith('PLATINUM')) return 'PLATINUM';
+  if (rank.startsWith('DIAMOND')) return 'DIAMOND';
+  if (rank.startsWith('EMERALD')) return 'EMERALD';
+  if (rank.startsWith('NIGHTMARE')) return 'NIGHTMARE';
+  return 'BRONZE';
+}
+
+function applyRankDifficultyScaling(rpChange: number, rank: string) {
+  const multiplier = RANK_DIFFICULTY_MULTIPLIERS[getRankTier(rank)] || 1.0;
+  return Math.round(rpChange * multiplier);
+}
+
+function adjustRPForRankChange(baseRP: number, playerGlicko: number, newRank: string, wasPromoted: boolean) {
+  const newRankBaseline = GLICKO_RATINGS[RANK_DIVISIONS[newRank as keyof typeof RANK_DIVISIONS]];
+  const skillGap = playerGlicko - newRankBaseline;
+  if (wasPromoted) {
+    // After promotion: Harder to gain RP, easier to lose RP
+    const difficultyIncrease = Math.max(0.7, 1.0 - (skillGap / 300));
+    return Math.round(baseRP * difficultyIncrease);
+  } else {
+    // After demotion: Easier to gain RP, harder to lose RP
+    const recoveryBonus = Math.min(1.3, 1.0 + Math.abs(skillGap) / 400);
+    return Math.round(baseRP * recoveryBonus);
+  }
+}
+
 const BedWarsMMRCalculator = () => {
   const [playerData, setPlayerData] = useState<PlayerData>({
     currentRank: 'SILVER_2',
@@ -549,6 +590,29 @@ const BedWarsMMRCalculator = () => {
     return { newRP: currentRP, newRank: rankOrder[division], promoted };
   }
 
+  // --- Glicko-2 Update (simplified for simulation) ---
+  function updateGlickoRating(rating: number, rd: number, vol: number, matchResult: 'win' | 'loss') {
+    const baseChange = matchResult === 'win' ? 15 : -10;
+    const confidenceMultiplier = Math.max(0.5, rd / 2.0);
+    const ratingChange = baseChange * confidenceMultiplier;
+    return {
+      rating: rating + ratingChange,
+      rd: Math.max(0.8, rd - 0.03),
+      vol: Math.max(0.04, vol + Math.abs(ratingChange) * 0.001)
+    };
+  }
+
+  function calculateRPChange(currentGlicko: number, currentRank: string, matchResult: 'win' | 'loss', skillGap: number) {
+    const baseRP = matchResult === 'win' ? 15 : -12;
+    let skillMultiplier = 1.0;
+    if (matchResult === 'win') {
+      skillMultiplier = Math.max(0.7, 1.0 - (skillGap / 400));
+    } else {
+      skillMultiplier = Math.min(1.3, 1.0 + (skillGap / 500));
+    }
+    return Math.round(baseRP * skillMultiplier);
+  }
+
   function generateSimulationData(
     games: number,
     winRate: number,
@@ -556,55 +620,63 @@ const BedWarsMMRCalculator = () => {
     avgRPLoss: number,
     startingRP: number,
     startingRank: string,
-    startingGlicko: number
+    startingGlicko: number,
+    startingRD: number = 1.8,
+    startingVol: number = 0.06
   ) {
     const data = [];
     let currentRP = startingRP;
     let currentRank = startingRank;
     let currentGlicko = startingGlicko;
+    let currentRD = startingRD;
+    let currentVol = startingVol;
     let promotions = 0;
     const rankPromotions = [];
     let division = RANK_DIVISIONS[startingRank as keyof typeof RANK_DIVISIONS];
+    let lastRankChange = null as null | { promoted: boolean, newRank: string };
     for (let i = 1; i <= games; i++) {
       const isWin = Math.random() < (winRate / 100);
-      // Always use the current Glicko for RP gain/loss calculation
+      const matchResult = isWin ? 'win' : 'loss';
       const divisionGlicko = GLICKO_RATINGS[division];
-      let baseRP = isWin ? avgRPWin : avgRPLoss;
-      // Diminishing returns: as Glicko increases, RP gain shrinks for wins, increases for losses
-      if (isWin && currentGlicko > divisionGlicko) {
-        baseRP = Math.max(1, Math.round(baseRP * (1 - (currentGlicko - divisionGlicko) / 2000)));
+      const skillGap = currentGlicko - divisionGlicko;
+      // Dynamic RP calculation based on evolving Glicko
+      let rpChange = calculateRPChange(currentGlicko, currentRank, matchResult, skillGap);
+      // Apply rank difficulty scaling
+      rpChange = applyRankDifficultyScaling(rpChange, currentRank);
+      // Apply new RP and check for rank progression
+      let newRP = currentRP + rpChange;
+      const { newRP: checkedRP, newRank, promoted } = handleRankProgression(newRP, currentRank);
+      let rankChanged = newRank !== currentRank;
+      // If rank changed, adjust RP for the rank change effect
+      if (rankChanged) {
+        rpChange = adjustRPForRankChange(rpChange, currentGlicko, newRank, promoted);
+        newRP = checkedRP;
       }
-      if (!isWin && currentGlicko < divisionGlicko) {
-        baseRP = Math.min(-1, Math.round(baseRP * (1 - (divisionGlicko - currentGlicko) / 2000)));
-      }
-      let rpChange = baseRP;
-      currentRP += rpChange;
-      // Handle promotion/demotion
-      const { newRP, newRank, promoted } = handleRankProgression(currentRP, currentRank);
-      if (promoted) {
-        promotions++;
-        rankPromotions.push({ game: i, rank: newRank });
-        // When promoted, RP gain/loss is further reduced (simulate harder climb)
-        if (isWin) rpChange = Math.max(1, Math.round(rpChange * 0.85));
-        else rpChange = Math.round(rpChange * 1.1); // Losses can be harsher after promotion
-      }
+      // Update Glicko rating
+      const glickoUpdate = updateGlickoRating(currentGlicko, currentRD, currentVol, matchResult);
+      data.push({
+        game: i,
+        result: matchResult === 'win' ? 'Win' : 'Loss',
+        rp: newRP,
+        rank: newRank,
+        glicko: Math.round(glickoUpdate.rating),
+        rpChange: rpChange,
+        promoted: promoted,
+        demoted: !promoted && rankChanged,
+        skillGap: Math.round(skillGap),
+        rd: glickoUpdate.rd,
+        vol: glickoUpdate.vol
+      });
+      // Carry forward for next match
+      currentGlicko = glickoUpdate.rating;
+      currentRD = glickoUpdate.rd;
+      currentVol = glickoUpdate.vol;
       currentRP = newRP;
       currentRank = newRank;
       division = RANK_DIVISIONS[currentRank as keyof typeof RANK_DIVISIONS];
-      // Glicko update (simple model)
-      const expected = 0.5; // Assume even matchups for simulation
-      currentGlicko += 32 * ((isWin ? 1 : 0) - expected);
-      data.push({
-        game: i,
-        rp: Math.max(0, Math.min(99, currentRP)),
-        rank: currentRank,
-        glicko: Math.round(currentGlicko),
-        result: isWin ? 'Win' : 'Loss',
-        rpChange: rpChange,
-        promoted: promoted
-      });
+      if (promoted) rankPromotions.push({ game: i, rank: newRank });
     }
-    return { data, promotions, finalRP: Math.round(currentRP), finalRank: currentRank, rankPromotions };
+    return { data, promotions: rankPromotions.length, finalRP: Math.round(currentRP), finalRank: currentRank, rankPromotions, finalGlicko: Math.round(currentGlicko), startingGlicko: Math.round(startingGlicko) };
   }
 
   const simulation = generateSimulationData(
@@ -1014,23 +1086,24 @@ const BedWarsMMRCalculator = () => {
                 <p className="text-xs text-gray-600 dark:text-gray-400">From your recent {playerData.matchHistory.length} matches</p>
               </div>
             </div>
-            {/* RP Progression Graph */}
+            {/* RP Progression Graph with Glicko overlay */}
             <div className="mt-6">
-              <h4 className="text-lg font-semibold mb-3">RP Progression Prediction</h4>
-              <div className="h-64 w-full">
+              <h4 className="text-lg font-semibold mb-3">RP & Glicko Progression Prediction</h4>
+              <div className="h-72 w-full">
                 <ResponsiveContainer width="100%" height="100%">
                   <LineChart data={simulation.data}>
                     <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
                     <XAxis dataKey="game" label={{ value: 'Match Number', position: 'insideBottom', offset: -5, fill: '#6b7280' }} tick={{ fill: '#6b7280' }} />
-                    <YAxis dataKey="rp" label={{ value: 'RP', angle: -90, position: 'insideLeft', fill: '#6b7280' }} tick={{ fill: '#6b7280' }} />
+                    <YAxis yAxisId="rp" dataKey="rp" label={{ value: 'RP', angle: -90, position: 'insideLeft', fill: '#6b7280' }} tick={{ fill: '#6b7280' }} />
+                    <YAxis yAxisId="glicko" orientation="right" dataKey="glicko" label={{ value: 'Glicko', angle: 90, position: 'insideRight', fill: '#8B5CF6' }} tick={{ fill: '#8B5CF6' }} />
                     <RechartsTooltip 
-                      content={({ active, payload, label }) => {
+                      content={({ active, payload, label }: { active?: boolean; payload?: any[]; label?: string | number }) => {
                         if (active && payload && payload.length) {
                           const point = payload[0].payload;
                           return (
-                            <div className="rounded-lg shadow-lg p-3 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-xs">
+                            <div className="rounded-lg shadow-lg p-3 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-xs min-w-[180px]">
                               <div className="font-semibold mb-1">Match {label}</div>
-                              <div className="flex items-center gap-2">
+                              <div className="flex items-center gap-2 mb-1">
                                 <span className={point.rpChange > 0 ? 'text-green-600 dark:text-green-400' : point.rpChange < 0 ? 'text-red-600 dark:text-red-400' : 'text-gray-600 dark:text-gray-300'}>
                                   {point.rpChange > 0 ? `+${point.rpChange}` : point.rpChange}
                                 </span>
@@ -1039,15 +1112,16 @@ const BedWarsMMRCalculator = () => {
                               <div>Result: <span className={point.result === 'Win' ? 'text-green-700 dark:text-green-300' : 'text-red-700 dark:text-red-300'}>{point.result}</span></div>
                               <div>RP after match: <span className="font-mono">{point.rp}</span></div>
                               <div>Rank: <span className="font-mono">{point.rank.replace('_', ' ')}</span></div>
-                              {point.promoted && <div className="text-purple-600 dark:text-purple-400 font-semibold">Rank Up!</div>}
+                              <div>Glicko: <span className="font-mono text-purple-700 dark:text-purple-300">{point.glicko}</span></div>
+                              {point.promoted && <div className="text-purple-600 dark:text-purple-400 font-semibold mt-1">Rank Up!</div>}
                             </div>
                           );
                         }
                         return null;
                       }}
                     />
-                    <Line type="monotone" dataKey="rp" stroke="#3B82F6" strokeWidth={2} dot={{ r: 3, stroke: '#3B82F6', strokeWidth: 2, fill: '#fff' }} activeDot={{ r: 5, fill: '#3B82F6' }} />
-                    {/* Add vertical lines for rank promotions */}
+                    <Line yAxisId="rp" type="monotone" dataKey="rp" stroke="#3B82F6" strokeWidth={3} dot={{ r: 3, stroke: '#3B82F6', strokeWidth: 2, fill: '#fff' }} activeDot={{ r: 5, fill: '#3B82F6' }} />
+                    <Line yAxisId="glicko" type="monotone" dataKey="glicko" stroke="#8B5CF6" strokeWidth={2} strokeDasharray="5 5" dot={false} />
                     {simulation.rankPromotions.map(promotion => (
                       <ReferenceLine key={promotion.game} x={promotion.game} stroke="#10B981" strokeDasharray="5 5" />
                     ))}
@@ -1055,27 +1129,54 @@ const BedWarsMMRCalculator = () => {
                 </ResponsiveContainer>
               </div>
             </div>
-            {/* Insights/Results Display */}
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mt-4">
-              <div className="bg-green-50 dark:bg-green-900/20 p-4 rounded-lg text-center border border-green-100 dark:border-green-700">
-                <div className="text-2xl font-bold text-green-700 dark:text-green-300">{simulation.finalRP}</div>
-                <div className="text-sm text-green-600 dark:text-green-400">Final RP</div>
-              </div>
-              <div className="bg-blue-50 dark:bg-blue-900/20 p-4 rounded-lg text-center border border-blue-100 dark:border-blue-700">
-                <div className="text-2xl font-bold text-blue-700 dark:text-blue-300">{simulation.finalRank.replace('_', ' ')}</div>
-                <div className="text-sm text-blue-600 dark:text-blue-400">Final Rank</div>
-              </div>
-              <div className="bg-purple-50 dark:bg-purple-900/20 p-4 rounded-lg text-center border border-purple-100 dark:border-purple-700">
-                <div className="text-2xl font-bold text-purple-700 dark:text-purple-300">+{simulation.promotions}</div>
-                <div className="text-sm text-purple-600 dark:text-purple-400">Rank Ups</div>
-              </div>
-              <div className="bg-gray-50 dark:bg-gray-800/80 p-4 rounded-lg text-center border border-gray-100 dark:border-gray-700">
-                <div className="text-lg font-bold text-gray-700 dark:text-gray-200 mb-1">RP Insights</div>
-                <div className="text-sm">
-                  <span className="block">Total RP gain: <span className="text-green-700 dark:text-green-400 font-semibold">{simulation.finalRP - playerData.currentRP >= 0 ? '+' : ''}{simulation.finalRP - playerData.currentRP}</span></span>
-                  <span className="block">Avg RP per match: <span className={((simulation.finalRP - playerData.currentRP) / gamesToPredict) >= 0 ? 'text-green-700 dark:text-green-400' : 'text-red-700 dark:text-red-400'}>{((simulation.finalRP - playerData.currentRP) / gamesToPredict).toFixed(2)}</span></span>
+            {/* Skill Evolution Table */}
+            <div className="mt-8">
+              <h4 className="font-semibold text-purple-800 dark:text-purple-300 mb-2">🧠 Skill Evolution</h4>
+              <div className="grid grid-cols-3 gap-4 mt-2 text-sm">
+                <div>
+                  <span className="text-purple-600 dark:text-purple-400">Starting Glicko:</span>
+                  <span className="font-mono ml-2">{simulation.startingGlicko}</span>
+                </div>
+                <div>
+                  <span className="text-purple-600 dark:text-purple-400">Final Glicko:</span>
+                  <span className="font-mono ml-2">{simulation.finalGlicko}</span>
+                </div>
+                <div>
+                  <span className="text-purple-600 dark:text-purple-400">Skill Change:</span>
+                  <span className={`font-mono ml-2 ${(simulation.finalGlicko - simulation.startingGlicko) > 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>
+                    {(simulation.finalGlicko - simulation.startingGlicko) > 0 ? '+' : ''}{simulation.finalGlicko - simulation.startingGlicko}
+                  </span>
                 </div>
               </div>
+            </div>
+            {/* Results Table */}
+            <div className="mt-8 overflow-x-auto">
+              <table className="w-full border-collapse bg-white dark:bg-gray-900 rounded-lg overflow-hidden shadow-sm text-xs md:text-sm">
+                <thead className="bg-gray-100 dark:bg-gray-800">
+                  <tr>
+                    <th className="px-3 py-2 text-left">Game</th>
+                    <th className="px-3 py-2 text-left">Result</th>
+                    <th className="px-3 py-2 text-left">RP</th>
+                    <th className="px-3 py-2 text-left">Rank</th>
+                    <th className="px-3 py-2 text-left">Glicko</th>
+                    <th className="px-3 py-2 text-left">ΔRP</th>
+                    <th className="px-3 py-2 text-left">Skill Gap</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {simulation.data.map((match, index) => (
+                    <tr key={index} className={`${index % 2 === 0 ? 'bg-gray-50 dark:bg-gray-800/60' : 'bg-white dark:bg-gray-900'} ${match.promoted ? 'border-l-4 border-green-500' : ''}`}>
+                      <td className="px-3 py-2">{match.game}</td>
+                      <td className={`px-3 py-2 font-medium ${match.result === 'Win' ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>{match.result}</td>
+                      <td className="px-3 py-2">{match.rp}</td>
+                      <td className="px-3 py-2">{match.rank}</td>
+                      <td className="px-3 py-2 font-mono">{match.glicko}</td>
+                      <td className={`px-3 py-2 font-mono font-bold ${match.rpChange > 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>{match.rpChange > 0 ? '+' : ''}{match.rpChange}</td>
+                      <td className={`px-3 py-2 text-xs ${match.skillGap > 0 ? 'text-blue-600 dark:text-blue-400' : 'text-orange-600 dark:text-orange-400'}`}>{match.skillGap > 0 ? '+' : ''}{match.skillGap}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
             </div>
           </section>
         )}
