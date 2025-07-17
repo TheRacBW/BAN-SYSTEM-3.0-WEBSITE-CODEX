@@ -1,13 +1,60 @@
 import React from 'react';
-import { Link, NavLink, useNavigate } from 'react-router-dom';
+import { Link, NavLink, useNavigate, useLocation } from 'react-router-dom';
 import { Moon, Sun, User, LogOut, Plus, TrendingUp, Settings, Home, Users, Trophy, Compass, Calculator } from 'lucide-react';
 import { useTheme } from '../context/ThemeContext';
 import { useAuth } from '../context/AuthContext';
+import { useRef, useEffect, useState } from 'react';
 
 const Header: React.FC = () => {
   const { theme, toggleTheme } = useTheme();
   const { user, signOut, isAdmin } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
+
+  // For sliding selection bar
+  const navContainerRef = useRef<HTMLDivElement>(null);
+  const iconRefs = {
+    home: useRef<HTMLAnchorElement>(null),
+    'strat-picker': useRef<HTMLAnchorElement>(null),
+    leaderboard: useRef<HTMLAnchorElement>(null),
+    calculator: useRef<HTMLAnchorElement>(null),
+    players: useRef<HTMLAnchorElement>(null),
+  };
+  const [sliderStyle, setSliderStyle] = useState<React.CSSProperties>({ opacity: 0 });
+  const [sliderClass, setSliderClass] = useState('');
+
+  // Map routes to page keys
+  const routeToPage: Record<string, keyof typeof iconRefs> = {
+    '/': 'home',
+    '/strat-picker': 'strat-picker',
+    '/leaderboard': 'leaderboard',
+    '/mmr-calculator': 'calculator',
+    '/players': 'players',
+  };
+
+  useEffect(() => {
+    const page = routeToPage[location.pathname as keyof typeof routeToPage];
+    if (!page) {
+      setSliderStyle({ opacity: 0 });
+      return;
+    }
+    const iconEl = iconRefs[page].current;
+    const containerEl = navContainerRef.current;
+    if (iconEl && containerEl) {
+      const iconRect = iconEl.getBoundingClientRect();
+      const containerRect = containerEl.getBoundingClientRect();
+      const left = iconRect.left - containerRect.left;
+      const width = iconRect.width;
+      setSliderStyle({
+        left,
+        width,
+        opacity: 1,
+      });
+      setSliderClass(`nav-slider-bar ${page}`);
+    } else {
+      setSliderStyle({ opacity: 0 });
+    }
+  }, [location.pathname]);
 
   const handleSignOut = async () => {
     await signOut();
@@ -26,7 +73,8 @@ const Header: React.FC = () => {
             />
           </Link>
           
-          <div className="flex items-center gap-4">
+          <div className="flex items-center gap-4 relative" ref={navContainerRef} style={{ minHeight: 40 }}>
+            <div className={sliderClass} style={sliderStyle} />
             <NavLink
               to="/"
               className={({ isActive }) =>
@@ -34,6 +82,7 @@ const Header: React.FC = () => {
               }
               title="Home"
               data-page="home"
+              ref={iconRefs.home}
             >
               <Home size={20} />
             </NavLink>
@@ -45,6 +94,7 @@ const Header: React.FC = () => {
               }
               title="Strat Picker"
               data-page="strat-picker"
+              ref={iconRefs['strat-picker']}
             >
               <Compass size={20} />
             </NavLink>
@@ -56,6 +106,7 @@ const Header: React.FC = () => {
               }
               title="Leaderboard"
               data-page="leaderboard"
+              ref={iconRefs.leaderboard}
             >
               <Trophy size={20} />
             </NavLink>
@@ -66,6 +117,7 @@ const Header: React.FC = () => {
               }
               title="MMR Calculator"
               data-page="calculator"
+              ref={iconRefs.calculator}
             >
               <Calculator size={20} />
             </NavLink>
@@ -79,6 +131,7 @@ const Header: React.FC = () => {
                   }
                   title="Player Tracking"
                   data-page="players"
+                  ref={iconRefs.players}
                 >
                   <Users size={20} />
                 </NavLink>
