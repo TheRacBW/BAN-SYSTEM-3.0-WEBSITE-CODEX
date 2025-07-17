@@ -128,13 +128,13 @@ function validateRPSymmetry(rpWin: number, rpLoss: number, playerGlicko: number,
 
 // --- Rank Difficulty Multipliers ---
 const RANK_DIFFICULTY_MULTIPLIERS: Record<string, number> = {
-  'BRONZE': 1.0,
-  'SILVER': 0.95,
-  'GOLD': 0.90,
-  'PLATINUM': 0.85,
-  'DIAMOND': 0.80,
-  'EMERALD': 0.75,
-  'NIGHTMARE': 0.70
+  'BRONZE': 1.35,   // Slightly higher new player boost
+  'SILVER': 1.15,   // Keep as-is
+  'GOLD': 1.0,      // Perfect baseline
+  'PLATINUM': 0.85, // Gentle transition
+  'DIAMOND': 0.7,   // Keep the difficulty spike
+  'EMERALD': 0.55,  // Bridge to Nightmare
+  'NIGHTMARE': 0.4  // Keep extreme difficulty
 };
 
 function getRankTier(rank: string) {
