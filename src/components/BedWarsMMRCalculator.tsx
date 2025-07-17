@@ -63,6 +63,141 @@ interface GlickoRating {
   vol: number;
 }
 
+// --- Advanced RP Prediction Section ---
+const TABS = [
+  { key: 'win', label: 'Win-based' },
+  { key: 'loss', label: 'Loss-based' },
+  { key: 'auto', label: 'Auto-calculate' },
+];
+
+const getAvgRP = (history: MatchData[], outcome: 'win' | 'loss') => {
+  const filtered = history.filter(m => m.outcome === outcome);
+  if (filtered.length === 0) return '';
+  return Math.round(filtered.reduce((sum, m) => sum + m.rpChange, 0) / filtered.length);
+};
+
+function Tooltip({ text, children }: { text: string; children: React.ReactNode }) {
+  return (
+    <span className="relative group cursor-help">
+      {children}
+      <span className="absolute left-1/2 -translate-x-1/2 bottom-full mb-2 w-max max-w-xs bg-gray-800 text-white text-xs rounded px-2 py-1 opacity-0 group-hover:opacity-100 pointer-events-none z-20 shadow-lg">
+        {text}
+      </span>
+    </span>
+  );
+}
+
+// --- Glicko-2 Math for RP Prediction ---
+function glickoExpectedScore(player: number, opponent: number) {
+  // E = 1 / (1 + 10^((opponent - player)/400))
+  return 1 / (1 + Math.pow(10, (opponent - player) / 400));
+}
+
+function estimateOpponentGlicko(playerGlicko: number, rpChange: number, outcome: 1 | 0, kFactor = 32) {
+  // RP change = (ActualResult - ExpectedResult) * K
+  // Rearranged: ExpectedResult = ActualResult - (RPchange / K)
+  // E = 1 / (1 + 10^((opponent - player)/400))
+  // Solve for opponent
+  const expected = outcome - (rpChange / kFactor);
+  if (expected <= 0 || expected >= 1) return null; // Out of bounds
+  const odds = (1 / expected) - 1;
+  const opponent = playerGlicko + 400 * Math.log10(odds);
+  return Math.round(opponent);
+}
+
+function predictCounterRP(knownRP: number, knownOutcome: 1 | 0, playerGlicko: number, kFactor = 32) {
+  // Estimate opponent rating
+  const opponent = estimateOpponentGlicko(playerGlicko, knownRP, knownOutcome, kFactor);
+  if (opponent === null) return null;
+  // Predict RP for the opposite outcome
+  const expected = glickoExpectedScore(playerGlicko, opponent);
+  const counterRP = ((knownOutcome === 1 ? 0 : 1) - expected) * kFactor;
+  return Math.round(counterRP);
+}
+
+function validateRPSymmetry(rpWin: number, rpLoss: number, playerGlicko: number, kFactor = 32) {
+  // Predict loss from win and win from loss, check for symmetry
+  const predLoss = predictCounterRP(rpWin, 1, playerGlicko, kFactor);
+  const predWin = predictCounterRP(rpLoss, 0, playerGlicko, kFactor);
+  let warning = '';
+  if (predLoss !== null && Math.abs(predLoss - rpLoss) > 5) warning = 'Loss RP does not match Glicko-2 prediction.';
+  if (predWin !== null && Math.abs(predWin - rpWin) > 5) warning = 'Win RP does not match Glicko-2 prediction.';
+  return { predLoss, predWin, warning };
+}
+
+// --- Simulation Engine for RP Progression ---
+function simulateRPProgression({
+  games,
+  winRate,
+  avgRPWin,
+  avgRPLoss,
+  startRP,
+  startRank,
+  startGlicko,
+  kFactor = 32,
+  rankDivisions = RANK_DIVISIONS,
+  glickoRatings = GLICKO_RATINGS,
+  rankNames = RANK_NAMES
+}: {
+  games: number;
+  winRate: number;
+  avgRPWin: number;
+  avgRPLoss: number;
+  startRP: number;
+  startRank: string;
+  startGlicko: number;
+  kFactor?: number;
+  rankDivisions?: typeof RANK_DIVISIONS;
+  glickoRatings?: typeof GLICKO_RATINGS;
+  rankNames?: string[];
+}) {
+  let rp = startRP;
+  let glicko = startGlicko;
+  let division = rankDivisions[startRank as keyof typeof rankDivisions];
+  let history = [];
+  let rank = startRank;
+  let promotions = 0;
+  let demotions = 0;
+  for (let i = 0; i < games; i++) {
+    const win = Math.random() < winRate;
+    let rpChange = win ? avgRPWin : avgRPLoss;
+    // Diminishing returns: as Glicko increases, RP gain shrinks
+    if (win && glicko > glickoRatings[division]) {
+      rpChange = Math.max(1, Math.round(rpChange * (1 - (glicko - glickoRatings[division]) / 2000)));
+    }
+    if (!win && glicko < glickoRatings[division]) {
+      rpChange = Math.min(-1, Math.round(rpChange * (1 - (glickoRatings[division] - glicko) / 2000)));
+    }
+    rp += rpChange;
+    // Promotion
+    if (rp >= 100) {
+      rp -= 100;
+      division = Math.min(division + 1, rankNames.length - 1);
+      rank = rankNames[division];
+      promotions++;
+    }
+    // Demotion
+    if (rp < 0) {
+      rp += 100;
+      division = Math.max(division - 1, 0);
+      rank = rankNames[division];
+      demotions++;
+    }
+    // Glicko update (simple model)
+    const expected = 0.5; // Assume even matchups for simulation
+    glicko += kFactor * ((win ? 1 : 0) - expected);
+    history.push({
+      game: i + 1,
+      win,
+      rp: Math.max(0, Math.min(99, rp)),
+      rank,
+      glicko: Math.round(glicko),
+      rpChange
+    });
+  }
+  return { finalRP: Math.max(0, Math.min(99, rp)), finalRank: rank, finalGlicko: Math.round(glicko), promotions, demotions, history };
+}
+
 const BedWarsMMRCalculator = () => {
   const [playerData, setPlayerData] = useState<PlayerData>({
     currentRank: 'SILVER_2',
@@ -84,6 +219,12 @@ const BedWarsMMRCalculator = () => {
     gamesUsed: 0, 
     warning: false 
   });
+
+  // --- Advanced RP Prediction Section ---
+  const [predictionTab, setPredictionTab] = useState('win'); // Default to Win-based
+  const [simGames, setSimGames] = useState(10); // Default to 10 games
+  const [avgRPWin, setAvgRPWin] = useState<number>(0);
+  const [avgRPLoss, setAvgRPLoss] = useState<number>(0);
 
   // Initialize with some sample match data including shield scenarios
   useEffect(() => {
@@ -294,6 +435,60 @@ const BedWarsMMRCalculator = () => {
 
   const ratingDiff = getRatingDifference();
 
+  const kFactor = 32; // Could be dynamic per rank
+  const playerGlicko = calculatedMMR?.rating || 1500;
+
+  // Auto-populate averages from match history if available
+  const autoAvgWin = getAvgRP(playerData.matchHistory, 'win') || 15;
+  const autoAvgLoss = getAvgRP(playerData.matchHistory, 'loss') || -12;
+
+  let usedAvgWin = avgRPWin;
+  let usedAvgLoss = avgRPLoss;
+  if (predictionTab === 'auto') {
+    usedAvgWin = autoAvgWin;
+    usedAvgLoss = autoAvgLoss;
+  }
+  if (predictionTab === 'win' && !avgRPWin) usedAvgWin = autoAvgWin;
+  if (predictionTab === 'loss' && !avgRPLoss) usedAvgLoss = autoAvgLoss;
+
+  // Predict counter RP
+  let predictedLoss = null, predictedWin = null, opponentSkill = null, symmetryWarning = '';
+  if (predictionTab === 'win' && usedAvgWin) {
+    predictedLoss = predictCounterRP(usedAvgWin, 1, playerGlicko, kFactor);
+    opponentSkill = estimateOpponentGlicko(playerGlicko, usedAvgWin, 1, kFactor);
+  } else if (predictionTab === 'loss' && usedAvgLoss) {
+    predictedWin = predictCounterRP(usedAvgLoss, 0, playerGlicko, kFactor);
+    opponentSkill = estimateOpponentGlicko(playerGlicko, usedAvgLoss, 0, kFactor);
+  } else if (predictionTab === 'auto') {
+    predictedLoss = predictCounterRP(usedAvgWin, 1, playerGlicko, kFactor);
+    predictedWin = predictCounterRP(usedAvgLoss, 0, playerGlicko, kFactor);
+    opponentSkill = estimateOpponentGlicko(playerGlicko, usedAvgWin, 1, kFactor);
+  }
+  // Symmetry check
+  const symmetry = validateRPSymmetry(usedAvgWin, usedAvgLoss, playerGlicko, kFactor);
+  if (symmetry.warning) symmetryWarning = symmetry.warning;
+
+  // --- Simulation Inputs ---
+  const winRate = 0.5; // For now, assume 50% win rate (could be user input)
+  const simResult = simulateRPProgression({
+    games: simGames,
+    winRate,
+    avgRPWin: usedAvgWin,
+    avgRPLoss: usedAvgLoss,
+    startRP: playerData.currentRP,
+    startRank: playerData.currentRank,
+    startGlicko: playerGlicko,
+    kFactor,
+    rankDivisions: RANK_DIVISIONS,
+    glickoRatings: GLICKO_RATINGS,
+    rankNames: RANK_NAMES
+  });
+  // --- Confidence Calculation ---
+  let confidence = 'Medium';
+  if (playerData.matchHistory.length >= 8) confidence = 'High';
+  else if (playerData.matchHistory.length <= 2) confidence = 'Low';
+  if (symmetryWarning) confidence = 'Low';
+
   return (
     <div className="max-w-5xl mx-auto py-8 px-2">
       <div className="bg-white dark:bg-gray-900 rounded-2xl shadow-xl border border-gray-200 dark:border-gray-800 p-6 md:p-10 mb-8 animate-fade-in">
@@ -470,6 +665,176 @@ const BedWarsMMRCalculator = () => {
               </div>
             )}
           </div>
+          {/* Advanced RP Prediction Section */}
+          <div className="mt-10 bg-white dark:bg-gray-900 rounded-2xl shadow-xl border border-gray-200 dark:border-gray-800 p-6 md:p-10">
+            <h2 className="text-2xl font-bold mb-4 flex items-center gap-2">
+              <BarChart3 className="w-6 h-6 text-primary-600 dark:text-primary-400" />
+              Advanced RP Prediction
+            </h2>
+            <div className="mb-4 flex gap-2">
+              {TABS.map(tab => (
+                <button
+                  key={tab.key}
+                  onClick={() => setPredictionTab(tab.key)}
+                  className={`px-4 py-2 rounded-t-lg font-semibold transition border-b-2 ${predictionTab === tab.key ? 'border-primary-600 dark:border-primary-400 bg-primary-50 dark:bg-primary-900/20 text-primary-900 dark:text-primary-100' : 'border-transparent bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-300'}`}
+                >
+                  {tab.label}
+                </button>
+              ))}
+            </div>
+            <div className="flex flex-col md:flex-row gap-6">
+              <div className="flex-1 space-y-4">
+                <div>
+                  <label className="block text-xs font-semibold text-gray-600 dark:text-gray-300 mb-1">
+                    Games to simulate
+                    <Tooltip text="How many future games to predict using your win/loss pattern and Glicko-2 math." >
+                      <span className="ml-1 text-primary-500">?</span>
+                    </Tooltip>
+                  </label>
+                  <input
+                    type="number"
+                    min={1}
+                    max={100}
+                    value={simGames}
+                    onChange={e => setSimGames(Math.max(1, Math.min(100, parseInt(e.target.value) || 1)))}
+                    className="w-32 p-2 bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-md focus:ring-2 focus:ring-primary-500 focus:border-primary-500 dark:focus:ring-primary-400 dark:focus:border-primary-400 transition"
+                  />
+                </div>
+                {predictionTab === 'win' && (
+                  <div>
+                    <label className="block text-xs font-semibold text-gray-600 dark:text-gray-300 mb-1">
+                      Average RP per Win
+                      <Tooltip text="Your recent average RP gain per win. Used to estimate opponent skill and predict loss RP using Glicko-2 relationships." >
+                        <span className="ml-1 text-primary-500">?</span>
+                      </Tooltip>
+                    </label>
+                    <input
+                      type="number"
+                      value={avgRPWin}
+                      onChange={e => setAvgRPWin(parseInt(e.target.value) || 0)}
+                      className="w-32 p-2 bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-md focus:ring-2 focus:ring-primary-500 focus:border-primary-500 dark:focus:ring-primary-400 dark:focus:border-primary-400 transition"
+                      placeholder={String(getAvgRP(playerData.matchHistory, 'win')) || 'Auto'}
+                    />
+                  </div>
+                )}
+                {predictionTab === 'loss' && (
+                  <div>
+                    <label className="block text-xs font-semibold text-gray-600 dark:text-gray-300 mb-1">
+                      Average RP per Loss
+                      <Tooltip text="Your recent average RP loss per defeat. Used to estimate opponent skill and predict win RP using Glicko-2 relationships." >
+                        <span className="ml-1 text-primary-500">?</span>
+                      </Tooltip>
+                    </label>
+                    <input
+                      type="number"
+                      value={avgRPLoss}
+                      onChange={e => setAvgRPLoss(parseInt(e.target.value) || 0)}
+                      className="w-32 p-2 bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-md focus:ring-2 focus:ring-primary-500 focus:border-primary-500 dark:focus:ring-primary-400 dark:focus:border-primary-400 transition"
+                      placeholder={String(getAvgRP(playerData.matchHistory, 'loss')) || 'Auto'}
+                    />
+                  </div>
+                )}
+                {predictionTab === 'auto' && (
+                  <div className="text-xs text-gray-500 dark:text-gray-400">
+                    Using your match history to auto-calculate win/loss RP averages and simulate progression.
+                  </div>
+                )}
+              </div>
+              <div className="flex-1 space-y-2">
+                <div className="bg-gray-50 dark:bg-gray-800 rounded-lg p-4 border border-gray-100 dark:border-gray-700">
+                  <div className="font-semibold text-gray-800 dark:text-gray-100 mb-2">Prediction Results</div>
+                  <div className="text-sm text-gray-700 dark:text-gray-300 space-y-2">
+                    {predictionTab === 'win' && usedAvgWin && (
+                      <div>
+                        <div>Input Win RP: <span className="font-bold">+{usedAvgWin}</span></div>
+                        <div>Predicted Loss RP: <span className="font-bold">{predictedLoss !== null ? predictedLoss : 'N/A'}</span></div>
+                      </div>
+                    )}
+                    {predictionTab === 'loss' && usedAvgLoss && (
+                      <div>
+                        <div>Input Loss RP: <span className="font-bold">{usedAvgLoss}</span></div>
+                        <div>Predicted Win RP: <span className="font-bold">+{predictedWin !== null ? predictedWin : 'N/A'}</span></div>
+                      </div>
+                    )}
+                    {predictionTab === 'auto' && (
+                      <div>
+                        <div>Avg Win RP: <span className="font-bold">+{usedAvgWin}</span></div>
+                        <div>Avg Loss RP: <span className="font-bold">{usedAvgLoss}</span></div>
+                        <div>Predicted Loss RP: <span className="font-bold">{predictedLoss !== null ? predictedLoss : 'N/A'}</span></div>
+                        <div>Predicted Win RP: <span className="font-bold">+{predictedWin !== null ? predictedWin : 'N/A'}</span></div>
+                      </div>
+                    )}
+                    {opponentSkill && (
+                      <div>Opponent Skill Estimate: <span className="font-bold">{opponentSkill} Glicko</span></div>
+                    )}
+                    {symmetryWarning && (
+                      <div className="text-red-600 dark:text-red-400 font-semibold">{symmetryWarning}</div>
+                    )}
+                    {!usedAvgWin && !usedAvgLoss && (
+                      <span className="italic text-gray-400">Prediction results will appear here as you enter data.</span>
+                    )}
+                  </div>
+                </div>
+                <div className="mt-4">
+                  <div className="font-semibold text-gray-800 dark:text-gray-100 mb-1 flex items-center gap-2">
+                    Simulation Results
+                    <Tooltip text="Simulates your RP and Glicko progression over the next N games, including promotions and demotions, using your win/loss pattern and Glicko-2 math."><span className="ml-1 text-primary-500">?</span></Tooltip>
+                  </div>
+                  <div className="text-xs text-gray-600 dark:text-gray-300 mb-2">
+                    Assumes 50% win rate for demonstration. (Custom win rate coming soon!)
+                  </div>
+                  <div className="bg-gray-100 dark:bg-gray-800 rounded p-3 mb-2">
+                    <div>Final RP: <span className="font-bold">{simResult.finalRP}</span></div>
+                    <div>Final Rank: <span className="font-bold">{simResult.finalRank.replace('_', ' ')}</span></div>
+                    <div>Final Glicko: <span className="font-bold">{simResult.finalGlicko}</span></div>
+                    <div>Promotions: <span className="font-bold">{simResult.promotions}</span> | Demotions: <span className="font-bold">{simResult.demotions}</span></div>
+                  </div>
+                  <div className="overflow-x-auto max-h-40">
+                    <table className="text-xs w-full">
+                      <thead>
+                        <tr className="bg-gray-200 dark:bg-gray-700">
+                          <th className="px-2 py-1">Game</th>
+                          <th className="px-2 py-1">Result</th>
+                          <th className="px-2 py-1">RP</th>
+                          <th className="px-2 py-1">Rank</th>
+                          <th className="px-2 py-1">Glicko</th>
+                          <th className="px-2 py-1">ΔRP</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {simResult.history.map(row => (
+                          <tr key={row.game} className="even:bg-gray-50 dark:even:bg-gray-900">
+                            <td className="px-2 py-1 text-center">{row.game}</td>
+                            <td className="px-2 py-1 text-center">{row.win ? 'Win' : 'Loss'}</td>
+                            <td className="px-2 py-1 text-center">{row.rp}</td>
+                            <td className="px-2 py-1 text-center">{row.rank.replace('_', ' ')}</td>
+                            <td className="px-2 py-1 text-center">{row.glicko}</td>
+                            <td className="px-2 py-1 text-center">{row.rpChange > 0 ? '+' : ''}{row.rpChange}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+                <div className="mt-4 flex flex-wrap gap-4 items-center">
+                  <div className="bg-primary-50 dark:bg-primary-900/20 border border-primary-200 dark:border-primary-700 rounded p-2 text-xs">
+                    Prediction Confidence: <span className="font-bold">{confidence}</span>
+                  </div>
+                  <div className="bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-700 rounded p-2 text-xs">
+                    RP Symmetry Check: <span className="font-bold">{symmetry.warning ? '⚠️ ' + symmetry.warning : 'OK'}</span>
+                  </div>
+                  <div className="bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-700 rounded p-2 text-xs">
+                    Opponent Skill Estimate: <span className="font-bold">{opponentSkill ? opponentSkill + ' Glicko' : 'N/A'}</span>
+                  </div>
+                </div>
+                <div className="text-xs text-gray-500 dark:text-gray-400 mt-2">
+                  <Tooltip text="Glicko-2 is a rating system that predicts your expected win/loss RP based on your skill and your opponent's skill. This tool uses those relationships for advanced predictions.">
+                    <span className="underline cursor-help">What is Glicko-2?</span>
+                  </Tooltip>
+                </div>
+              </div>
+            </div>
+          </div>
           {/* Match History */}
           <div className="space-y-6 bg-gray-50 dark:bg-gray-800 rounded-xl p-5 border border-gray-100 dark:border-gray-700 shadow-sm">
             <div className="flex justify-between items-center mb-2">
@@ -565,7 +930,7 @@ const BedWarsMMRCalculator = () => {
           <div className="bg-red-50 dark:bg-red-900/20 p-4 rounded-lg flex flex-col items-center border border-red-100 dark:border-red-700">
             <div className="font-semibold text-red-900 dark:text-red-100">Avg RP/Win</div>
             <div className="text-2xl font-extrabold text-red-700 dark:text-red-300">
-              +{playerData.matchHistory.length > 0 
+              {playerData.matchHistory.length > 0 
                 ? Math.round(playerData.matchHistory.filter(m => m.outcome === 'win').reduce((sum, m) => sum + m.rpChange, 0) / playerData.matchHistory.filter(m => m.outcome === 'win').length) || 0
                 : 0
               }
