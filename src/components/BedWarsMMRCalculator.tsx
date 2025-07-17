@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Calculator, TrendingUp, TrendingDown, Target, Award, Shield, AlertCircle, BarChart3, Clock, BarChart2 } from 'lucide-react';
 import RankBadge from './leaderboard/RankBadge';
 import { calculateRankFromRP, getRankDisplayName } from '../utils/rankingSystem';
+import { ResponsiveContainer, LineChart, Line, XAxis, YAxis, CartesianGrid, ReferenceLine, Tooltip as RechartsTooltip } from 'recharts';
 
 // Rank system definitions based on your decompiled code
 const RANK_DIVISIONS = {
@@ -495,6 +496,80 @@ const BedWarsMMRCalculator = () => {
   ];
   const [mainTab, setMainTab] = useState<'calculator' | 'advanced'>('calculator');
 
+  // In the BedWarsMMRCalculator component, add state for simplified prediction:
+  const [gamesToPredict, setGamesToPredict] = useState(10);
+  const recentWinRate = playerData.matchHistory.length > 0 ? Math.round((playerData.matchHistory.filter(m => m.outcome === 'win').length / playerData.matchHistory.length) * 100) : 50;
+  const [expectedWinRate, setExpectedWinRate] = useState(recentWinRate);
+  const avgRPWin = playerData.matchHistory.length > 0 ? Math.round(playerData.matchHistory.filter(m => m.outcome === 'win').reduce((sum, m) => sum + m.rpChange, 0) / playerData.matchHistory.filter(m => m.outcome === 'win').length) || 0 : 15;
+  const avgRPLoss = playerData.matchHistory.length > 0 ? Math.round(playerData.matchHistory.filter(m => m.outcome === 'loss').reduce((sum, m) => sum + m.rpChange, 0) / playerData.matchHistory.filter(m => m.outcome === 'loss').length) || 0 : -12;
+
+  // Generate simulation data for the graph
+  function handleRankProgression(currentRP: number, currentRank: string) {
+    // Use the same logic as your rank system for promotions
+    const rankOrder = RANK_NAMES;
+    let division = RANK_DIVISIONS[currentRank as keyof typeof RANK_DIVISIONS];
+    let promoted = false;
+    if (currentRP >= 100 && division < rankOrder.length - 1) {
+      currentRP -= 100;
+      division++;
+      promoted = true;
+    }
+    if (currentRP < 0 && division > 0) {
+      currentRP += 100;
+      division--;
+    }
+    return { newRP: currentRP, newRank: rankOrder[division], promoted };
+  }
+
+  function generateSimulationData(
+    games: number,
+    winRate: number,
+    avgRPWin: number,
+    avgRPLoss: number,
+    startingRP: number,
+    startingRank: string,
+    startingGlicko: number
+  ) {
+    const data = [];
+    let currentRP = startingRP;
+    let currentRank = startingRank;
+    let currentGlicko = startingGlicko;
+    let promotions = 0;
+    const rankPromotions = [];
+    for (let i = 1; i <= games; i++) {
+      const isWin = Math.random() < (winRate / 100);
+      const rpChange = isWin ? avgRPWin : avgRPLoss;
+      currentRP += rpChange;
+      const { newRP, newRank, promoted } = handleRankProgression(currentRP, currentRank);
+      if (promoted) {
+        promotions++;
+        rankPromotions.push({ game: i, rank: newRank });
+      }
+      currentRP = newRP;
+      currentRank = newRank;
+      data.push({
+        game: i,
+        rp: Math.max(0, Math.min(99, currentRP)),
+        rank: currentRank,
+        glicko: Math.round(currentGlicko + (rpChange * 0.8)),
+        result: isWin ? 'Win' : 'Loss',
+        rpChange: rpChange,
+        promoted: promoted
+      });
+    }
+    return { data, promotions, finalRP: Math.round(currentRP), finalRank: currentRank, rankPromotions };
+  }
+
+  const simulation = generateSimulationData(
+    gamesToPredict,
+    expectedWinRate,
+    avgRPWin,
+    avgRPLoss,
+    playerData.currentRP,
+    playerData.currentRank,
+    calculatedMMR?.rating || 1500
+  );
+
   return (
     <div className="max-w-7xl mx-auto py-12 px-4 flex flex-col gap-8 animate-fade-in">
       {/* Mini Header like Leaderboard/Strat Picker */}
@@ -824,163 +899,69 @@ const BedWarsMMRCalculator = () => {
               <BarChart3 className="w-7 h-7 text-primary-600 dark:text-primary-400" />
               Advanced RP Prediction
             </h2>
-            {/* Modern tab bar for prediction modes */}
-            <div className="prediction-tabs flex gap-2 mb-8 border-b-2 border-gray-200 dark:border-gray-700">
-              {TABS.map(tab => (
-                <button
-                  key={tab.key}
-                  onClick={() => setPredictionTab(tab.key)}
-                  className={`tab-button px-6 py-3 font-semibold text-base transition-all duration-200 border-b-2 ${predictionTab === tab.key ? 'border-primary-600 dark:border-primary-400 bg-primary-50 dark:bg-primary-900/20 text-primary-900 dark:text-primary-100' : 'border-transparent bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700'}`}
-                  style={{ minWidth: 140 }}
-                >
-                  {tab.label}
-                </button>
-              ))}
-            </div>
-            {/* Input Form Grid */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mb-8">
-              <div className="space-y-6">
+            {/* Simplified Input Interface */}
+            <div className="space-y-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-sm font-semibold text-gray-700 dark:text-gray-200 mb-1">Games to simulate</label>
-                  <input
-                    type="number"
-                    min={1}
-                    max={100}
-                    value={simGames}
-                    onChange={e => setSimGames(Math.max(1, Math.min(100, parseInt(e.target.value) || 1)))}
-                    className="w-full p-3 border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-primary-500 focus:border-primary-500 dark:focus:ring-primary-400 dark:focus:border-primary-400 transition"
-                  />
-                  <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">How many future games to predict using your win/loss pattern and Glicko-2 math.</p>
+                  <label className="block text-sm font-medium mb-1">Games to Predict</label>
+                  <input type="number" min="1" max="100" value={gamesToPredict}
+                    onChange={e => setGamesToPredict(Math.max(1, Math.min(100, parseInt(e.target.value) || 1)))}
+                    className="w-full p-2 border rounded-md bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100" />
                 </div>
-                {predictionTab === 'win' && (
-                  <div>
-                    <label className="block text-sm font-semibold text-gray-700 dark:text-gray-200 mb-1">Average RP per Win</label>
-                    <input
-                      type="number"
-                      value={avgRPWin}
-                      onChange={e => setAvgRPWin(parseInt(e.target.value) || 0)}
-                      className="w-full p-3 border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-primary-500 focus:border-primary-500 dark:focus:ring-primary-400 dark:focus:border-primary-400 transition"
-                      placeholder={String(getAvgRP(playerData.matchHistory, 'win')) || 'Auto'}
-                    />
-                    <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">Your recent average RP gain per win. Used to estimate opponent skill and predict loss RP using Glicko-2 relationships.</p>
+                <div>
+                  <label className="block text-sm font-medium mb-1">Expected Win Rate %</label>
+                  <input type="number" min="0" max="100" value={expectedWinRate}
+                    onChange={e => setExpectedWinRate(Math.max(0, Math.min(100, parseInt(e.target.value) || 0)))}
+                    className="w-full p-2 border rounded-md bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100" />
+                  <p className="text-xs text-gray-500">Based on your recent matches: {recentWinRate}%</p>
+                  <div className="flex gap-2 mt-2">
+                    <button type="button" className="px-2 py-1 rounded bg-gray-100 dark:bg-gray-700 text-xs" onClick={() => setExpectedWinRate(40)}>Conservative (40%)</button>
+                    <button type="button" className="px-2 py-1 rounded bg-blue-100 dark:bg-blue-700 text-xs" onClick={() => setExpectedWinRate(recentWinRate)}>Current Rate ({recentWinRate}%)</button>
+                    <button type="button" className="px-2 py-1 rounded bg-green-100 dark:bg-green-700 text-xs" onClick={() => setExpectedWinRate(70)}>Optimistic (70%)</button>
                   </div>
-                )}
-                {predictionTab === 'loss' && (
-                  <div>
-                    <label className="block text-sm font-semibold text-gray-700 dark:text-gray-200 mb-1">Average RP per Loss</label>
-                    <input
-                      type="number"
-                      value={avgRPLoss}
-                      onChange={e => setAvgRPLoss(parseInt(e.target.value) || 0)}
-                      className="w-full p-3 border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-primary-500 focus:border-primary-500 dark:focus:ring-primary-400 dark:focus:border-primary-400 transition"
-                      placeholder={String(getAvgRP(playerData.matchHistory, 'loss')) || 'Auto'}
-                    />
-                    <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">Your recent average RP loss per defeat. Used to estimate opponent skill and predict win RP using Glicko-2 relationships.</p>
-                  </div>
-                )}
-                {predictionTab === 'auto' && (
-                  <div className="text-xs text-gray-500 dark:text-gray-400">
-                    Using your match history to auto-calculate win/loss RP averages and simulate progression.
-                  </div>
-                )}
+                </div>
               </div>
-              {/* Results Cards Grid */}
-              <div className="grid grid-cols-1 gap-6 mt-0 lg:mt-6">
-                <div className="bg-gray-50 dark:bg-gray-800 rounded-lg p-6 shadow-md">
-                  <h3 className="text-lg font-semibold mb-4 flex items-center gap-2"><BarChart3 className="w-5 h-5 text-primary-600 dark:text-primary-400" />Prediction Results</h3>
-                  <div className="space-y-2 text-base">
-                    {predictionTab === 'win' && usedAvgWin && (
-                      <div className="flex items-center gap-4">
-                        <span>Input Win RP: <span className="font-mono font-bold text-green-600">+{usedAvgWin}</span></span>
-                        <span>Predicted Loss RP: <span className="font-mono font-bold text-red-600">{predictedLoss !== null ? predictedLoss : 'N/A'}</span></span>
-                      </div>
-                    )}
-                    {predictionTab === 'loss' && usedAvgLoss && (
-                      <div className="flex items-center gap-4">
-                        <span>Input Loss RP: <span className="font-mono font-bold text-red-600">{usedAvgLoss}</span></span>
-                        <span>Predicted Win RP: <span className="font-mono font-bold text-green-600">+{predictedWin !== null ? predictedWin : 'N/A'}</span></span>
-                      </div>
-                    )}
-                    {predictionTab === 'auto' && (
-                      <div className="flex items-center gap-4">
-                        <span>Avg Win RP: <span className="font-mono font-bold text-green-600">+{usedAvgWin}</span></span>
-                        <span>Avg Loss RP: <span className="font-mono font-bold text-red-600">{usedAvgLoss}</span></span>
-                        <span>Predicted Loss RP: <span className="font-mono font-bold text-red-600">{predictedLoss !== null ? predictedLoss : 'N/A'}</span></span>
-                        <span>Predicted Win RP: <span className="font-mono font-bold text-green-600">+{predictedWin !== null ? predictedWin : 'N/A'}</span></span>
-                      </div>
-                    )}
-                    {opponentSkill && (
-                      <div className="mt-2">Opponent Skill Estimate: <span className="font-bold text-blue-700 dark:text-blue-300">{opponentSkill} Glicko</span></div>
-                    )}
-                    {symmetryWarning && (
-                      <div className="text-red-600 dark:text-red-400 font-semibold mt-2 flex items-center gap-2"><AlertCircle className="w-4 h-4" />{symmetryWarning}</div>
-                    )}
-                    {!usedAvgWin && !usedAvgLoss && (
-                      <span className="italic text-gray-400">Prediction results will appear here as you enter data.</span>
-                    )}
-                  </div>
-                </div>
-                <div className="bg-gray-50 dark:bg-gray-800 rounded-lg p-6 shadow-md">
-                  <h3 className="text-lg font-semibold mb-4 flex items-center gap-2"><BarChart2 className="w-5 h-5 text-primary-600 dark:text-primary-400" />Simulation Results</h3>
-                  <div className="space-y-2 text-base">
-                    <div>Final RP: <span className="font-bold text-primary-700 dark:text-primary-300">{simResult.finalRP}</span></div>
-                    <div>Final Rank: <span className="font-bold text-primary-900 dark:text-primary-100">{simResult.finalRank.replace('_', ' ')}</span></div>
-                    <div>Final Glicko: <span className="font-bold text-blue-700 dark:text-blue-300">{simResult.finalGlicko}</span></div>
-                    <div>Promotions: <span className="font-bold text-green-700 dark:text-green-300">{simResult.promotions}</span> | Demotions: <span className="font-bold text-red-700 dark:text-red-300">{simResult.demotions}</span></div>
-                  </div>
-                  {/* Enhanced Table Design */}
-                  <div className="overflow-x-auto mt-4">
-                    <table className="w-full border-collapse bg-white dark:bg-gray-900 rounded-lg overflow-hidden shadow-sm text-sm">
-                      <thead className="bg-gray-100 dark:bg-gray-800">
-                        <tr>
-                          <th className="px-4 py-3 text-left font-medium text-gray-700 dark:text-gray-200">Game</th>
-                          <th className="px-4 py-3 text-left font-medium text-gray-700 dark:text-gray-200">Result</th>
-                          <th className="px-4 py-3 text-left font-medium text-gray-700 dark:text-gray-200">RP</th>
-                          <th className="px-4 py-3 text-left font-medium text-gray-700 dark:text-gray-200">Rank</th>
-                          <th className="px-4 py-3 text-left font-medium text-gray-700 dark:text-gray-200">Glicko</th>
-                          <th className="px-4 py-3 text-left font-medium text-gray-700 dark:text-gray-200">ΔRP</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {simResult.history.map((row, idx) => (
-                          <tr key={row.game} className={idx % 2 === 0 ? 'bg-gray-50 dark:bg-gray-800' : 'bg-white dark:bg-gray-900'}>
-                            <td className="px-4 py-2 text-left">{row.game}</td>
-                            <td className={`px-4 py-2 text-left font-bold ${row.win ? 'text-green-600' : 'text-red-600'}`}>{row.win ? 'Win' : 'Loss'}</td>
-                            <td className="px-4 py-2 text-left font-mono">{row.rp}</td>
-                            <td className="px-4 py-2 text-left">{row.rank.replace('_', ' ')}</td>
-                            <td className="px-4 py-2 text-left font-mono">{row.glicko}</td>
-                            <td className={`px-4 py-2 text-left font-mono font-bold ${row.rpChange > 0 ? 'text-green-600' : row.rpChange < 0 ? 'text-red-600' : 'text-gray-600'}`}>{row.rpChange > 0 ? '+' : ''}{row.rpChange}</td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                </div>
-                <div className="flex flex-wrap gap-4 items-center mt-6">
-                  <span className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium ${
-                    confidence === 'High' ? 'bg-green-100 text-green-800' :
-                    confidence === 'Medium' ? 'bg-yellow-100 text-yellow-800' :
-                    'bg-red-100 text-red-800'
-                  }`}>
-                    {confidence} Confidence
-                  </span>
-                  <span className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium ${
-                    symmetry.warning ? 'bg-yellow-100 text-yellow-800 border border-yellow-300' : 'bg-green-100 text-green-800 border border-green-300'
-                  }`}>
-                    {symmetry.warning ? <AlertCircle className="w-4 h-4 mr-1" /> : null}
-                    {symmetry.warning ? symmetry.warning : 'RP Symmetry OK'}
-                  </span>
-                  <span className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-blue-100 text-blue-800 border border-blue-300">
-                    <BarChart3 className="w-4 h-4 mr-1" />
-                    Opponent Skill: {opponentSkill ? opponentSkill + ' Glicko' : 'N/A'}
-                  </span>
-                </div>
+              <div className="bg-blue-50 dark:bg-blue-900/20 p-3 rounded-lg text-sm">
+                <p><strong>Using your averages:</strong> +{avgRPWin} per win, {avgRPLoss} per loss</p>
+                <p className="text-xs text-gray-600">From your recent {playerData.matchHistory.length} matches</p>
               </div>
             </div>
-            <div className="mt-8 text-xs text-gray-500 dark:text-gray-400">
-              <Tooltip text="Glicko-2 is a rating system that predicts your expected win/loss RP based on your skill and your opponent's skill. This tool uses those relationships for advanced predictions.">
-                <span className="underline cursor-help">What is Glicko-2?</span>
-              </Tooltip>
+            {/* RP Progression Graph */}
+            <div className="mt-6">
+              <h4 className="text-lg font-semibold mb-3">RP Progression Prediction</h4>
+              <div className="h-64 w-full">
+                <ResponsiveContainer width="100%" height="100%">
+                  <LineChart data={simulation.data}>
+                    <CartesianGrid strokeDasharray="3 3" />
+                    <XAxis dataKey="game" label={{ value: 'Match Number', position: 'insideBottom', offset: -5 }} />
+                    <YAxis dataKey="rp" label={{ value: 'RP', angle: -90, position: 'insideLeft' }} />
+                    <RechartsTooltip 
+                      formatter={(value, name) => [value, name]}
+                      labelFormatter={(label) => `Match ${label}`}
+                    />
+                    <Line type="monotone" dataKey="rp" stroke="#3B82F6" strokeWidth={2} />
+                    {/* Add vertical lines for rank promotions */}
+                    {simulation.rankPromotions.map(promotion => (
+                      <ReferenceLine key={promotion.game} x={promotion.game} stroke="#10B981" strokeDasharray="5 5" />
+                    ))}
+                  </LineChart>
+                </ResponsiveContainer>
+              </div>
+            </div>
+            {/* Simplified Results Display */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-4">
+              <div className="bg-green-50 p-4 rounded-lg text-center">
+                <div className="text-2xl font-bold text-green-700">{simulation.finalRP}</div>
+                <div className="text-sm text-green-600">Final RP</div>
+              </div>
+              <div className="bg-blue-50 p-4 rounded-lg text-center">
+                <div className="text-2xl font-bold text-blue-700">{simulation.finalRank.replace('_', ' ')}</div>
+                <div className="text-sm text-blue-600">Final Rank</div>
+              </div>
+              <div className="bg-purple-50 p-4 rounded-lg text-center">
+                <div className="text-2xl font-bold text-purple-700">+{simulation.promotions}</div>
+                <div className="text-sm text-purple-600">Rank Ups</div>
+              </div>
             </div>
           </section>
         )}
