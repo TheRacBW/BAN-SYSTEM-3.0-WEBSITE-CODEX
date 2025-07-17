@@ -831,7 +831,7 @@ const BedWarsMMRCalculator = () => {
             <p className="text-sm text-gray-600 dark:text-gray-300">RP: {data.rp} ({data.rank.replace('_', ' ')})</p>
             {data.promoted && (<p className="text-green-600 dark:text-green-400 font-bold text-sm">🎉 PROMOTED!</p>)}
             {data.demoted && (<p className="text-red-600 dark:text-red-400 font-bold text-sm">💔 DEMOTED</p>)}
-            <p className="text-xs mt-1 font-bold text-purple-700 dark:text-purple-300">Glicko: {Math.round(data.glicko)}</p>
+            <p className="text-xs mt-1 font-bold text-purple-700 dark:text-purple-300">MMR: {Math.round(data.glicko)}</p>
           </div>
         </div>
       );
@@ -971,7 +971,7 @@ const BedWarsMMRCalculator = () => {
               {calculatedMMR && (
                 <div className="space-y-4">
                   <div className="bg-primary-50 dark:bg-primary-900/20 border border-primary-200 dark:border-primary-700 rounded-lg p-4 flex flex-col items-center">
-                    <span className="text-xs font-semibold text-primary-700 dark:text-primary-300 mb-1">Estimated Glicko</span>
+                    <span className="text-xs font-semibold text-primary-700 dark:text-primary-300 mb-1">Estimated MMR</span>
                     <span className="text-3xl font-extrabold text-primary-900 dark:text-primary-100 tracking-tight">{calculatedMMR.rating}</span>
                     <div className="text-xs text-primary-600 dark:text-primary-400 mt-1">RD: {calculatedMMR.rd} | Volatility: {calculatedMMR.vol}</div>
                   </div>
@@ -1016,7 +1016,7 @@ const BedWarsMMRCalculator = () => {
                         </span>
                       </div>
                       <div className="text-xs mt-1">
-                        Glicko is {Math.abs(ratingDiff.diff)} points {ratingDiff.status === 'underranked' ? 'above' : 'below'} expected
+                        MMR is {Math.abs(ratingDiff.diff)} points {ratingDiff.status === 'underranked' ? 'above' : 'below'} expected
                       </div>
                     </div>
                   )}
@@ -1038,7 +1038,7 @@ const BedWarsMMRCalculator = () => {
                       </div>
                       {shieldStatus.active && (
                         <div className="text-xs mt-2 p-2 bg-white/50 dark:bg-gray-900/50 rounded">
-                          ⚠️ Your Glicko is still dropping during shield games, even though your RP stays at 0
+                          ⚠️ Your MMR is still dropping during shield games, even though your RP stays at 0
                         </div>
                       )}
                     </div>
@@ -1249,7 +1249,7 @@ const BedWarsMMRCalculator = () => {
             </div>
             {/* RP Progression Graph with Glicko overlay */}
             <div className="mt-6">
-              <h4 className="text-lg font-semibold mb-3">RP & Glicko Progression Prediction</h4>
+              <h4 className="text-lg font-semibold mb-3">RP & MMR Progression Prediction</h4>
               <div className="h-72 w-full">
                 <ResponsiveContainer width="100%" height="100%">
                   <LineChart data={simulation.data}>
@@ -1267,11 +1267,11 @@ const BedWarsMMRCalculator = () => {
                     <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
                     <XAxis dataKey="game" label={{ value: 'Match Number', position: 'insideBottom', offset: -5, fill: '#6b7280' }} tick={{ fill: '#6b7280' }} />
                     <YAxis yAxisId="rp" dataKey="rp" label={{ value: 'RP', angle: -90, position: 'insideLeft', fill: '#6b7280' }} tickFormatter={formatYAxis} domain={['dataMin - 10', 'dataMax + 10']} tick={{ fill: '#6b7280' }} />
-                    <YAxis yAxisId="glicko" orientation="right" dataKey="glicko" label={{ value: 'Glicko', angle: 90, position: 'insideRight', fill: '#8B5CF6' }} tick={{ fill: '#8B5CF6' }} />
+                    <YAxis yAxisId="glicko" orientation="right" dataKey="glicko" label={{ value: 'MMR', angle: 90, position: 'insideRight', fill: '#8B5CF6' }} tick={{ fill: '#8B5CF6' }} />
                     <RechartsTooltip content={EnhancedTooltip} />
                     {/* RP line with gradient coloring */}
                     <Line yAxisId="rp" type="monotone" dataKey="rp" stroke="url(#rankLineGradient)" strokeWidth={3} dot={<PromotionDot />} activeDot={{ r: 5 }} connectNulls={false} />
-                    {/* Glicko line */}
+                    {/* MMR line */}
                     <Line yAxisId="glicko" type="monotone" dataKey="glicko" stroke="#8B5CF6" strokeWidth={2} strokeDasharray="5 5" dot={false} />
                     {/* Promotion/demotion reference lines and labels */}
                     {simulation.promotions.map((promo, index) => (
@@ -1291,7 +1291,7 @@ const BedWarsMMRCalculator = () => {
               </div>
               {/* Simulation Calculation Summary */}
               <div className="mt-3 text-xs text-gray-700 dark:text-gray-300 bg-blue-50 dark:bg-blue-900/20 rounded-lg p-3">
-                <strong>Simulation includes:</strong> Glicko-2 skill progression (Glicko, RD, volatility), RP gain/loss based on evolving skill gap, immediate effects of promotions/demotions, and rank difficulty multipliers for each tier. All calculations shown in the graph and table reflect these effects.
+                <strong>Simulation includes:</strong> MMR progression (MMR, RD, volatility), RP gain/loss based on evolving skill gap, immediate effects of promotions/demotions, and rank difficulty multipliers for each tier. All calculations shown in the graph and table reflect these effects.
               </div>
             </div>
             {/* Insights/Results Display */}
@@ -1321,11 +1321,11 @@ const BedWarsMMRCalculator = () => {
               <h4 className="font-semibold text-purple-800 dark:text-purple-300 mb-2">🧠 Skill Evolution</h4>
               <div className="grid grid-cols-3 gap-4 mt-2 text-sm">
                 <div>
-                  <span className="text-purple-600 dark:text-purple-400">Starting Glicko:</span>
+                  <span className="text-purple-600 dark:text-purple-400">Starting MMR:</span>
                   <span className="font-mono ml-2">{simulation.startingGlicko}</span>
                 </div>
                 <div>
-                  <span className="text-purple-600 dark:text-purple-400">Final Glicko:</span>
+                  <span className="text-purple-600 dark:text-purple-400">Final MMR:</span>
                   <span className="font-mono ml-2">{simulation.finalGlicko}</span>
                 </div>
                 <div>
@@ -1345,7 +1345,7 @@ const BedWarsMMRCalculator = () => {
                     <th className="px-3 py-2 text-left">Result</th>
                     <th className="px-3 py-2 text-left">RP</th>
                     <th className="px-3 py-2 text-left">Rank</th>
-                    <th className="px-3 py-2 text-left">Glicko</th>
+                    <th className="px-3 py-2 text-left">MMR</th>
                     <th className="px-3 py-2 text-left">ΔRP</th>
                     <th className="px-3 py-2 text-left">Skill Gap</th>
                   </tr>
