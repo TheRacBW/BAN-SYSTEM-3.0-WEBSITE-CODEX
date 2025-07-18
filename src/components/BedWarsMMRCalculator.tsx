@@ -616,9 +616,39 @@ const BedWarsMMRCalculator = () => {
   const updateMatch = (id: string, field: keyof MatchData, value: any) => {
     setPlayerData(prev => ({
       ...prev,
-      matchHistory: prev.matchHistory.map(match =>
-        match.id === id ? { ...match, [field]: value } : match
-      )
+      matchHistory: prev.matchHistory.map(match => {
+        if (match.id !== id) return match;
+        // If changing outcome to 'draw', force rpChange to 0
+        if (field === 'outcome' && value === 'draw') {
+          return { ...match, outcome: value, rpChange: 0, wasShielded: false };
+        }
+        // If editing rpChange, enforce rules based on outcome
+        if (field === 'rpChange') {
+          if (match.outcome === 'win') {
+            // Only allow positive values (min 1)
+            const rp = Math.max(1, parseInt(value) || 1);
+            return { ...match, rpChange: rp };
+          } else if (match.outcome === 'loss') {
+            // Only allow negative values (max -1)
+            const rp = Math.min(-1, parseInt(value) || -1);
+            return { ...match, rpChange: rp };
+          } else if (match.outcome === 'draw') {
+            // Always 0 for draw
+            return { ...match, rpChange: 0 };
+          }
+        }
+        // If changing outcome to win/loss, adjust rpChange if needed
+        if (field === 'outcome' && value === 'win') {
+          const rp = match.rpChange > 0 ? match.rpChange : 15;
+          return { ...match, outcome: value, rpChange: rp, wasShielded: false };
+        }
+        if (field === 'outcome' && value === 'loss') {
+          const rp = match.rpChange < 0 ? match.rpChange : -12;
+          return { ...match, outcome: value, rpChange: rp };
+        }
+        // Default
+        return { ...match, [field]: value };
+      })
     }));
   };
 
@@ -1372,17 +1402,21 @@ const BedWarsMMRCalculator = () => {
                       <span className="text-xs text-gray-600 dark:text-gray-300">RP:</span>
                       <input
                         type="number"
-                        value={match.wasShielded ? 0 : match.rpChange}
-                        onChange={(e) => updateMatch(match.id, 'rpChange', parseInt(e.target.value) || 0)}
+                        value={match.outcome === 'draw' ? 0 : (match.wasShielded ? 0 : match.rpChange)}
+                        onChange={(e) => updateMatch(match.id, 'rpChange', e.target.value)}
                         className="text-xs px-2 py-1 bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded w-16 focus:ring-primary-500 dark:focus:ring-primary-400"
-                        disabled={match.wasShielded}
+                        disabled={match.wasShielded || match.outcome === 'draw'}
+                        min={match.outcome === 'win' ? 1 : match.outcome === 'loss' ? -99 : 0}
+                        max={match.outcome === 'win' ? 99 : match.outcome === 'loss' ? -1 : 0}
                       />
                       <span className={`text-xs font-medium ${
                         match.wasShielded ? 'text-yellow-600 dark:text-yellow-400' : 
+                        match.outcome === 'draw' ? 'text-blue-600 dark:text-blue-400' :
                         match.rpChange > 0 ? 'text-green-600 dark:text-green-400' : 
                         match.rpChange < 0 ? 'text-red-600 dark:text-red-400' : 'text-gray-600 dark:text-gray-300'
                       }`}>
                         {match.wasShielded ? '🛡️ 0 (shielded)' : 
+                         match.outcome === 'draw' ? '0 (draw)' :
                          match.rpChange > 0 ? '+' + match.rpChange : match.rpChange}
                       </span>
                     </div>
