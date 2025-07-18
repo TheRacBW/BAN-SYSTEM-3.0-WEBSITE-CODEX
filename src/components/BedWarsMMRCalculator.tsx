@@ -1370,7 +1370,7 @@ const BedWarsMMRCalculator = () => {
                 {playerData.matchHistory.map((match, index) => (
                   <div key={match.id} className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg p-3 flex flex-col md:flex-row md:items-center gap-2 shadow-sm hover:shadow-md transition">
                     <div className="flex items-center gap-2 mb-1 md:mb-0">
-                      <span className="text-xs text-gray-500 dark:text-gray-400 font-mono">#{nextMatchId - index - 1}</span>
+                      <span className="text-xs text-gray-500 dark:text-gray-400 font-mono">#{playerData.matchHistory.length - index}</span>
                       <select
                         value={match.outcome}
                         onChange={(e) => updateMatch(match.id, 'outcome', e.target.value)}
