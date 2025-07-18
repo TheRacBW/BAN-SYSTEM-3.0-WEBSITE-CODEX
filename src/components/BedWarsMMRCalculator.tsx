@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Calculator, TrendingUp, TrendingDown, Target, Award, Shield, AlertCircle, BarChart3, Clock, BarChart2, BookOpen, Brain, HelpCircle } from 'lucide-react';
 import RankBadge from './leaderboard/RankBadge';
 import { calculateRankFromRP, getRankDisplayName } from '../utils/rankingSystem';
@@ -430,6 +430,25 @@ const BedWarsMMRCalculator = () => {
   const [avgRPWin, setAvgRPWin] = useState<number>(0);
   const [avgRPLoss, setAvgRPLoss] = useState<number>(0);
 
+  // Track next match ID for unique, ever-increasing IDs
+  const [nextMatchId, setNextMatchId] = useState(() => {
+    // Find the highest ID in the initial matchHistory
+    const initial = [
+      { id: '1', outcome: 'win', rpChange: 18 },
+      { id: '2', outcome: 'win', rpChange: 15 },
+      { id: '3', outcome: 'loss', rpChange: -12 },
+      { id: '4', outcome: 'win', rpChange: 22 },
+      { id: '5', outcome: 'loss', rpChange: -8 },
+      { id: '6', outcome: 'draw', rpChange: 3 },
+      { id: '7', outcome: 'win', rpChange: 16 },
+      { id: '8', outcome: 'loss', rpChange: 0, wasShielded: true },
+      { id: '9', outcome: 'win', rpChange: 19 },
+      { id: '10', outcome: 'win', rpChange: 21 }
+    ];
+    const maxId = initial.reduce((max, m) => Math.max(max, parseInt(m.id, 10)), 0);
+    return maxId + 1;
+  });
+
   // Initialize with some sample match data including shield scenarios
   useEffect(() => {
     const sampleMatches: MatchData[] = [
@@ -584,17 +603,14 @@ const BedWarsMMRCalculator = () => {
   }, [playerData]);
 
   const addMatch = () => {
-    const newMatch: MatchData = {
-      id: (playerData.matchHistory.length + 1).toString(),
-      outcome: 'win',
-      rpChange: 15,
-      wasShielded: false
-    };
-    
     setPlayerData(prev => ({
       ...prev,
-      matchHistory: [newMatch, ...prev.matchHistory.slice(0, 9)]
+      matchHistory: [
+        { id: nextMatchId.toString(), outcome: 'win', rpChange: 15, wasShielded: false },
+        ...prev.matchHistory
+      ]
     }));
+    setNextMatchId(id => id + 1);
   };
 
   const updateMatch = (id: string, field: keyof MatchData, value: any) => {
@@ -1090,6 +1106,16 @@ const BedWarsMMRCalculator = () => {
     return null;
   };
 
+  // Ref for recent matches scroll
+  const recentMatchesRef = useRef<HTMLDivElement | null>(null);
+
+  // Scroll to top when a new match is added
+  useEffect(() => {
+    if (recentMatchesRef.current) {
+      recentMatchesRef.current.scrollTop = 0;
+    }
+  }, [playerData.matchHistory]);
+
   return (
     <div className="w-[1216px] max-w-[1216px] mx-auto py-12 px-0 flex flex-col gap-8 animate-fade-in">
       {/* Mini Header like Leaderboard/Strat Picker */}
@@ -1298,7 +1324,7 @@ const BedWarsMMRCalculator = () => {
               )}
             </div>
             {/* Recent Matches - now wider */}
-            <div className="bg-gray-50 dark:bg-gray-800/80 rounded-2xl p-8 border border-gray-100 dark:border-gray-700 shadow-md flex flex-col gap-6 animate-fade-in min-w-[320px]">
+            <div ref={recentMatchesRef} className="bg-gray-50 dark:bg-gray-800/80 rounded-2xl p-8 border border-gray-100 dark:border-gray-700 shadow-md flex flex-col gap-6 animate-fade-in min-w-[320px]">
               <div className="flex justify-between items-center mb-2">
                 <h2 className="text-lg font-bold text-gray-800 dark:text-gray-100 flex items-center gap-2">
                   <Clock className="w-5 h-5" /> Recent Matches
@@ -1310,11 +1336,11 @@ const BedWarsMMRCalculator = () => {
                   Add Match
                 </button>
               </div>
-              <div className="space-y-2 max-h-96 overflow-y-auto scrollbar-thin scrollable-section">
+              <div className="space-y-2 max-h-[600px] overflow-y-auto scrollbar-thin scrollable-section">
                 {playerData.matchHistory.map((match, index) => (
                   <div key={match.id} className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg p-3 flex flex-col md:flex-row md:items-center gap-2 shadow-sm hover:shadow-md transition">
                     <div className="flex items-center gap-2 mb-1 md:mb-0">
-                      <span className="text-xs text-gray-500 dark:text-gray-400 font-mono">#{index + 1}</span>
+                      <span className="text-xs text-gray-500 dark:text-gray-400 font-mono">#{nextMatchId - index - 1}</span>
                       <select
                         value={match.outcome}
                         onChange={(e) => updateMatch(match.id, 'outcome', e.target.value)}
