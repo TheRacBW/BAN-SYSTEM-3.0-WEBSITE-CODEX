@@ -1091,7 +1091,7 @@ const BedWarsMMRCalculator = () => {
   };
 
   return (
-    <div className="max-w-7xl mx-auto py-12 px-4 flex flex-col gap-8 animate-fade-in">
+    <div className="w-[1216px] max-w-[1216px] mx-auto py-12 px-0 flex flex-col gap-8 animate-fade-in">
       {/* Mini Header like Leaderboard/Strat Picker */}
       <div className="mb-6">
         <div className="flex flex-col gap-2">
@@ -1099,8 +1099,8 @@ const BedWarsMMRCalculator = () => {
         </div>
       </div>
       {/* Main Tabs - Leaderboard style, full width, rectangle with rounded corners */}
-      <div className="w-full mb-0">
-        <div className="flex w-full bg-gray-100 dark:bg-gray-700 p-1 rounded-lg shadow-md">
+      <div className="w-[1216px] max-w-[1216px] mx-auto mb-0">
+        <div className="flex w-[1216px] max-w-[1216px] bg-gray-100 dark:bg-gray-700 p-1 rounded-lg shadow-md">
           {MAIN_TABS.map(tab => (
             <button
               key={tab.key}
@@ -1119,9 +1119,9 @@ const BedWarsMMRCalculator = () => {
         </div>
       </div>
       {/* Main Content */}
-      <div className="rounded-3xl shadow-2xl border border-gray-200 dark:border-gray-800 bg-white/80 dark:bg-gray-900/80 p-10 animate-fade-in backdrop-blur-md">
+      <div className="rounded-3xl shadow-2xl border border-gray-200 dark:border-gray-800 bg-white/80 dark:bg-gray-900/80 p-10 animate-fade-in backdrop-blur-md w-[1216px] max-w-[1216px] mx-auto">
         {mainTab === 'calculator' && (
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-10 animate-slide-up">
+          <div className="grid grid-cols-1 lg:grid-cols-[320px_320px_1fr] gap-10 animate-slide-up">
             {/* Player Info */}
             <div className="bg-gray-50 dark:bg-gray-800/80 rounded-2xl p-8 border border-gray-100 dark:border-gray-700 shadow-md flex flex-col gap-6 animate-fade-in">
               <h2 className="text-lg font-bold text-gray-800 dark:text-gray-100 flex items-center gap-2 mb-2">
@@ -1297,8 +1297,8 @@ const BedWarsMMRCalculator = () => {
                 </div>
               )}
             </div>
-            {/* Recent Matches */}
-            <div className="bg-gray-50 dark:bg-gray-800/80 rounded-2xl p-8 border border-gray-100 dark:border-gray-700 shadow-md flex flex-col gap-6 animate-fade-in">
+            {/* Recent Matches - now wider */}
+            <div className="bg-gray-50 dark:bg-gray-800/80 rounded-2xl p-8 border border-gray-100 dark:border-gray-700 shadow-md flex flex-col gap-6 animate-fade-in min-w-[320px]">
               <div className="flex justify-between items-center mb-2">
                 <h2 className="text-lg font-bold text-gray-800 dark:text-gray-100 flex items-center gap-2">
                   <Clock className="w-5 h-5" /> Recent Matches
