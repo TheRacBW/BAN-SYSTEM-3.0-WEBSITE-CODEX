@@ -1367,61 +1367,84 @@ const BedWarsMMRCalculator = () => {
                 </button>
               </div>
               <div className="space-y-2 max-h-[600px] overflow-y-auto scrollbar-thin scrollable-section">
-                {playerData.matchHistory.map((match, index) => (
-                  <div key={match.id} className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg p-3 flex flex-col md:flex-row md:items-center gap-2 shadow-sm hover:shadow-md transition">
-                    <div className="flex items-center gap-2 mb-1 md:mb-0">
-                      <span className="text-xs text-gray-500 dark:text-gray-400 font-mono">#{playerData.matchHistory.length - index}</span>
-                      <select
-                        value={match.outcome}
-                        onChange={(e) => updateMatch(match.id, 'outcome', e.target.value)}
-                        className="text-xs px-2 py-1 bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded focus:ring-primary-500 dark:focus:ring-primary-400"
+                {playerData.matchHistory.map((match, index) => {
+                  let glowColor = '';
+                  if (match.outcome === 'win') {
+                    glowColor = '0 0 16px 4px rgba(16, 185, 129, 0.5)'; // dark green
+                  } else if (match.outcome === 'loss') {
+                    glowColor = '0 0 16px 4px rgba(220, 38, 38, 0.5)'; // dark red
+                  } else if (match.outcome === 'draw') {
+                    glowColor = '0 0 16px 4px rgba(251, 191, 36, 0.5)'; // dark orange/yellow
+                  }
+                  return (
+                    <div key={match.id} className="flex w-full">
+                      <div
+                        className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg p-3 flex flex-col md:flex-row md:items-center gap-2 shadow-sm transition-all duration-200 group relative mx-auto w-[97%]"
+                        style={{
+                          transition: 'box-shadow 0.2s',
+                        }}
+                        onMouseEnter={e => {
+                          (e.currentTarget as HTMLDivElement).style.boxShadow = glowColor;
+                        }}
+                        onMouseLeave={e => {
+                          (e.currentTarget as HTMLDivElement).style.boxShadow = '';
+                        }}
                       >
-                        <option value="win">Win</option>
-                        <option value="loss">Loss</option>
-                        <option value="draw">Draw</option>
-                      </select>
-                      {match.outcome === 'loss' && (
-                        <label className="flex items-center gap-1 text-xs">
+                        <div className="flex items-center gap-2 mb-1 md:mb-0">
+                          <span className="text-xs text-gray-500 dark:text-gray-400 font-mono">#{playerData.matchHistory.length - index}</span>
+                          <select
+                            value={match.outcome}
+                            onChange={(e) => updateMatch(match.id, 'outcome', e.target.value)}
+                            className="text-xs px-2 py-1 bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded focus:ring-primary-500 dark:focus:ring-primary-400"
+                          >
+                            <option value="win">Win</option>
+                            <option value="loss">Loss</option>
+                            <option value="draw">Draw</option>
+                          </select>
+                          {match.outcome === 'loss' && (
+                            <label className="flex items-center gap-1 text-xs">
+                              <input
+                                type="checkbox"
+                                checked={match.wasShielded || false}
+                                onChange={(e) => updateMatch(match.id, 'wasShielded', e.target.checked)}
+                                className="w-3 h-3 accent-yellow-500"
+                              />
+                              <Shield className="w-3 h-3 text-yellow-600 dark:text-yellow-400" />
+                            </label>
+                          )}
+                          <button
+                            onClick={() => removeMatch(match.id)}
+                            className="text-red-500 hover:text-red-700 dark:text-red-400 dark:hover:text-red-300 text-xs ml-auto"
+                          >
+                            Remove
+                          </button>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <span className="text-xs text-gray-600 dark:text-gray-300">RP:</span>
                           <input
-                            type="checkbox"
-                            checked={match.wasShielded || false}
-                            onChange={(e) => updateMatch(match.id, 'wasShielded', e.target.checked)}
-                            className="w-3 h-3 accent-yellow-500"
+                            type="number"
+                            value={match.outcome === 'draw' ? 0 : (match.wasShielded ? 0 : match.rpChange)}
+                            onChange={(e) => updateMatch(match.id, 'rpChange', e.target.value)}
+                            className="text-xs px-2 py-1 bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded w-16 focus:ring-primary-500 dark:focus:ring-primary-400"
+                            disabled={match.wasShielded || match.outcome === 'draw'}
+                            min={match.outcome === 'win' ? 1 : match.outcome === 'loss' ? -99 : 0}
+                            max={match.outcome === 'win' ? 99 : match.outcome === 'loss' ? -1 : 0}
                           />
-                          <Shield className="w-3 h-3 text-yellow-600 dark:text-yellow-400" />
-                        </label>
-                      )}
-                      <button
-                        onClick={() => removeMatch(match.id)}
-                        className="text-red-500 hover:text-red-700 dark:text-red-400 dark:hover:text-red-300 text-xs ml-auto"
-                      >
-                        Remove
-                      </button>
+                          <span className={`text-xs font-medium ${
+                            match.wasShielded ? 'text-yellow-600 dark:text-yellow-400' : 
+                            match.outcome === 'draw' ? 'text-blue-600 dark:text-blue-400' :
+                            match.rpChange > 0 ? 'text-green-600 dark:text-green-400' : 
+                            match.rpChange < 0 ? 'text-red-600 dark:text-red-400' : 'text-gray-600 dark:text-gray-300'
+                          }`}>
+                            {match.wasShielded ? '🛡️ 0 (shielded)' : 
+                              match.outcome === 'draw' ? '0 (draw)' :
+                              match.rpChange > 0 ? '+' + match.rpChange : match.rpChange}
+                          </span>
+                        </div>
+                      </div>
                     </div>
-                    <div className="flex items-center gap-2">
-                      <span className="text-xs text-gray-600 dark:text-gray-300">RP:</span>
-                      <input
-                        type="number"
-                        value={match.outcome === 'draw' ? 0 : (match.wasShielded ? 0 : match.rpChange)}
-                        onChange={(e) => updateMatch(match.id, 'rpChange', e.target.value)}
-                        className="text-xs px-2 py-1 bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded w-16 focus:ring-primary-500 dark:focus:ring-primary-400"
-                        disabled={match.wasShielded || match.outcome === 'draw'}
-                        min={match.outcome === 'win' ? 1 : match.outcome === 'loss' ? -99 : 0}
-                        max={match.outcome === 'win' ? 99 : match.outcome === 'loss' ? -1 : 0}
-                      />
-                      <span className={`text-xs font-medium ${
-                        match.wasShielded ? 'text-yellow-600 dark:text-yellow-400' : 
-                        match.outcome === 'draw' ? 'text-blue-600 dark:text-blue-400' :
-                        match.rpChange > 0 ? 'text-green-600 dark:text-green-400' : 
-                        match.rpChange < 0 ? 'text-red-600 dark:text-red-400' : 'text-gray-600 dark:text-gray-300'
-                      }`}>
-                        {match.wasShielded ? '🛡️ 0 (shielded)' : 
-                         match.outcome === 'draw' ? '0 (draw)' :
-                         match.rpChange > 0 ? '+' + match.rpChange : match.rpChange}
-                      </span>
-                    </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
               {playerData.matchHistory.length === 0 && (
                 <div className="text-center text-gray-500 dark:text-gray-400 py-8">
