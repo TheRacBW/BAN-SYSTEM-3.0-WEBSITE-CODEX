@@ -467,48 +467,57 @@ const BedWarsMMRCalculator = () => {
     setPlayerData(prev => ({ ...prev, matchHistory: sampleMatches }));
   }, []);
 
-  // Calculate MMR using Glicko-2 inspired algorithm
-  const calculateMMR = (data: PlayerData): GlickoRating => {
-    const currentDivision = RANK_DIVISIONS[data.currentRank as keyof typeof RANK_DIVISIONS];
-    const currentGlicko = GLICKO_RATINGS[currentDivision];
-    const nextGlicko = GLICKO_RATINGS[currentDivision + 1] !== undefined ? GLICKO_RATINGS[currentDivision + 1] : currentGlicko;
-    const rpProgress = Math.max(0, Math.min(1, data.currentRP / 100));
-    // Interpolate Glicko between current and next division
-    let rating = currentGlicko + (nextGlicko - currentGlicko) * rpProgress;
-    let rd = data.isNewSeason ? 2.5 : 1.8;
-    let vol = data.previousSeasonMMR ? 0.06 : 0.08;
+  // --- New MMR Estimation and RP Gain Projection ---
+  const calculateMMR = (currentRank: string, currentRP: number, matchHistory: MatchData[]): number => {
+    const division = RANK_DIVISIONS[currentRank as keyof typeof RANK_DIVISIONS];
+    const nextDivision = Math.min(division + 1, RANK_NAMES.length - 1);
+    const baseMMR = GLICKO_RATINGS[division] +
+      (GLICKO_RATINGS[nextDivision] - GLICKO_RATINGS[division]) * (currentRP / 100);
 
-    if (data.previousSeasonMMR && data.isNewSeason) {
-      rating = (data.previousSeasonMMR + rating) / 2;
-      rd = 2.2;
-    }
-
-    data.matchHistory.forEach(match => {
-      // Use interpolated Glicko for match calculations
-      const actualOutcome = match.outcome;
-      const expectedRP = estimateExpectedRPChange(rating, match.wasShielded ? -12 : match.rpChange, actualOutcome);
-      const surprise = Math.abs((match.wasShielded ? -12 : match.rpChange) - expectedRP) / 20;
-
-      if (actualOutcome === 'win') {
-        rating += Math.max(5, match.rpChange * 0.8);
-      } else if (actualOutcome === 'loss') {
-        const mmrDrop = match.wasShielded ? -12 : match.rpChange;
-        rating += Math.min(-5, mmrDrop * 0.8);
-      } else {
-        rating += match.rpChange * 0.5;
-      }
-
-      rd = Math.max(0.8, rd - 0.05 + surprise * 0.1);
-      vol = Math.max(0.04, vol + surprise * 0.005);
+    // Weighted average RP gain (last 3 matches get 1.2x weight)
+    let totalWeight = 0, weightedSum = 0;
+    const recentMatches = matchHistory.slice(-10);
+    recentMatches.forEach((match, i, arr) => {
+      const weight = (arr.length - i <= 3) ? 1.2 : 1.0;
+      weightedSum += match.rpChange * weight;
+      totalWeight += weight;
     });
+    const avgRP = totalWeight > 0 ? weightedSum / totalWeight : 0;
 
-    return { rating: Math.round(rating), rd: Math.round(rd * 100) / 100, vol: Math.round(vol * 1000) / 1000 };
+    // Expected RP gain for this division (use a reasonable default, e.g., 12)
+    const expectedRP = 12;
+
+    // If avgRP > expected, boost MMR; if < expected, lower MMR
+    let mmrAdjustment = (avgRP - expectedRP) * 10; // scale factor, tune as needed
+    mmrAdjustment = Math.max(-200, Math.min(200, mmrAdjustment));
+
+    return Math.round(baseMMR + mmrAdjustment);
   };
 
-  const estimateExpectedRPChange = (rating: number, actualChange: number, outcome: string): number => {
-    const baseChange = outcome === 'win' ? 15 : outcome === 'loss' ? -12 : 2;
-    const difficultyMultiplier = Math.max(0.5, Math.min(2.0, 1800 / rating));
-    return Math.round(baseChange * difficultyMultiplier);
+  const projectRPGains = (playerMMR: number, currentRank: string): number => {
+    const division = RANK_DIVISIONS[currentRank as keyof typeof RANK_DIVISIONS];
+    const baseline = GLICKO_RATINGS[division];
+    const mmrGap = playerMMR - baseline;
+
+    let baseGain;
+    if (mmrGap > 200) baseGain = 20;
+    else if (mmrGap > 100) baseGain = 16;
+    else if (mmrGap > -100) baseGain = 12;
+    else if (mmrGap > -200) baseGain = 8;
+    else baseGain = 6;
+    if (getRankTier(currentRank) === 'NIGHTMARE') baseGain = 4;
+
+    const multiplier = RANK_DIFFICULTY_MULTIPLIERS[getRankTier(currentRank)] || 1.0;
+    return Math.round(baseGain * multiplier);
+  };
+
+  const getStatus = (playerMMR: number, currentRank: string): { status: string; diff: number } => {
+    const division = RANK_DIVISIONS[currentRank as keyof typeof RANK_DIVISIONS];
+    const baseline = GLICKO_RATINGS[division];
+    const diff = playerMMR - baseline;
+    if (diff > 50) return { status: 'Underranked', diff: Math.round(diff) };
+    if (diff < -50) return { status: 'Overranked', diff: Math.round(diff) };
+    return { status: 'Normal', diff: Math.round(diff) };
   };
 
   const calculateAccuracy = (data: PlayerData): { score: 'Low' | 'Medium' | 'High'; percentage: number } => {
@@ -555,24 +564,7 @@ const BedWarsMMRCalculator = () => {
     return { score: rating, percentage };
   };
 
-  // --- Fix RP Gain Projection ---
-  const projectRPGains = (mmr: GlickoRating): number => {
-    const currentDivision = RANK_DIVISIONS[playerData.currentRank as keyof typeof RANK_DIVISIONS];
-    const currentGlicko = GLICKO_RATINGS[currentDivision];
-    const nextGlicko = GLICKO_RATINGS[currentDivision + 1] !== undefined ? GLICKO_RATINGS[currentDivision + 1] : currentGlicko;
-    const rpProgress = Math.max(0, Math.min(1, playerData.currentRP / 100));
-    // Interpolated expected Glicko for this RP
-    const expectedGlicko = currentGlicko + (nextGlicko - currentGlicko) * rpProgress;
-    const ratingDiff = mmr.rating - expectedGlicko;
-    // Use a more realistic RP gain formula based on rating difference
-    let baseGain = 15;
-    if (ratingDiff > 100) return Math.round(baseGain * 1.3);
-    if (ratingDiff > 50) return Math.round(baseGain * 1.15);
-    if (ratingDiff < -100) return Math.round(baseGain * 0.7);
-    if (ratingDiff < -50) return Math.round(baseGain * 0.85);
-    return baseGain;
-  };
-
+  
   const calculateShieldStatus = (data: PlayerData) => {
     const recentLossesAt0RP = data.matchHistory
       .filter(match => match.outcome === 'loss' && (match.rpChange === 0 || match.wasShielded))
@@ -589,9 +581,9 @@ const BedWarsMMRCalculator = () => {
   };
 
   useEffect(() => {
-    const mmr = calculateMMR(playerData);
-    setCalculatedMMR(mmr);
-    setProjectedRP(projectRPGains(mmr));
+    const mmr = calculateMMR(playerData.currentRank, playerData.currentRP, playerData.matchHistory);
+    setCalculatedMMR({ rating: mmr, rd: 1.7, vol: 0.1 }); // RD/vol: placeholder
+    setProjectedRP(projectRPGains(mmr, playerData.currentRank));
     
     const accuracy = calculateAccuracy(playerData);
     setAccuracyScore(accuracy.score);
@@ -1277,11 +1269,63 @@ const BedWarsMMRCalculator = () => {
               </h2>
               {calculatedMMR && (
                 <div className="space-y-4">
+                  {/* Estimated MMR Card (existing) */}
                   <div className="bg-primary-50 dark:bg-primary-900/20 border border-primary-200 dark:border-primary-700 rounded-lg p-4 flex flex-col items-center">
                     <span className="text-xs font-semibold text-primary-700 dark:text-primary-300 mb-1">Estimated MMR</span>
                     <span className="text-3xl font-extrabold text-primary-900 dark:text-primary-100 tracking-tight">{calculatedMMR.rating}</span>
                     <div className="text-xs text-primary-600 dark:text-primary-400 mt-1">RD: {calculatedMMR.rd} | Volatility: {calculatedMMR.vol}</div>
                   </div>
+                  {/* NEW: Expected MMR for Rank Card */}
+                  <div className={`border rounded-lg p-4 flex flex-col items-center mt-2 ${
+                    ratingDiff.status === 'underranked'
+                      ? 'bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-700'
+                      : ratingDiff.status === 'overranked'
+                      ? 'bg-red-50 dark:bg-red-900/20 border-red-200 dark:border-red-700'
+                      : 'bg-gray-50 dark:bg-gray-800/20 border-gray-200 dark:border-gray-700'
+                  }`} style={{ maxWidth: 320 }}>
+                    <span className={`text-xs font-semibold mb-1 ${
+                      ratingDiff.status === 'underranked'
+                        ? 'text-green-700 dark:text-green-300'
+                        : ratingDiff.status === 'overranked'
+                        ? 'text-red-700 dark:text-red-300'
+                        : 'text-gray-700 dark:text-gray-300'
+                    }`}>Expected MMR for Rank</span>
+                    <span className={`text-lg font-bold ${
+                      ratingDiff.status === 'underranked'
+                        ? 'text-green-900 dark:text-green-100'
+                        : ratingDiff.status === 'overranked'
+                        ? 'text-red-900 dark:text-red-100'
+                        : 'text-gray-900 dark:text-gray-100'
+                    }`}>
+                      {/* Interpolated expected MMR based on current rank and RP */}
+                      {(() => {
+                        const division = RANK_DIVISIONS[playerData.currentRank as keyof typeof RANK_DIVISIONS];
+                        const nextDivision = Math.min(division + 1, RANK_NAMES.length - 1);
+                        const base = GLICKO_RATINGS[division];
+                        const next = GLICKO_RATINGS[nextDivision];
+                        const rpProgress = Math.max(0, Math.min(1, playerData.currentRP / 100));
+                        const interpolated = Math.round(base + (next - base) * rpProgress);
+                        return interpolated;
+                      })()}
+                    </span>
+                    <span className={`text-xs mt-1 font-medium ${
+                      ratingDiff.status === 'underranked'
+                        ? 'text-green-700 dark:text-green-300'
+                        : ratingDiff.status === 'overranked'
+                        ? 'text-red-700 dark:text-red-300'
+                        : 'text-gray-700 dark:text-gray-300'
+                    }`}>
+                      {ratingDiff.status === 'underranked'
+                        ? 'You are likely to rank up quickly.'
+                        : ratingDiff.status === 'overranked'
+                        ? 'You may lose RP faster.'
+                        : 'You are perfectly ranked.'}
+                    </span>
+                    <span className="text-xs text-gray-500 dark:text-gray-400 mt-2 text-center">
+                      This is the system's expected MMR for your current rank and RP. If your estimated MMR is much higher, you are likely to rank up quickly. If much lower, you may lose RP faster.
+                    </span>
+                  </div>
+                  {/* Current RP Card (existing) */}
                   <div className="bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-700 rounded-lg p-4 flex flex-col items-center">
                     <span className="text-xs font-semibold text-green-700 dark:text-green-300 mb-1">Current RP</span>
                     <span className="text-2xl font-bold text-green-900 dark:text-green-100">{playerData.currentRP}</span>
@@ -1324,6 +1368,26 @@ const BedWarsMMRCalculator = () => {
                       </div>
                       <div className="text-xs mt-1">
                         MMR is {Math.abs(ratingDiff.diff)} points {ratingDiff.status === 'underranked' ? 'above' : 'below'} expected
+                      </div>
+                      <div className="text-xs mt-1">
+                        {ratingDiff.status === 'underranked'
+                          ? 'You are likely to rank up quickly.'
+                          : 'You may lose RP faster.'}
+                      </div>
+                    </div>
+                  )}
+                  {/* Show notification for perfectly ranked (aligned) */}
+                  {ratingDiff.status === 'aligned' && (
+                    <div className="border rounded-lg p-3 flex flex-col items-center mt-2 bg-gray-50 dark:bg-gray-800/20 border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-300">
+                      <div className="flex items-center gap-2">
+                        <Award className="w-4 h-4" />
+                        <span className="text-sm font-medium">Perfectly Ranked</span>
+                      </div>
+                      <div className="text-xs mt-1">
+                        Your MMR matches the system's expectation for your rank.
+                      </div>
+                      <div className="text-xs mt-1">
+                        You are perfectly ranked.
                       </div>
                     </div>
                   )}
