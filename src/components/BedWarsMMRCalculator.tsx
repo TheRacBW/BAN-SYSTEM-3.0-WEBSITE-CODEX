@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Calculator, TrendingUp, TrendingDown, Target, Award, Shield, AlertCircle, BarChart3, Clock, BarChart2, BookOpen, Brain, HelpCircle } from 'lucide-react';
+import { Calculator, TrendingUp, TrendingDown, Target, Award, Shield, AlertCircle, BarChart3, Clock, BarChart2, BookOpen, Brain, HelpCircle, GripVertical } from 'lucide-react';
 import { ReferenceDot } from 'recharts';
 import RankBadge from './leaderboard/RankBadge';
 import { calculateRankFromRP, getRankDisplayName } from '../utils/rankingSystem';
@@ -1165,6 +1165,38 @@ const BedWarsMMRCalculator = () => {
     );
   })();
 
+  const [draggedIndex, setDraggedIndex] = useState<number | null>(null);
+  const [dragOverIndex, setDragOverIndex] = useState<number | null>(null);
+
+  const handleDragStart = (e: React.DragEvent, index: number) => {
+    setDraggedIndex(index);
+    e.dataTransfer.effectAllowed = 'move';
+  };
+
+  const handleDragOver = (e: React.DragEvent, index: number) => {
+    e.preventDefault();
+    setDragOverIndex(index);
+  };
+
+  const handleDrop = (e: React.DragEvent, dropIndex: number) => {
+    e.preventDefault();
+    if (draggedIndex === null) return;
+    
+    const newMatchHistory = [...playerData.matchHistory];
+    const draggedItem = newMatchHistory[draggedIndex];
+    newMatchHistory.splice(draggedIndex, 1);
+    newMatchHistory.splice(dropIndex, 0, draggedItem);
+    
+    setPlayerData(prev => ({ ...prev, matchHistory: newMatchHistory }));
+    setDraggedIndex(null);
+    setDragOverIndex(null);
+  };
+
+  const handleDragEnd = () => {
+    setDraggedIndex(null);
+    setDragOverIndex(null);
+  };
+
   return (
     <div className="w-[1216px] max-w-[1216px] mx-auto py-12 px-0 flex flex-col gap-8 animate-fade-in">
       {/* Mini Header like Leaderboard/Strat Picker */}
@@ -1453,6 +1485,7 @@ const BedWarsMMRCalculator = () => {
                   Add Match
                 </button>
               </div>
+              <p className="text-xs text-gray-600 dark:text-gray-400 mb-3">#1 being most recent to #10 being latest</p>
               <div className="space-y-2 max-h-[600px] overflow-y-auto scrollbar-thin scrollable-section">
                 {playerData.matchHistory.map((match, index) => {
                   let glowColor = '';
@@ -1464,21 +1497,44 @@ const BedWarsMMRCalculator = () => {
                     glowColor = '0 0 16px 4px rgba(251, 191, 36, 0.5)'; // dark orange/yellow
                   }
                   return (
-                    <div key={match.id} className="flex w-full">
+                    <div
+                      key={match.id}
+                      draggable
+                      onDragStart={(e) => handleDragStart(e, index)}
+                      onDragOver={(e) => handleDragOver(e, index)}
+                      onDrop={(e) => handleDrop(e, index)}
+                      onDragEnd={handleDragEnd}
+                      className={`flex w-full ${
+                        draggedIndex === index
+                          ? 'opacity-50'
+                          : dragOverIndex === index
+                          ? 'transform scale-105'
+                          : ''
+                      }`}
+                    >
                       <div
-                        className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg p-3 flex flex-col md:flex-row md:items-center gap-2 shadow-sm transition-all duration-200 group relative mx-auto w-[97%]"
+                        className={`bg-white dark:bg-gray-900 border rounded-lg p-3 flex flex-col md:flex-row md:items-center gap-2 shadow-sm transition-all duration-200 group relative mx-auto w-[97%] ${
+                          draggedIndex === index
+                            ? 'border-blue-300 dark:border-blue-600 bg-blue-50 dark:bg-blue-900/20'
+                            : dragOverIndex === index
+                            ? 'border-green-300 dark:border-green-600 bg-green-50 dark:bg-green-900/20'
+                            : 'border-gray-200 dark:border-gray-700'
+                        }`}
                         style={{
                           transition: 'box-shadow 0.2s',
                         }}
                         onMouseEnter={e => {
-                          (e.currentTarget as HTMLDivElement).style.boxShadow = glowColor;
+                          if (draggedIndex !== index) {
+                            (e.currentTarget as HTMLDivElement).style.boxShadow = glowColor;
+                          }
                         }}
                         onMouseLeave={e => {
                           (e.currentTarget as HTMLDivElement).style.boxShadow = '';
                         }}
                       >
                         <div className="flex items-center gap-2 mb-1 md:mb-0">
-                          <span className="text-xs text-gray-500 dark:text-gray-400 font-mono">#{playerData.matchHistory.length - index}</span>
+                          <GripVertical className="w-4 h-4 text-gray-400 cursor-grab active:cursor-grabbing" />
+                          <span className="text-xs text-gray-500 dark:text-gray-400 font-mono">#{index + 1}</span>
                           <select
                             value={match.outcome}
                             onChange={(e) => updateMatch(match.id, 'outcome', e.target.value)}
