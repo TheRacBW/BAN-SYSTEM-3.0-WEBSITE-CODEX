@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Calculator, TrendingUp, TrendingDown, Target, Award, Shield, AlertCircle, BarChart3, Clock, BarChart2, BookOpen, Brain, HelpCircle } from 'lucide-react';
+import { ReferenceDot } from 'recharts';
 import RankBadge from './leaderboard/RankBadge';
 import { calculateRankFromRP, getRankDisplayName } from '../utils/rankingSystem';
 import { ResponsiveContainer, LineChart, Line, XAxis, YAxis, CartesianGrid, ReferenceLine, Tooltip as RechartsTooltip, ReferenceArea } from 'recharts';
@@ -1138,6 +1139,32 @@ const BedWarsMMRCalculator = () => {
     }
   }, [playerData.matchHistory]);
 
+  // Place this above the return statement of the component
+  const mmrSpectrumSummary = (() => {
+    if (!calculatedMMR) return null;
+    const division = RANK_DIVISIONS[playerData.currentRank as keyof typeof RANK_DIVISIONS];
+    const nextDivision = Math.min(division + 1, RANK_NAMES.length - 1);
+    const prevDivision = Math.max(division - 1, 0);
+    const base = GLICKO_RATINGS[division];
+    const next = GLICKO_RATINGS[nextDivision];
+    const prev = GLICKO_RATINGS[prevDivision];
+    const rpProgress = Math.max(0, Math.min(1, playerData.currentRP / 100));
+    const expected = Math.round(base + (next - base) * rpProgress);
+    const toPromotion = next - calculatedMMR.rating;
+    const toDemotion = calculatedMMR.rating - base;
+    let status = '';
+    if (calculatedMMR.rating > expected) status = "Your MMR is above the expected for your rank, so you're likely to rank up quickly.";
+    else if (calculatedMMR.rating < expected) status = "Your MMR is below the expected for your rank, so you may lose RP faster.";
+    else status = 'You are perfectly ranked.';
+    return (
+      <>
+        <div>MMR to next promotion: <span className="font-semibold">{toPromotion > 0 ? toPromotion : 0}</span></div>
+        <div>MMR to demotion: <span className="font-semibold">{toDemotion > 0 ? toDemotion : 0}</span></div>
+        <div className="mt-1">{status}</div>
+      </>
+    );
+  })();
+
   return (
     <div className="w-[1216px] max-w-[1216px] mx-auto py-12 px-0 flex flex-col gap-8 animate-fade-in">
       {/* Mini Header like Leaderboard/Strat Picker */}
@@ -1325,11 +1352,7 @@ const BedWarsMMRCalculator = () => {
                       This is the system's expected MMR for your current rank and RP. If your estimated MMR is much higher, you are likely to rank up quickly. If much lower, you may lose RP faster.
                     </span>
                   </div>
-                  {/* Current RP Card (existing) */}
-                  <div className="bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-700 rounded-lg p-4 flex flex-col items-center">
-                    <span className="text-xs font-semibold text-green-700 dark:text-green-300 mb-1">Current RP</span>
-                    <span className="text-2xl font-bold text-green-900 dark:text-green-100">{playerData.currentRP}</span>
-                  </div>
+                  
                   <div className="bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-700 rounded-lg p-4 flex flex-col items-center">
                     <span className="text-xs font-semibold text-green-700 dark:text-green-300 mb-1">Expected RP Gain</span>
                     <span className="text-2xl font-bold text-green-900 dark:text-green-100">+{projectedRP}</span>
@@ -1767,6 +1790,128 @@ const BedWarsMMRCalculator = () => {
         )}
         {mainTab === 'info' && (!infoTabAdminOnly || isAdmin) && (
           <GlickoGuide />
+        )}
+        {calculatedMMR && (
+          <div className="mt-8">
+            <h3 className="text-lg font-bold mb-3 text-gray-900 dark:text-gray-100 flex items-center gap-2">
+              <BarChart2 className="w-5 h-5 text-primary-600 dark:text-primary-400" />
+              MMR Spectrum
+            </h3>
+            <div className="w-full max-w-2xl mx-auto bg-white/80 dark:bg-gray-900/80 rounded-2xl shadow-lg p-6 border border-gray-200 dark:border-gray-800">
+              <ResponsiveContainer width="100%" height={140}>
+                <LineChart data={[{ mmr: 0 }]}> {/* Dummy data to enable overlays */}
+                  {/* Colored bands for each rank */}
+                  {RANK_NAMES.map((rank, i) => {
+                    const start = GLICKO_RATINGS[i];
+                    const end = GLICKO_RATINGS[i + 1] !== undefined ? GLICKO_RATINGS[i + 1] : 2600;
+                    const color = RANK_COLORS[getRankBase(rank)];
+                    return (
+                      <ReferenceArea
+                        key={rank}
+                        x1={start}
+                        x2={end}
+                        y1={0}
+                        y2={1}
+                        fill={color}
+                        fillOpacity={0.13}
+                      />
+                    );
+                  })}
+                  {/* Promotion/demotion lines and rank labels */}
+                  {RANK_NAMES.map((rank, i) => (
+                    <ReferenceLine
+                      key={`line-${rank}`}
+                      x={GLICKO_RATINGS[i]}
+                      stroke="#6b7280"
+                      strokeDasharray="3 3"
+                      label={{
+                        value: rank.replace('_', ' '),
+                        position: 'top',
+                        fill: '#6b7280',
+                        fontSize: 12,
+                        fontWeight: 600,
+                        dy: -8
+                      }}
+                    />
+                  ))}
+                  {/* X Axis: MMR scale with ticks at each rank boundary */}
+                  <XAxis
+                    type="number"
+                    dataKey="mmr"
+                    domain={[0, 2600]}
+                    ticks={RANK_NAMES.map((_, i) => GLICKO_RATINGS[i])}
+                    tick={{ fill: '#6b7280', fontSize: 12 }}
+                    axisLine={false}
+                    tickLine={false}
+                    height={30}
+                  />
+                  <YAxis hide domain={[0, 1]} />
+                  {/* User's estimated MMR marker */}
+                  <ReferenceDot
+                    x={calculatedMMR.rating}
+                    y={0.5}
+                    r={12}
+                    fill="#8B5CF6"
+                    stroke="#fff"
+                    strokeWidth={3}
+                    label={{
+                      value: 'Your MMR',
+                      position: 'top',
+                      fill: '#8B5CF6',
+                      fontWeight: 700,
+                      fontSize: 12,
+                      offset: 10
+                    }}
+                  />
+                  {/* Expected MMR for current rank/RP marker */}
+                  <ReferenceDot
+                    x={(() => {
+                      const division = RANK_DIVISIONS[playerData.currentRank as keyof typeof RANK_DIVISIONS];
+                      const nextDivision = Math.min(division + 1, RANK_NAMES.length - 1);
+                      const base = GLICKO_RATINGS[division];
+                      const next = GLICKO_RATINGS[nextDivision];
+                      const rpProgress = Math.max(0, Math.min(1, playerData.currentRP / 100));
+                      return Math.round(base + (next - base) * rpProgress);
+                    })()}
+                    y={0.5}
+                    r={10}
+                    fill="#10B981"
+                    stroke="#fff"
+                    strokeWidth={2}
+                    label={{
+                      value: 'Expected',
+                      position: 'bottom',
+                      fill: '#10B981',
+                      fontWeight: 700,
+                      fontSize: 12,
+                      offset: 10
+                    }}
+                  />
+                </LineChart>
+              </ResponsiveContainer>
+              {/* Legend */}
+              <div className="flex flex-wrap gap-4 justify-center mt-4 mb-2 text-xs">
+                {Object.entries(RANK_COLORS).map(([rank, color]) => (
+                  <div key={rank} className="flex items-center gap-1">
+                    <span style={{ width: 16, height: 8, background: color, display: 'inline-block', borderRadius: 2, opacity: 0.7 }}></span>
+                    <span className="text-gray-700 dark:text-gray-300">{rank.charAt(0) + rank.slice(1).toLowerCase()}</span>
+                  </div>
+                ))}
+                <div className="flex items-center gap-1">
+                  <span style={{ width: 12, height: 12, background: '#8B5CF6', borderRadius: '50%', display: 'inline-block', border: '2px solid #fff' }}></span>
+                  <span className="text-gray-700 dark:text-gray-300">Your MMR</span>
+                </div>
+                <div className="flex items-center gap-1">
+                  <span style={{ width: 12, height: 12, background: '#10B981', borderRadius: '50%', display: 'inline-block', border: '2px solid #fff' }}></span>
+                  <span className="text-gray-700 dark:text-gray-300">Expected</span>
+                </div>
+              </div>
+              {/* Short summary below the graph */}
+              <div className="mt-2 text-xs text-gray-700 dark:text-gray-300 text-center">
+                {mmrSpectrumSummary}
+              </div>
+            </div>
+          </div>
         )}
       </div>
     </div>
