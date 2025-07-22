@@ -470,29 +470,155 @@ const BedWarsMMRCalculator = () => {
 
   // --- New MMR Estimation and RP Gain Projection ---
   const calculateMMR = (currentRank: string, currentRP: number, matchHistory: MatchData[]): number => {
-    const division = RANK_DIVISIONS[currentRank as keyof typeof RANK_DIVISIONS];
-    const nextDivision = Math.min(division + 1, RANK_NAMES.length - 1);
-    const baseMMR = GLICKO_RATINGS[division] +
-      (GLICKO_RATINGS[nextDivision] - GLICKO_RATINGS[division]) * (currentRP / 100);
+    if (matchHistory.length === 0) {
+      // Fallback to rank-based estimation if no match history
+      const division = RANK_DIVISIONS[currentRank as keyof typeof RANK_DIVISIONS];
+      const base = GLICKO_RATINGS[division];
+      const rpProgress = Math.max(0, Math.min(1, currentRP / 100));
+      const nextDivision = Math.min(division + 1, RANK_NAMES.length - 1);
+      const next = GLICKO_RATINGS[nextDivision];
+      return Math.round(base + (next - base) * rpProgress);
+    }
 
-    // Weighted average RP gain (last 3 matches get 1.2x weight)
-    let totalWeight = 0, weightedSum = 0;
-    const recentMatches = matchHistory.slice(-10);
-    recentMatches.forEach((match, i, arr) => {
-      const weight = (arr.length - i <= 3) ? 1.2 : 1.0;
-      weightedSum += match.rpChange * weight;
-      totalWeight += weight;
-    });
-    const avgRP = totalWeight > 0 ? weightedSum / totalWeight : 0;
+    // Enhanced progression-based MMR calculation
+    // Start from current state and work backwards through matches
+    let estimatedMMR = (() => {
+      const division = RANK_DIVISIONS[currentRank as keyof typeof RANK_DIVISIONS];
+      const base = GLICKO_RATINGS[division];
+      const rpProgress = Math.max(0, Math.min(1, currentRP / 100));
+      const nextDivision = Math.min(division + 1, RANK_NAMES.length - 1);
+      const next = GLICKO_RATINGS[nextDivision];
+      return Math.round(base + (next - base) * rpProgress);
+    })();
 
-    // Expected RP gain for this division (use a reasonable default, e.g., 12)
-    const expectedRP = 12;
+    // Work backwards through matches to reconstruct MMR progression
+    const reversedMatches = [...matchHistory].reverse(); // Oldest to newest
+    let trackedRP = currentRP;
+    let trackedRank = currentRank;
+    
+    // Track RP gain trends for convergence detection
+    const recentWinRPGains: number[] = [];
+    const recentLossRPLosses: number[] = [];
+    
+    // Calculate base weights for recent match emphasis
+    const totalMatches = reversedMatches.length;
+    const recentMatchCount = Math.min(5, Math.floor(totalMatches * 0.4)); // Last 40% of matches, max 5
 
-    // If avgRP > expected, boost MMR; if < expected, lower MMR
-    let mmrAdjustment = (avgRP - expectedRP) * 10; // scale factor, tune as needed
-    mmrAdjustment = Math.max(-200, Math.min(200, mmrAdjustment));
+    for (let i = 0; i < reversedMatches.length; i++) {
+      const match = reversedMatches[i];
+      
+      // Determine match weight based on recency
+      const isRecentMatch = i < recentMatchCount;
+      const matchWeight = isRecentMatch ? 1.5 : 1.0;
+      
+      // Calculate expected RP change for this rank/MMR with rank difficulty scaling
+      const expectedWinRP = getExpectedRPForRankWithScaling(trackedRank, estimatedMMR, 'win');
+      const expectedLossRP = getExpectedRPForRankWithScaling(trackedRank, estimatedMMR, 'loss');
+      
+      // Compare actual vs expected RP change
+      const actualRPChange = match.rpChange;
+      const expectedRPChange = match.outcome === 'win' ? expectedWinRP : expectedLossRP;
+      
+      // Track recent trends for convergence detection
+      if (match.outcome === 'win' && recentWinRPGains.length < 5) {
+        recentWinRPGains.push(actualRPChange);
+      } else if (match.outcome === 'loss' && recentLossRPLosses.length < 5) {
+        recentLossRPLosses.push(actualRPChange);
+      }
+      
+      // Adjust MMR based on how much RP change deviates from expected
+      const rpDeviation = actualRPChange - expectedRPChange;
+      let mmrAdjustment = rpDeviation * 2 * matchWeight; // Scale factor with match weight
+      
+      // Convergence detection: if recent RP gains are decreasing, reduce adjustment
+      if (isRecentMatch && recentWinRPGains.length >= 3) {
+        const recentGains = recentWinRPGains.slice(-3);
+        const isConverging = recentGains[0] > recentGains[recentGains.length - 1];
+        if (isConverging && match.outcome === 'win') {
+          mmrAdjustment *= 0.7; // Reduce adjustment for converging players
+        }
+      }
+      
+      estimatedMMR += mmrAdjustment;
+      
+      // Update current RP and rank for next iteration
+      if (match.outcome === 'win') {
+        trackedRP = Math.max(0, trackedRP - actualRPChange);
+      } else if (match.outcome === 'loss') {
+        trackedRP = Math.min(99, trackedRP - actualRPChange);
+      }
+      
+      // Handle rank changes if RP goes out of bounds
+      if (trackedRP >= 100) {
+        const currentDivision = RANK_DIVISIONS[trackedRank as keyof typeof RANK_DIVISIONS];
+        const nextDivision = Math.min(currentDivision + 1, RANK_NAMES.length - 1);
+        trackedRank = RANK_NAMES[nextDivision];
+        trackedRP = trackedRP - 100;
+      } else if (trackedRP < 0) {
+        const currentDivision = RANK_DIVISIONS[trackedRank as keyof typeof RANK_DIVISIONS];
+        const prevDivision = Math.max(currentDivision - 1, 0);
+        trackedRank = RANK_NAMES[prevDivision];
+        trackedRP = 100 + trackedRP;
+      }
+    }
 
-    return Math.round(baseMMR + mmrAdjustment);
+    // Edge case handling: if no losses, adjust based on win rate
+    const winRate = matchHistory.filter(m => m.outcome === 'win').length / matchHistory.length;
+    const drawRate = matchHistory.filter(m => m.outcome === 'draw').length / matchHistory.length;
+    
+    if (winRate > 0.8 && recentLossRPLosses.length === 0) {
+      // High win rate with no recent losses - likely underranked
+      estimatedMMR += 50;
+    } else if (drawRate > 0.3) {
+      // High draw rate - reduce confidence in MMR estimate
+      estimatedMMR *= 0.95;
+    }
+
+    return Math.round(estimatedMMR);
+  };
+
+  // Enhanced helper function with rank difficulty scaling
+  const getExpectedRPForRankWithScaling = (rank: string, mmr: number, outcome: 'win' | 'loss'): number => {
+    const division = RANK_DIVISIONS[rank as keyof typeof RANK_DIVISIONS];
+    const rankBaseline = GLICKO_RATINGS[division];
+    const nextRankBaseline = GLICKO_RATINGS[Math.min(division + 1, RANK_NAMES.length - 1)];
+    
+    // Calculate how far above/below the rank baseline the MMR is
+    const mmrDifference = mmr - rankBaseline;
+    const rankRange = nextRankBaseline - rankBaseline;
+    const mmrRatio = mmrDifference / rankRange;
+    
+    // Rank difficulty scaling: different ranks have different base RP expectations
+    const rankDifficultyMultiplier = getRankDifficultyMultiplier(rank);
+    
+    // Base RP values adjusted for rank difficulty
+    const baseWinRP = 15 * rankDifficultyMultiplier;
+    const baseLossRP = -12 * rankDifficultyMultiplier;
+    
+    // Adjust based on MMR difference
+    const winAdjustment = mmrRatio * 8 * rankDifficultyMultiplier;
+    const lossAdjustment = mmrRatio * 6 * rankDifficultyMultiplier;
+    
+    if (outcome === 'win') {
+      return Math.round(baseWinRP + winAdjustment);
+    } else {
+      return Math.round(baseLossRP + lossAdjustment);
+    }
+  };
+
+  // Helper function for rank difficulty scaling
+  const getRankDifficultyMultiplier = (rank: string): number => {
+    const rankTier = getRankTier(rank);
+    switch (rankTier) {
+      case 'BRONZE': return 0.8; // Easier ranks, lower RP gains
+      case 'SILVER': return 0.9;
+      case 'GOLD': return 1.0; // Baseline
+      case 'PLATINUM': return 1.1;
+      case 'DIAMOND': return 1.2;
+      case 'EMERALD': return 1.3;
+      case 'NIGHTMARE': return 1.4; // Harder ranks, higher RP gains
+      default: return 1.0;
+    }
   };
 
   const projectRPGains = (playerMMR: number, currentRank: string): number => {
