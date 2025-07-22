@@ -1482,15 +1482,20 @@ const BedWarsMMRCalculator = () => {
                         ? 'text-red-900 dark:text-red-100'
                         : 'text-gray-900 dark:text-gray-100'
                     }`}>
-                      {/* Interpolated expected MMR based on current rank and RP */}
+                      {/* Interpolated expected MMR based on current rank and RP with rank difficulty scaling */}
                       {(() => {
                         const division = RANK_DIVISIONS[playerData.currentRank as keyof typeof RANK_DIVISIONS];
                         const nextDivision = Math.min(division + 1, RANK_NAMES.length - 1);
                         const base = GLICKO_RATINGS[division];
                         const next = GLICKO_RATINGS[nextDivision];
                         const rpProgress = Math.max(0, Math.min(1, playerData.currentRP / 100));
-                        const interpolated = Math.round(base + (next - base) * rpProgress);
-                        return interpolated;
+                        
+                        // Apply rank difficulty scaling to the interpolation
+                        const rankDifficultyMultiplier = getRankDifficultyMultiplier(playerData.currentRank);
+                        const baseInterpolated = base + (next - base) * rpProgress;
+                        const scaledInterpolated = baseInterpolated * rankDifficultyMultiplier;
+                        
+                        return Math.round(scaledInterpolated);
                       })()}
                     </span>
                     <span className={`text-xs mt-1 font-medium ${
