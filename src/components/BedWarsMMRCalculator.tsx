@@ -640,7 +640,7 @@ const BedWarsMMRCalculator = () => {
       
       // Adjust MMR based on how much RP change deviates from expected
       const rpDeviation = actualRPChange - expectedRPChange;
-      let mmrAdjustment = rpDeviation * 2 * matchWeight; // Scale factor with match weight
+      let mmrAdjustment = rpDeviation * 1.5 * matchWeight; // Reduced from 2 to be less aggressive
       
       // Convergence detection: if recent RP gains are decreasing, reduce adjustment
       if (isRecentMatch && recentWinRPGains.length >= 3) {
@@ -713,8 +713,8 @@ const BedWarsMMRCalculator = () => {
     const rankDifficultyMultiplier = getRankDifficultyMultiplier(rank);
     
     // Base RP values adjusted for rank difficulty
-    const baseWinRP = 15 * rankDifficultyMultiplier;
-    const baseLossRP = -12 * rankDifficultyMultiplier;
+    const baseWinRP = 12 * rankDifficultyMultiplier; // Reduced from 15 to match real data
+    const baseLossRP = -20 * rankDifficultyMultiplier; // Increased from -12 to match real data
     
     // Adjust based on MMR difference
     const winAdjustment = mmrRatio * 8 * rankDifficultyMultiplier;
@@ -734,10 +734,10 @@ const BedWarsMMRCalculator = () => {
       case 'BRONZE': return 0.8; // Easier ranks, lower RP gains
       case 'SILVER': return 0.9;
       case 'GOLD': return 1.0; // Baseline
-      case 'PLATINUM': return 1.1;
-      case 'DIAMOND': return 1.2;
-      case 'EMERALD': return 1.3;
-      case 'NIGHTMARE': return 1.4; // Harder ranks, higher RP gains
+      case 'PLATINUM': return 1.0; // Adjusted based on real data
+      case 'DIAMOND': return 0.8; // Adjusted based on real data
+      case 'EMERALD': return 0.7; // Adjusted based on real data
+      case 'NIGHTMARE': return 0.6; // Adjusted based on real data
       default: return 1.0;
     }
   };
@@ -1678,7 +1678,7 @@ const BedWarsMMRCalculator = () => {
                       <div className="flex flex-col items-center">
                         <span className="text-xs font-medium text-green-700 dark:text-green-300 mb-1">Gain</span>
                         <span className="text-xl font-bold text-green-900 dark:text-green-100">
-                          +{calculatedMMR ? calculateExpectedRPGain(calculatedMMR.rating, playerData.currentRank) : projectedRP}
+                          +{calculatedMMR ? calculateExpectedRPGain(calculateExpectedMMR(playerData.currentRank, playerData.currentRP), playerData.currentRank) : projectedRP}
                         </span>
                         {playerData.matchHistory.length > 0 && (
                           <span className="text-xs text-gray-500 dark:text-gray-400 mt-1">
@@ -1694,7 +1694,7 @@ const BedWarsMMRCalculator = () => {
                       <div className="flex flex-col items-center">
                         <span className="text-xs font-medium text-red-700 dark:text-red-300 mb-1">Loss</span>
                         <span className="text-xl font-bold text-red-900 dark:text-red-100">
-                          {calculatedMMR ? calculateExpectedRPLoss(calculatedMMR.rating, playerData.currentRank) : -12}
+                          {calculatedMMR ? calculateExpectedRPLoss(calculateExpectedMMR(playerData.currentRank, playerData.currentRP), playerData.currentRank) : -12}
                         </span>
                         {playerData.matchHistory.length > 0 && (
                           <span className="text-xs text-gray-500 dark:text-gray-400 mt-1">
