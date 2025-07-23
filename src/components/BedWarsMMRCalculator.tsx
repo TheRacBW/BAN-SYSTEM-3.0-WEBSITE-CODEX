@@ -45,8 +45,20 @@ const RANK_NAMES = Object.keys(RANK_DIVISIONS);
 // Shared function to calculate expected MMR for a given rank and RP (simple interpolation, no difficulty scaling)
 const calculateExpectedMMR = (currentRank: string, currentRP: number): number => {
   const division = RANK_DIVISIONS[currentRank as keyof typeof RANK_DIVISIONS];
-  const nextDivision = Math.min(division + 1, RANK_NAMES.length - 1);
   const base = GLICKO_RATINGS[division];
+  
+  // Handle Nightmare rank edge case (no next rank to interpolate to)
+  if (currentRank === 'NIGHTMARE_1') {
+    // For Nightmare, use a reasonable progression beyond the baseline
+    // Nightmare baseline is 2500, so we can extend it by a reasonable amount
+    const nightmarerpProgress = Math.max(0, Math.min(1, currentRP / 100));
+    // Extend beyond 2500 by up to 500 MMR (reasonable for very high RP)
+    const maxExtension = 500;
+    return Math.round(base + (maxExtension * nightmarerpProgress));
+  }
+  
+  // Normal calculation for all other ranks
+  const nextDivision = Math.min(division + 1, RANK_NAMES.length - 1);
   const next = GLICKO_RATINGS[nextDivision];
   const rpProgress = Math.max(0, Math.min(1, currentRP / 100));
   return Math.round(base + (next - base) * rpProgress);
@@ -56,6 +68,15 @@ const calculateExpectedMMR = (currentRank: string, currentRP: number): number =>
 const getRankThreshold = (currentRank: string): number => {
   const division = RANK_DIVISIONS[currentRank as keyof typeof RANK_DIVISIONS];
   const base = GLICKO_RATINGS[division];
+  
+  // Handle Nightmare rank edge case
+  if (currentRank === 'NIGHTMARE_1') {
+    // For Nightmare, use a reasonable threshold based on the extension range
+    const maxExtension = 500; // Same as in calculateExpectedMMR
+    return Math.round(maxExtension * 0.05); // 5% of 500 = 25 points
+  }
+  
+  // Normal calculation for all other ranks
   const next = GLICKO_RATINGS[division + 1] !== undefined ? GLICKO_RATINGS[division + 1] : base + 100;
   const rankRange = next - base;
   return Math.round(rankRange * 0.05); // 5% of rank range
@@ -142,9 +163,31 @@ const TABS = [
 ];
 
 const getAvgRP = (history: MatchData[], outcome: 'win' | 'loss') => {
-  const filtered = history.filter(m => m.outcome === outcome);
+  let filtered: MatchData[];
+  
+  if (outcome === 'loss') {
+    // For losses, exclude shielded losses (0 RP loss) and only count actual RP losses
+    filtered = history.filter(m => 
+      m.outcome === 'loss' && m.rpChange < 0 && !m.wasShielded
+    );
+  } else {
+    // For wins, include all wins
+    filtered = history.filter(m => m.outcome === outcome);
+  }
+  
   if (filtered.length === 0) return '';
-  return Math.round(filtered.reduce((sum, m) => sum + m.rpChange, 0) / filtered.length);
+  
+  // Apply recency weighting: more recent matches have higher weight
+  const weightedSum = filtered.reduce((sum, match, index) => {
+    const recencyWeight = Math.pow(0.9, index); // Recent matches get higher weight
+    return sum + (match.rpChange * recencyWeight);
+  }, 0);
+  
+  const totalWeight = filtered.reduce((sum, _, index) => {
+    return sum + Math.pow(0.9, index);
+  }, 0);
+  
+  return Math.round(weightedSum / totalWeight);
 };
 
 function Tooltip({ text, children }: { text: string; children: React.ReactNode }) {
@@ -650,12 +693,21 @@ const BedWarsMMRCalculator = () => {
   const getExpectedRPForRankWithScaling = (rank: string, mmr: number, outcome: 'win' | 'loss'): number => {
     const division = RANK_DIVISIONS[rank as keyof typeof RANK_DIVISIONS];
     const rankBaseline = GLICKO_RATINGS[division];
-    const nextRankBaseline = GLICKO_RATINGS[Math.min(division + 1, RANK_NAMES.length - 1)];
     
-    // Calculate how far above/below the rank baseline the MMR is
-    const mmrDifference = mmr - rankBaseline;
-    const rankRange = nextRankBaseline - rankBaseline;
-    const mmrRatio = mmrDifference / rankRange;
+    // Handle Nightmare rank edge case
+    let mmrRatio: number;
+    if (rank === 'NIGHTMARE_1') {
+      // For Nightmare, use the same extension logic as calculateExpectedMMR
+      const maxExtension = 500;
+      const mmrDifference = mmr - rankBaseline;
+      mmrRatio = mmrDifference / maxExtension;
+    } else {
+      // Normal calculation for all other ranks
+      const nextRankBaseline = GLICKO_RATINGS[Math.min(division + 1, RANK_NAMES.length - 1)];
+      const mmrDifference = mmr - rankBaseline;
+      const rankRange = nextRankBaseline - rankBaseline;
+      mmrRatio = mmrDifference / rankRange;
+    }
     
     // Rank difficulty scaling: different ranks have different base RP expectations
     const rankDifficultyMultiplier = getRankDifficultyMultiplier(rank);
@@ -700,18 +752,44 @@ const BedWarsMMRCalculator = () => {
     return getExpectedRPForRankWithScaling(currentRank, playerMMR, 'loss');
   };
 
-  // Calculate average RP gain from recent match history
+  // Calculate weighted average RP gain from recent match history (recent matches weighted more)
   const calculateAverageRPGain = (matchHistory: MatchData[]): number => {
     const winMatches = matchHistory.filter(m => m.outcome === 'win');
     if (winMatches.length === 0) return 15; // Default fallback
-    return Math.round(winMatches.reduce((sum, m) => sum + m.rpChange, 0) / winMatches.length);
+    
+    // Apply recency weighting: more recent matches have higher weight
+    const weightedSum = winMatches.reduce((sum, match, index) => {
+      const recencyWeight = Math.pow(0.9, index); // Recent matches get higher weight
+      return sum + (match.rpChange * recencyWeight);
+    }, 0);
+    
+    const totalWeight = winMatches.reduce((sum, _, index) => {
+      return sum + Math.pow(0.9, index);
+    }, 0);
+    
+    return Math.round(weightedSum / totalWeight);
   };
 
-  // Calculate average RP loss from recent match history
+  // Calculate weighted average RP loss from recent match history (recent matches weighted more, excluding shielded losses)
   const calculateAverageRPLoss = (matchHistory: MatchData[]): number => {
-    const lossMatches = matchHistory.filter(m => m.outcome === 'loss');
-    if (lossMatches.length === 0) return -12; // Default fallback
-    return Math.round(lossMatches.reduce((sum, m) => sum + m.rpChange, 0) / lossMatches.length);
+    // Filter out shielded losses (0 RP loss) and only count actual RP losses
+    const actualLossMatches = matchHistory.filter(m => 
+      m.outcome === 'loss' && m.rpChange < 0 && !m.wasShielded
+    );
+    
+    if (actualLossMatches.length === 0) return -12; // Default fallback
+    
+    // Apply recency weighting: more recent matches have higher weight
+    const weightedSum = actualLossMatches.reduce((sum, match, index) => {
+      const recencyWeight = Math.pow(0.9, index); // Recent matches get higher weight
+      return sum + (match.rpChange * recencyWeight);
+    }, 0);
+    
+    const totalWeight = actualLossMatches.reduce((sum, _, index) => {
+      return sum + Math.pow(0.9, index);
+    }, 0);
+    
+    return Math.round(weightedSum / totalWeight);
   };
 
   const projectRPGains = (playerMMR: number, currentRank: string): number => {
