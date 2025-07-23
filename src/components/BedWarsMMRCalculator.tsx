@@ -1984,7 +1984,7 @@ const BedWarsMMRCalculator = () => {
               <BarChart2 className="w-5 h-5 text-primary-600 dark:text-primary-400" />
               MMR Spectrum
             </h3>
-            <div className="w-full max-w-2xl mx-auto bg-white/80 dark:bg-gray-900/80 rounded-2xl shadow-lg p-6 border border-gray-200 dark:border-gray-800 relative">
+            <div className="w-full max-w-6xl mx-auto bg-white/80 dark:bg-gray-900/80 rounded-2xl shadow-lg p-6 border border-gray-200 dark:border-gray-800 relative">
               {/* Custom label for Your MMR positioned above the chart */}
               <div 
                 className="absolute text-center text-xs font-bold text-purple-600 dark:text-purple-400"
@@ -1998,13 +1998,14 @@ const BedWarsMMRCalculator = () => {
               >
                 Your MMR: {calculatedMMR.rating}
               </div>
-              <ResponsiveContainer width="100%" height={140}>
+              <ResponsiveContainer width="100%" height={300}>
                 <ComposedChart data={[{ mmr: 0 }]}> {/* Use ComposedChart for better overlay support */}
                   {/* Colored bands for each rank using Area components */}
                   {RANK_NAMES.map((rank, i) => {
                     const start = GLICKO_RATINGS[i];
                     const end = GLICKO_RATINGS[i + 1] !== undefined ? GLICKO_RATINGS[i + 1] : 2600;
                     const color = RANK_COLORS[getRankBase(rank)];
+                    
                     return (
                       <Area
                         key={rank}
@@ -2024,26 +2025,51 @@ const BedWarsMMRCalculator = () => {
                       x={GLICKO_RATINGS[i]}
                       stroke="#6b7280"
                       strokeDasharray="3 3"
-                      label={{
-                        value: rank.replace('_', ' '),
-                        position: 'top',
-                        fill: '#6b7280',
-                        fontSize: 12,
-                        fontWeight: 600,
-                        dy: -8
-                      }}
                     />
                   ))}
                   {/* X Axis: MMR scale with ticks at each rank boundary */}
                   <XAxis
                     type="number"
                     dataKey="mmr"
-                    domain={[0, 2600]}
-                    ticks={RANK_NAMES.map((_, i) => GLICKO_RATINGS[i])}
-                    tick={{ fill: '#6b7280', fontSize: 12 }}
+                    domain={[1100, 2600]}
+                    ticks={[0, 500, 900, 1100, 1400, 1480, 1550, 1620, 1700, 1800, 1880, 1960, 2020, 2070, 2100, 2150, 2170, 2230, 2300, 2370, 2500]}
+                    interval={0}
+                    tick={({ x, y, payload }) => {
+                      const value = payload.value;
+                      const rankIndex = RANK_NAMES.findIndex((_, i) => GLICKO_RATINGS[i] === value);
+                      const rankName = rankIndex >= 0 ? RANK_NAMES[rankIndex].replace('_', ' ') : '';
+                      
+                      return (
+                        <g>
+                          {/* Numerical value */}
+                          <text
+                            x={x}
+                            y={y + 15}
+                            textAnchor="middle"
+                            fill="#6b7280"
+                            fontSize={10}
+                            fontWeight={600}
+                          >
+                            {value}
+                          </text>
+                          {/* Rank name - angled downward */}
+                          <text
+                            x={x}
+                            y={y + 35}
+                            textAnchor="middle"
+                            fill="#6b7280"
+                            fontSize={8}
+                            fontWeight={500}
+                            transform={`rotate(-45 ${x} ${y + 35})`}
+                          >
+                            {rankName}
+                          </text>
+                        </g>
+                      );
+                    }}
                     axisLine={false}
                     tickLine={false}
-                    height={30}
+                    height={100}
                   />
                   <YAxis hide domain={[0, 1]} />
                   {/* User's estimated MMR marker - vertical line */}
@@ -2072,7 +2098,7 @@ const BedWarsMMRCalculator = () => {
                           fill: '#10B981',
                           fontWeight: 700,
                           fontSize: 10,
-                          offset: 25
+                          offset: 5
                         }}
                       />
                     );
