@@ -3,7 +3,7 @@ import { Calculator, TrendingUp, TrendingDown, Target, Award, Shield, AlertCircl
 import { ReferenceDot } from 'recharts';
 import RankBadge from './leaderboard/RankBadge';
 import { calculateRankFromRP, getRankDisplayName } from '../utils/rankingSystem';
-import { ResponsiveContainer, LineChart, Line, XAxis, YAxis, CartesianGrid, ReferenceLine, Tooltip as RechartsTooltip, ReferenceArea } from 'recharts';
+import { ResponsiveContainer, LineChart, Line, XAxis, YAxis, CartesianGrid, ReferenceLine, Tooltip as RechartsTooltip, ReferenceArea, Area, Scatter, ComposedChart } from 'recharts';
 
 // Rank system definitions based on your decompiled code
 const RANK_DIVISIONS = {
@@ -1984,23 +1984,36 @@ const BedWarsMMRCalculator = () => {
               <BarChart2 className="w-5 h-5 text-primary-600 dark:text-primary-400" />
               MMR Spectrum
             </h3>
-            <div className="w-full max-w-2xl mx-auto bg-white/80 dark:bg-gray-900/80 rounded-2xl shadow-lg p-6 border border-gray-200 dark:border-gray-800">
+            <div className="w-full max-w-2xl mx-auto bg-white/80 dark:bg-gray-900/80 rounded-2xl shadow-lg p-6 border border-gray-200 dark:border-gray-800 relative">
+              {/* Custom label for Your MMR positioned above the chart */}
+              <div 
+                className="absolute text-center text-xs font-bold text-purple-600 dark:text-purple-400"
+                style={{
+                  left: `${(calculatedMMR.rating / 2600) * 100}%`,
+                  transform: 'translateX(-50%)',
+                  top: '10px',
+                  fontWeight: 700,
+                  fontSize: 10
+                }}
+              >
+                Your MMR: {calculatedMMR.rating}
+              </div>
               <ResponsiveContainer width="100%" height={140}>
-                <LineChart data={[{ mmr: 0 }]}> {/* Dummy data to enable overlays */}
-                  {/* Colored bands for each rank */}
+                <ComposedChart data={[{ mmr: 0 }]}> {/* Use ComposedChart for better overlay support */}
+                  {/* Colored bands for each rank using Area components */}
                   {RANK_NAMES.map((rank, i) => {
                     const start = GLICKO_RATINGS[i];
                     const end = GLICKO_RATINGS[i + 1] !== undefined ? GLICKO_RATINGS[i + 1] : 2600;
                     const color = RANK_COLORS[getRankBase(rank)];
                     return (
-                      <ReferenceArea
+                      <Area
                         key={rank}
-                        x1={start}
-                        x2={end}
-                        y1={0}
-                        y2={1}
+                        dataKey="mmr"
                         fill={color}
-                        fillOpacity={0.13}
+                        fillOpacity={0.2}
+                        stroke="none"
+                        type="monotone"
+                        data={[{ mmr: start }, { mmr: end }]}
                       />
                     );
                   })}
@@ -2033,48 +2046,38 @@ const BedWarsMMRCalculator = () => {
                     height={30}
                   />
                   <YAxis hide domain={[0, 1]} />
-                  {/* User's estimated MMR marker */}
-                  <ReferenceDot
+                  {/* User's estimated MMR marker - vertical line */}
+                  <ReferenceLine
                     x={calculatedMMR.rating}
-                    y={0.5}
-                    r={12}
-                    fill="#8B5CF6"
-                    stroke="#fff"
+                    stroke="#8B5CF6"
                     strokeWidth={3}
-                    label={{
-                      value: 'Your MMR',
-                      position: 'top',
-                      fill: '#8B5CF6',
-                      fontWeight: 700,
-                      fontSize: 12,
-                      offset: 10
-                    }}
                   />
-                  {/* Expected MMR for current rank/RP marker */}
-                  <ReferenceDot
-                    x={(() => {
-                      const division = RANK_DIVISIONS[playerData.currentRank as keyof typeof RANK_DIVISIONS];
-                      const nextDivision = Math.min(division + 1, RANK_NAMES.length - 1);
-                      const base = GLICKO_RATINGS[division];
-                      const next = GLICKO_RATINGS[nextDivision];
-                      const rpProgress = Math.max(0, Math.min(1, playerData.currentRP / 100));
-                      return Math.round(base + (next - base) * rpProgress);
-                    })()}
-                    y={0.5}
-                    r={10}
-                    fill="#10B981"
-                    stroke="#fff"
-                    strokeWidth={2}
-                    label={{
-                      value: 'Expected',
-                      position: 'bottom',
-                      fill: '#10B981',
-                      fontWeight: 700,
-                      fontSize: 12,
-                      offset: 10
-                    }}
-                  />
-                </LineChart>
+                  {/* Expected MMR marker - vertical line */}
+                  {(() => {
+                    const division = RANK_DIVISIONS[playerData.currentRank as keyof typeof RANK_DIVISIONS];
+                    const nextDivision = Math.min(division + 1, RANK_NAMES.length - 1);
+                    const base = GLICKO_RATINGS[division];
+                    const next = GLICKO_RATINGS[nextDivision];
+                    const rpProgress = Math.max(0, Math.min(1, playerData.currentRP / 100));
+                    const expectedMMR = Math.round(base + (next - base) * rpProgress);
+                    
+                    return (
+                      <ReferenceLine
+                        x={expectedMMR}
+                        stroke="#10B981"
+                        strokeWidth={3}
+                        label={{
+                          value: `Expected: ${expectedMMR}`,
+                          position: 'bottom',
+                          fill: '#10B981',
+                          fontWeight: 700,
+                          fontSize: 10,
+                          offset: 25
+                        }}
+                      />
+                    );
+                  })()}
+                </ComposedChart>
               </ResponsiveContainer>
               {/* Legend */}
               <div className="flex flex-wrap gap-4 justify-center mt-4 mb-2 text-xs">
