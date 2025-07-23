@@ -42,6 +42,75 @@ const GLICKO_RATINGS = {
 
 const RANK_NAMES = Object.keys(RANK_DIVISIONS);
 
+// Shared function to calculate expected MMR for a given rank and RP (simple interpolation, no difficulty scaling)
+const calculateExpectedMMR = (currentRank: string, currentRP: number): number => {
+  const division = RANK_DIVISIONS[currentRank as keyof typeof RANK_DIVISIONS];
+  const nextDivision = Math.min(division + 1, RANK_NAMES.length - 1);
+  const base = GLICKO_RATINGS[division];
+  const next = GLICKO_RATINGS[nextDivision];
+  const rpProgress = Math.max(0, Math.min(1, currentRP / 100));
+  return Math.round(base + (next - base) * rpProgress);
+};
+
+// Function to calculate dynamic threshold based on rank range (5% of rank range)
+const getRankThreshold = (currentRank: string): number => {
+  const division = RANK_DIVISIONS[currentRank as keyof typeof RANK_DIVISIONS];
+  const base = GLICKO_RATINGS[division];
+  const next = GLICKO_RATINGS[division + 1] !== undefined ? GLICKO_RATINGS[division + 1] : base + 100;
+  const rankRange = next - base;
+  return Math.round(rankRange * 0.05); // 5% of rank range
+};
+
+// Function to compress Bronze tiers and Silver 1 by additional 20% while keeping values visible
+const compressBronzeTiers = (mmr: number): number => {
+  if (mmr <= 1400) {
+    // Compress Bronze tiers (0-1100) and Silver 1 (1100-1400) by additional 20%
+    // Original range: 0-1400 (1400 units)
+    // First compression: 0-1100 becomes 0-770 (30% reduction)
+    // Additional 20% compression: 0-770 becomes 0-616 (20% further reduction)
+    if (mmr <= 1100) {
+      return mmr * 0.7 * 0.8; // 30% + 20% = 44% total compression
+    } else {
+      // Silver 1: 1100-1400 compressed by 20%
+      const bronzeCompressed = 1100 * 0.7 * 0.8; // 616
+      const silver1Range = mmr - 1100; // 0-300
+      const silver1Compressed = bronzeCompressed + (silver1Range * 0.8);
+      return silver1Compressed;
+    }
+  } else {
+    // For Silver 2+ tiers, adjust the scale to maintain proper positioning
+    const bronzeAndSilver1Compressed = 1100 * 0.7 * 0.8 + 300 * 0.8; // 616 + 240 = 856
+    const remainingRange = 2600 - 1400; // 1200
+    const availableSpace = 2600 - bronzeAndSilver1Compressed; // 1744
+    const scaleFactor = availableSpace / remainingRange; // 1744 / 1200 = 1.453
+    
+    return bronzeAndSilver1Compressed + (mmr - 1400) * scaleFactor;
+  }
+};
+
+// Function to decompress for display purposes
+const decompressForDisplay = (compressedMmr: number): number => {
+  const bronzeCompressed = 1100 * 0.7 * 0.8; // 616
+  const silver1Compressed = bronzeCompressed + 300 * 0.8; // 856
+  
+  if (compressedMmr <= bronzeCompressed) {
+    // Decompress Bronze tiers
+    return compressedMmr / (0.7 * 0.8);
+  } else if (compressedMmr <= silver1Compressed) {
+    // Decompress Silver 1
+    const bronzeDecompressed = 1100;
+    const silver1Range = (compressedMmr - bronzeCompressed) / 0.8;
+    return bronzeDecompressed + silver1Range;
+  } else {
+    // Decompress Silver 2+ tiers
+    const remainingRange = 2600 - 1400;
+    const availableSpace = 2600 - silver1Compressed;
+    const scaleFactor = availableSpace / remainingRange;
+    
+    return 1400 + (compressedMmr - silver1Compressed) / scaleFactor;
+  }
+};
+
 interface MatchData {
   id: string;
   outcome: 'win' | 'loss' | 'draw';
@@ -621,6 +690,30 @@ const BedWarsMMRCalculator = () => {
     }
   };
 
+  // Calculate expected RP gain based on current MMR and rank difficulty
+  const calculateExpectedRPGain = (playerMMR: number, currentRank: string): number => {
+    return getExpectedRPForRankWithScaling(currentRank, playerMMR, 'win');
+  };
+
+  // Calculate expected RP loss based on current MMR and rank difficulty  
+  const calculateExpectedRPLoss = (playerMMR: number, currentRank: string): number => {
+    return getExpectedRPForRankWithScaling(currentRank, playerMMR, 'loss');
+  };
+
+  // Calculate average RP gain from recent match history
+  const calculateAverageRPGain = (matchHistory: MatchData[]): number => {
+    const winMatches = matchHistory.filter(m => m.outcome === 'win');
+    if (winMatches.length === 0) return 15; // Default fallback
+    return Math.round(winMatches.reduce((sum, m) => sum + m.rpChange, 0) / winMatches.length);
+  };
+
+  // Calculate average RP loss from recent match history
+  const calculateAverageRPLoss = (matchHistory: MatchData[]): number => {
+    const lossMatches = matchHistory.filter(m => m.outcome === 'loss');
+    if (lossMatches.length === 0) return -12; // Default fallback
+    return Math.round(lossMatches.reduce((sum, m) => sum + m.rpChange, 0) / lossMatches.length);
+  };
+
   const projectRPGains = (playerMMR: number, currentRank: string): number => {
     const division = RANK_DIVISIONS[currentRank as keyof typeof RANK_DIVISIONS];
     const baseline = GLICKO_RATINGS[division];
@@ -639,11 +732,11 @@ const BedWarsMMRCalculator = () => {
   };
 
   const getStatus = (playerMMR: number, currentRank: string): { status: string; diff: number } => {
-    const division = RANK_DIVISIONS[currentRank as keyof typeof RANK_DIVISIONS];
-    const baseline = GLICKO_RATINGS[division];
-    const diff = playerMMR - baseline;
-    if (diff > 50) return { status: 'Underranked', diff: Math.round(diff) };
-    if (diff < -50) return { status: 'Overranked', diff: Math.round(diff) };
+    const expectedMMR = calculateExpectedMMR(currentRank, playerData.currentRP);
+    const threshold = getRankThreshold(currentRank);
+    const diff = playerMMR - expectedMMR;
+    if (diff > threshold) return { status: 'Underranked', diff: Math.round(diff) };
+    if (diff < -threshold) return { status: 'Overranked', diff: Math.round(diff) };
     return { status: 'Normal', diff: Math.round(diff) };
   };
 
@@ -790,15 +883,12 @@ const BedWarsMMRCalculator = () => {
   const getRatingDifference = () => {
     if (!calculatedMMR) return { diff: 0, status: 'aligned' };
     
-    const currentDivision = RANK_DIVISIONS[playerData.currentRank as keyof typeof RANK_DIVISIONS];
-    const currentGlicko = GLICKO_RATINGS[currentDivision];
-    const nextGlicko = GLICKO_RATINGS[currentDivision + 1] !== undefined ? GLICKO_RATINGS[currentDivision + 1] : currentGlicko;
-    const rpProgress = Math.max(0, Math.min(1, playerData.currentRP / 100));
-    const expectedGlicko = currentGlicko + (nextGlicko - currentGlicko) * rpProgress;
-    const diff = calculatedMMR.rating - expectedGlicko;
+    const expectedMMR = calculateExpectedMMR(playerData.currentRank, playerData.currentRP);
+    const threshold = getRankThreshold(playerData.currentRank);
+    const diff = calculatedMMR.rating - expectedMMR;
     
-    if (diff > 50) return { diff, status: 'underranked' };
-    if (diff < -50) return { diff, status: 'overranked' };
+    if (diff > threshold) return { diff, status: 'underranked' };
+    if (diff < -threshold) return { diff, status: 'overranked' };
     return { diff, status: 'aligned' };
   };
 
@@ -1268,14 +1358,13 @@ const BedWarsMMRCalculator = () => {
   // Place this above the return statement of the component
   const mmrSpectrumSummary = (() => {
     if (!calculatedMMR) return null;
+    const expected = calculateExpectedMMR(playerData.currentRank, playerData.currentRP);
     const division = RANK_DIVISIONS[playerData.currentRank as keyof typeof RANK_DIVISIONS];
     const nextDivision = Math.min(division + 1, RANK_NAMES.length - 1);
     const prevDivision = Math.max(division - 1, 0);
     const base = GLICKO_RATINGS[division];
     const next = GLICKO_RATINGS[nextDivision];
     const prev = GLICKO_RATINGS[prevDivision];
-    const rpProgress = Math.max(0, Math.min(1, playerData.currentRP / 100));
-    const expected = Math.round(base + (next - base) * rpProgress);
     const toPromotion = next - calculatedMMR.rating;
     const toDemotion = calculatedMMR.rating - base;
     let status = '';
@@ -1482,21 +1571,8 @@ const BedWarsMMRCalculator = () => {
                         ? 'text-red-900 dark:text-red-100'
                         : 'text-gray-900 dark:text-gray-100'
                     }`}>
-                      {/* Interpolated expected MMR based on current rank and RP with rank difficulty scaling */}
-                      {(() => {
-                        const division = RANK_DIVISIONS[playerData.currentRank as keyof typeof RANK_DIVISIONS];
-                        const nextDivision = Math.min(division + 1, RANK_NAMES.length - 1);
-                        const base = GLICKO_RATINGS[division];
-                        const next = GLICKO_RATINGS[nextDivision];
-                        const rpProgress = Math.max(0, Math.min(1, playerData.currentRP / 100));
-                        
-                        // Apply rank difficulty scaling to the interpolation
-                        const rankDifficultyMultiplier = getRankDifficultyMultiplier(playerData.currentRank);
-                        const baseInterpolated = base + (next - base) * rpProgress;
-                        const scaledInterpolated = baseInterpolated * rankDifficultyMultiplier;
-                        
-                        return Math.round(scaledInterpolated);
-                      })()}
+                      {/* Use shared expected MMR calculation */}
+                      {calculateExpectedMMR(playerData.currentRank, playerData.currentRP)}
                     </span>
                     <span className={`text-xs mt-1 font-medium ${
                       ratingDiff.status === 'underranked'
@@ -1516,9 +1592,42 @@ const BedWarsMMRCalculator = () => {
                     </span>
                   </div>
                   
-                  <div className="bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-700 rounded-lg p-4 flex flex-col items-center">
-                    <span className="text-xs font-semibold text-green-700 dark:text-green-300 mb-1">Expected RP Gain</span>
-                    <span className="text-2xl font-bold text-green-900 dark:text-green-100">+{projectedRP}</span>
+                  {/* Expected RP Gain/Loss Card */}
+                  <div className="bg-gradient-to-r from-green-50 to-red-50 dark:from-green-900/20 dark:to-red-900/20 border border-gray-200 dark:border-gray-700 rounded-lg p-4 flex flex-col items-center">
+                    <span className="text-xs font-semibold text-gray-700 dark:text-gray-300 mb-2">Expected RP Changes</span>
+                    <div className="flex items-center gap-6">
+                      {/* RP Gain */}
+                      <div className="flex flex-col items-center">
+                        <span className="text-xs font-medium text-green-700 dark:text-green-300 mb-1">Gain</span>
+                        <span className="text-xl font-bold text-green-900 dark:text-green-100">
+                          +{calculatedMMR ? calculateExpectedRPGain(calculatedMMR.rating, playerData.currentRank) : projectedRP}
+                        </span>
+                        {playerData.matchHistory.length > 0 && (
+                          <span className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                            Recent: +{calculateAverageRPGain(playerData.matchHistory)}
+                          </span>
+                        )}
+                      </div>
+                      
+                      {/* Divider */}
+                      <div className="w-px h-12 bg-gray-300 dark:bg-gray-600"></div>
+                      
+                      {/* RP Loss */}
+                      <div className="flex flex-col items-center">
+                        <span className="text-xs font-medium text-red-700 dark:text-red-300 mb-1">Loss</span>
+                        <span className="text-xl font-bold text-red-900 dark:text-red-100">
+                          {calculatedMMR ? calculateExpectedRPLoss(calculatedMMR.rating, playerData.currentRank) : -12}
+                        </span>
+                        {playerData.matchHistory.length > 0 && (
+                          <span className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                            Recent: {calculateAverageRPLoss(playerData.matchHistory)}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                    <span className="text-xs text-gray-600 dark:text-gray-400 mt-2 text-center">
+                      Based on your MMR and rank difficulty
+                    </span>
                   </div>
                   {/* Fix accuracy score coloring: */}
                   <div className={`border rounded-lg p-4 flex flex-col items-center mt-2 ${
@@ -1989,7 +2098,7 @@ const BedWarsMMRCalculator = () => {
               <div 
                 className="absolute text-center text-xs font-bold text-purple-600 dark:text-purple-400"
                 style={{
-                  left: `${(calculatedMMR.rating / 2600) * 100}%`,
+                  left: `${(compressBronzeTiers(calculatedMMR.rating) / 2600) * 100}%`,
                   transform: 'translateX(-50%)',
                   top: '10px',
                   fontWeight: 700,
@@ -2000,7 +2109,7 @@ const BedWarsMMRCalculator = () => {
               </div>
               <ResponsiveContainer width="100%" height={300}>
                 <ComposedChart data={[{ mmr: 0 }]}> {/* Use ComposedChart for better overlay support */}
-                  {/* Colored bands for each rank using Area components */}
+                  {/* Colored bands for each rank using Area components with compressed scale */}
                   {RANK_NAMES.map((rank, i) => {
                     const start = GLICKO_RATINGS[i];
                     const end = GLICKO_RATINGS[i + 1] !== undefined ? GLICKO_RATINGS[i + 1] : 2600;
@@ -2014,30 +2123,38 @@ const BedWarsMMRCalculator = () => {
                         fillOpacity={0.2}
                         stroke="none"
                         type="monotone"
-                        data={[{ mmr: start }, { mmr: end }]}
+                        data={[{ mmr: compressBronzeTiers(start) }, { mmr: compressBronzeTiers(end) }]}
                       />
                     );
                   })}
-                  {/* Promotion/demotion lines and rank labels */}
+                  {/* Promotion/demotion lines and rank labels with compressed scale */}
                   {RANK_NAMES.map((rank, i) => (
                     <ReferenceLine
                       key={`line-${rank}`}
-                      x={GLICKO_RATINGS[i]}
+                      x={compressBronzeTiers(GLICKO_RATINGS[i])}
                       stroke="#6b7280"
                       strokeDasharray="3 3"
                     />
                   ))}
-                  {/* X Axis: MMR scale with ticks at each rank boundary */}
+                  {/* X Axis: MMR scale with compressed ticks */}
                   <XAxis
                     type="number"
                     dataKey="mmr"
-                    domain={[1100, 2600]}
-                    ticks={[0, 500, 900, 1100, 1400, 1480, 1550, 1620, 1700, 1800, 1880, 1960, 2020, 2070, 2100, 2150, 2170, 2230, 2300, 2370, 2500]}
+                    domain={[0, 2600]}
+                    ticks={[0, 500, 900, 1100, 1400, 1480, 1550, 1620, 1700, 1800, 1880, 1960, 2020, 2070, 2100, 2150, 2170, 2230, 2300, 2370, 2500].map(compressBronzeTiers)}
                     interval={0}
                     tick={({ x, y, payload }) => {
-                      const value = payload.value;
-                      const rankIndex = RANK_NAMES.findIndex((_, i) => GLICKO_RATINGS[i] === value);
-                      const rankName = rankIndex >= 0 ? RANK_NAMES[rankIndex].replace('_', ' ') : '';
+                      const compressedValue = payload.value;
+                      const originalValue = Math.round(decompressForDisplay(compressedValue));
+                      
+                      // Find the rank name by matching the original value to GLICKO_RATINGS
+                      let rankName = '';
+                      for (let i = 0; i < RANK_NAMES.length; i++) {
+                        if (GLICKO_RATINGS[i] === originalValue) {
+                          rankName = RANK_NAMES[i].replace('_', ' ');
+                          break;
+                        }
+                      }
                       
                       return (
                         <g>
@@ -2050,7 +2167,7 @@ const BedWarsMMRCalculator = () => {
                             fontSize={10}
                             fontWeight={600}
                           >
-                            {value}
+                            {originalValue}
                           </text>
                           {/* Rank name - angled downward */}
                           <text
@@ -2074,22 +2191,17 @@ const BedWarsMMRCalculator = () => {
                   <YAxis hide domain={[0, 1]} />
                   {/* User's estimated MMR marker - vertical line */}
                   <ReferenceLine
-                    x={calculatedMMR.rating}
+                    x={compressBronzeTiers(calculatedMMR.rating)}
                     stroke="#8B5CF6"
                     strokeWidth={3}
                   />
                   {/* Expected MMR marker - vertical line */}
                   {(() => {
-                    const division = RANK_DIVISIONS[playerData.currentRank as keyof typeof RANK_DIVISIONS];
-                    const nextDivision = Math.min(division + 1, RANK_NAMES.length - 1);
-                    const base = GLICKO_RATINGS[division];
-                    const next = GLICKO_RATINGS[nextDivision];
-                    const rpProgress = Math.max(0, Math.min(1, playerData.currentRP / 100));
-                    const expectedMMR = Math.round(base + (next - base) * rpProgress);
+                    const expectedMMR = calculateExpectedMMR(playerData.currentRank, playerData.currentRP);
                     
                     return (
                       <ReferenceLine
-                        x={expectedMMR}
+                        x={compressBronzeTiers(expectedMMR)}
                         stroke="#10B981"
                         strokeWidth={3}
                         label={{
