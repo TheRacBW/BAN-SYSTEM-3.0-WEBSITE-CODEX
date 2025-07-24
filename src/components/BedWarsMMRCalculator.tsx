@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Calculator, TrendingUp, TrendingDown, Target, Award, Shield, AlertCircle, BarChart3, Clock, BarChart2, BookOpen, Brain, HelpCircle, GripVertical } from 'lucide-react';
+import { Calculator, TrendingUp, TrendingDown, Target, Award, Shield, AlertCircle, AlertTriangle, BarChart3, Clock, BarChart2, BookOpen, Brain, HelpCircle, GripVertical } from 'lucide-react';
 import { ReferenceDot } from 'recharts';
 import RankBadge from './leaderboard/RankBadge';
 import { calculateRankFromRP, getRankDisplayName } from '../utils/rankingSystem';
@@ -47,20 +47,24 @@ const calculateExpectedMMR = (currentRank: string, currentRP: number): number =>
   const division = RANK_DIVISIONS[currentRank as keyof typeof RANK_DIVISIONS];
   const base = GLICKO_RATINGS[division];
   
-  // Handle Nightmare rank edge case with Glicko-2 principles
+  // Handle Nightmare rank edge case with realistic scaling
   if (currentRank === 'NIGHTMARE_1') {
-    // For Nightmare, use extension beyond base rating
-    // Note: Glicko-2 doesn't have special scaling above 2500, so we maintain linear progression
-    const maxExtension = 500;
-    const rpProgress = Math.max(0, Math.min(1, currentRP / 100));
-    const expectedMMR = Math.round(base + (maxExtension * rpProgress));
+    // Use logistic curve to simulate realistic flattening at high RP
+    // This prevents the system from assuming infinite progression
+    const base = 2500;
+    const maxExtension = 2750; // Cap at 2750 instead of infinite
+    const scale = 0.05; // Increased from 0.03 for earlier flattening
+    const offset = -0.8; // Adjusted from -1.5 to start flattening around 50 RP
     
-    // For extreme cases (RP > 100), continue linear progression
-    // This prevents the system from incorrectly flagging high-skill players as "overranked"
-    // Declaration: The system will not consistently think Nightmare players with high RP are overranked
+    // Logistic curve: grows quickly early, then levels off around 50-60 RP
+    const growth = 1 / (1 + Math.exp(-scale * (currentRP + offset * 100)));
+    const expectedMMR = Math.round(base + (maxExtension - base) * growth);
+    
+    // For extreme cases (RP > 100), use diminishing returns
     if (currentRP > 100) {
       const additionalRP = currentRP - 100;
-      const additionalMMR = (maxExtension / 100) * additionalRP; // Linear continuation
+      const diminishingFactor = Math.max(0.05, 1 - (additionalRP / 150)); // More aggressive diminishing returns
+      const additionalMMR = (maxExtension - base) * 0.05 * diminishingFactor; // Reduced from 0.1
       return Math.round(expectedMMR + additionalMMR);
     }
     
@@ -735,10 +739,19 @@ const BedWarsMMRCalculator = () => {
     const winAdjustment = mmrRatio * 8 * rankDifficultyMultiplier;
     const lossAdjustment = mmrRatio * 6 * rankDifficultyMultiplier;
     
+    // Add dynamic difficulty penalty for Nightmare players
+    let rpModifier = 1.0;
+    if (rank === 'NIGHTMARE_1') {
+      const expectedMMR = calculateExpectedMMR(rank, 50); // Use 50 RP as baseline
+      const mmrGap = mmr - expectedMMR;
+      // Penalty curve: overranked players get reduced gains, underranked get bonuses
+      rpModifier = Math.max(0.75, Math.min(1.25, 1 - (mmrGap / 500))); // Clamps at 75% to 125%
+    }
+    
     if (outcome === 'win') {
-      return Math.round(baseWinRP + winAdjustment);
+      return Math.round((baseWinRP + winAdjustment) * rpModifier);
     } else {
-      return Math.round(baseLossRP + lossAdjustment);
+      return Math.round((baseLossRP + lossAdjustment) * rpModifier);
     }
   };
 
@@ -1742,6 +1755,20 @@ const BedWarsMMRCalculator = () => {
                     <span className="text-xs text-gray-500 dark:text-gray-400 mt-2 text-center">
                       This is the system's expected MMR for your current rank and RP. If your estimated MMR is much higher, you are likely to rank up quickly. If much lower, you may lose RP faster.
                     </span>
+                    {/* Nightmare survival mode warning */}
+                    {playerData.currentRank === 'NIGHTMARE_1' && playerData.currentRP >= 50 && (
+                      <div className="mt-3 p-2 bg-orange-50 dark:bg-orange-900/20 border border-orange-200 dark:border-orange-700 rounded text-xs text-orange-700 dark:text-orange-300 text-center">
+                        <div className="font-medium mb-1">⚠️ Nightmare Survival Mode</div>
+                        <div>
+                          At high Nightmare levels (e.g., 2550+ RP), your RP gain per win plateaus unless you're still rising in MMR. But losses remain heavily penalized — creating a 'survival mode' dynamic where you must maintain consistency to keep rising.
+                        </div>
+                        {playerData.currentRP >= 80 && (
+                          <div className="mt-2 p-1 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-700 rounded text-red-600 dark:text-red-400">
+                            <strong>Critical:</strong> At {playerData.currentRP}+ RP, every loss is devastating. Focus on consistency over aggression.
+                          </div>
+                        )}
+                      </div>
+                    )}
                   </div>
                   
                   {/* Expected RP Gain/Loss Card */}
@@ -1820,6 +1847,21 @@ const BedWarsMMRCalculator = () => {
                         {ratingDiff.status === 'underranked'
                           ? 'You are likely to rank up quickly.'
                           : 'You may lose RP faster.'}
+                      </div>
+                    </div>
+                  )}
+                  {/* Show Nightmare warning for overranked players */}
+                  {playerData.currentRank === 'NIGHTMARE_1' && ratingDiff.status === 'overranked' && Math.abs(ratingDiff.diff) > 100 && (
+                    <div className="border rounded-lg p-3 flex flex-col items-center mt-2 bg-orange-50 dark:bg-orange-900/20 border-orange-200 dark:border-orange-700 text-orange-700 dark:text-orange-300">
+                      <div className="flex items-center gap-2">
+                        <AlertTriangle className="w-4 h-4" />
+                        <span className="text-sm font-medium">Nightmare Difficulty Warning</span>
+                      </div>
+                      <div className="text-xs mt-1 text-center">
+                        ⚠️ You may gain less RP per win because the system expects higher MMR for your current Nightmare RP.
+                      </div>
+                      <div className="text-xs mt-1 text-center">
+                        Focus on consistent wins to close the gap.
                       </div>
                     </div>
                   )}
