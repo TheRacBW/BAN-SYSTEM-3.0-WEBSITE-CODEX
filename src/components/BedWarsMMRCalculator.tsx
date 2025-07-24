@@ -1220,13 +1220,13 @@ const BedWarsMMRCalculator = () => {
   }
 
   // --- Promotion/Demotion RP Adjustment (using new rank's interpolated Glicko) ---
-  function adjustRPForRankChange(baseRP: number, playerGlicko: number, newRank: string, newRP: number, wasPromoted: boolean) {
+  function adjustRPForRankChange(baseRP: number, expectedMMR: number, newRank: string, newRP: number, wasPromoted: boolean) {
     const newRankDivision = RANK_DIVISIONS[newRank as keyof typeof RANK_DIVISIONS];
     const newRankBaseline = GLICKO_RATINGS[newRankDivision];
     const nextRankGlicko = GLICKO_RATINGS[newRankDivision + 1] !== undefined ? GLICKO_RATINGS[newRankDivision + 1] : newRankBaseline + 100;
     const rpProgress = newRP / 100;
     const expectedGlickoAtNewRank = newRankBaseline + (nextRankGlicko - newRankBaseline) * rpProgress;
-    const skillGapAtNewRank = playerGlicko - expectedGlickoAtNewRank;
+    const skillGapAtNewRank = expectedMMR - expectedGlickoAtNewRank;
     if (wasPromoted) {
       const difficultyIncrease = Math.max(0.7, 1.0 - (skillGapAtNewRank / 300));
       return Math.round(baseRP * difficultyIncrease);
@@ -1294,8 +1294,11 @@ const BedWarsMMRCalculator = () => {
     for (let i = 1; i <= games; i++) {
       const isWin = Math.random() < (winRate / 100);
       const matchResult = isWin ? 'win' : 'loss';
-      // Dynamic RP calculation
-      let rpChange = calculateDynamicRP(currentGlicko, currentRank, currentRP, matchResult);
+      // Calculate expected MMR for current rank and RP (for RP calculations)
+      const expectedMMRForCurrentState = calculateExpectedMMR(currentRank, currentRP);
+      
+      // Dynamic RP calculation using expected MMR (not actual MMR)
+      let rpChange = calculateDynamicRP(expectedMMRForCurrentState, currentRank, currentRP, matchResult);
       // Shield logic (simulate only, not full BedWars logic)
       let isShielded = false;
       if (matchResult === 'loss' && currentRP === 0 && currentShieldGames < 3) {
@@ -1326,40 +1329,43 @@ const BedWarsMMRCalculator = () => {
       }
       // Promotion/demotion effects
       if (promoted || demoted) {
-        rpChange = adjustRPForRankChange(rpChange, currentGlicko, newRank, newRP, promoted);
+        // Recalculate expected MMR for new rank and RP
+        const expectedMMRForNewState = calculateExpectedMMR(newRank, newRP);
+        rpChange = adjustRPForRankChange(rpChange, expectedMMRForNewState, newRank, newRP, promoted);
         newRP = promoted ? Math.max(0, newRP) : Math.min(99, newRP);
       }
-      // Calculate skill gap for Glicko update
-      const skillGap = calculateSkillGap(currentGlicko, currentRank, currentRP);
-      // Glicko update (use actual MMR effect, not shielded RP, and pass skillGap)
-      const glickoUpdate = updateGlickoAfterMatch(currentGlicko, currentRD, currentVol, matchResult, skillGap);
+      // Calculate skill gap for Glicko update (using expected MMR)
+      const skillGap = calculateSkillGap(expectedMMRForCurrentState, currentRank, currentRP);
+      // Glicko update (use expected MMR as base, not actual MMR)
+      const glickoUpdate = updateGlickoAfterMatch(expectedMMRForCurrentState, currentRD, currentVol, matchResult, skillGap);
       // Debug output
       // eslint-disable-next-line no-console
       console.log('Match simulation debug:', {
         game: i,
-        currentGlicko,
+        expectedMMRForCurrentState,
         currentRank,
         currentRP,
         skillGap,
         rpChange,
         visibleRPChange: shieldEffects.visibleRPChange,
         promoted,
-        demoted
+        demoted,
+        mmrDifference: Math.round(expectedMMRForCurrentState - startGlicko)
       });
       data.push({
         game: i,
         result: matchResult === 'win' ? 'Win' : 'Loss',
         rp: Math.max(0, Math.min(99, newRP)),
         rank: newRank,
-        glicko: Math.round(glickoUpdate.rating),
+        glicko: Math.round(expectedMMRForCurrentState), // Use expected MMR, not inflated actual MMR
         rpChange: shieldEffects.visibleRPChange,
         promoted,
         demoted,
         skillGap: Math.round(skillGap),
         rd: glickoUpdate.rd
       });
-      // Carry forward for next match
-      currentGlicko = glickoUpdate.rating;
+      // Carry forward for next match (use expected MMR for next iteration)
+      currentGlicko = expectedMMRForCurrentState; // Use expected MMR, not inflated actual MMR
       currentRD = glickoUpdate.rd;
       currentVol = glickoUpdate.vol;
       currentRP = newRP;
@@ -1373,7 +1379,7 @@ const BedWarsMMRCalculator = () => {
       finalRP: Math.round(currentRP),
       finalRank: currentRank,
       startingGlicko: Math.round(startGlicko),
-      finalGlicko: Math.round(currentGlicko)
+      finalGlicko: Math.round(calculateExpectedMMR(currentRank, currentRP)) // Use expected MMR for final value
     };
   }
 
@@ -2154,8 +2160,8 @@ const BedWarsMMRCalculator = () => {
                 </div>
               </div>
               <div className="bg-blue-50 dark:bg-blue-900/20 p-3 rounded-lg text-sm">
-                <p><strong>Using your averages:</strong> <span className="text-green-700 dark:text-green-400">+{avgRPWin}</span> per win, <span className="text-red-700 dark:text-red-400">{avgRPLoss}</span> per loss</p>
-                <p className="text-xs text-gray-600 dark:text-gray-400">From your recent {playerData.matchHistory.length} matches</p>
+                <p><strong>Simulation uses expected MMR for all calculations:</strong> MMR is constrained to rank expectations</p>
+                <p className="text-xs text-gray-600 dark:text-gray-400">MMR progression follows rank/RP expectations, preventing unrealistic inflation.</p>
               </div>
             </div>
             {/* RP Progression Graph with Glicko overlay */}
@@ -2202,7 +2208,7 @@ const BedWarsMMRCalculator = () => {
               </div>
               {/* Simulation Calculation Summary */}
               <div className="mt-3 text-xs text-gray-700 dark:text-gray-300 bg-blue-50 dark:bg-blue-900/20 rounded-lg p-3">
-                <strong>Simulation includes:</strong> MMR progression (MMR, RD, volatility), RP gain/loss based on evolving skill gap, immediate effects of promotions/demotions, and rank difficulty multipliers for each tier. All calculations shown in the graph and table reflect these effects.
+                <strong>Simulation includes:</strong> MMR is constrained to expected values for current rank/RP (prevents inflation), RP calculations use expected MMR, rank difficulty multipliers, skill gap calculations, promotion/demotion effects, and shield mechanics. Each data point uses rank-appropriate MMR.
               </div>
             </div>
             {/* Insights/Results Display */}
