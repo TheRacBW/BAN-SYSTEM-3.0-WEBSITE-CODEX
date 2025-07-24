@@ -2467,7 +2467,7 @@ const BedWarsMMRCalculator = () => {
         {mainTab === 'history' && (
           <MMRHistoryTab />
         )}
-        {calculatedMMR && (
+        {calculatedMMR && (mainTab === 'calculator' || mainTab === 'advanced') && (
           <div className="mt-8">
             <h3 className="text-lg font-bold mb-3 text-gray-900 dark:text-gray-100 flex items-center gap-2">
               <BarChart2 className="w-5 h-5 text-primary-600 dark:text-primary-400" />
