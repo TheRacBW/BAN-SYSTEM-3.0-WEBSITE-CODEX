@@ -2292,7 +2292,7 @@ const BedWarsMMRCalculator = () => {
               <div 
                 className="absolute text-center text-xs font-bold text-purple-600 dark:text-purple-400"
                 style={{
-                  left: `${(compressBronzeTiers(calculatedMMR.rating) / 2600) * 100}%`,
+                  left: `${(compressBronzeTiers(calculatedMMR.rating) / compressBronzeTiers(Math.max(2600, calculatedMMR.rating + 100))) * 100}%`,
                   transform: 'translateX(-50%)',
                   top: '10px',
                   fontWeight: 700,
@@ -2303,10 +2303,20 @@ const BedWarsMMRCalculator = () => {
               </div>
               <ResponsiveContainer width="100%" height={300}>
                 <ComposedChart data={[{ mmr: 0 }]}> {/* Use ComposedChart for better overlay support */}
+                  {/* Extended range indicator */}
+                  {calculatedMMR.rating > 2600 && (
+                    <ReferenceArea
+                      x1={compressBronzeTiers(2600)}
+                      x2={compressBronzeTiers(Math.max(2600, calculatedMMR.rating + 100))}
+                      fill="#fef3c7"
+                      fillOpacity={0.3}
+                      stroke="none"
+                    />
+                  )}
                   {/* Colored bands for each rank using Area components with compressed scale */}
                   {RANK_NAMES.map((rank, i) => {
                     const start = GLICKO_RATINGS[i];
-                    const end = GLICKO_RATINGS[i + 1] !== undefined ? GLICKO_RATINGS[i + 1] : 2600;
+                    const end = GLICKO_RATINGS[i + 1] !== undefined ? GLICKO_RATINGS[i + 1] : Math.max(2600, calculatedMMR.rating + 100);
                     const color = RANK_COLORS[getRankBase(rank)];
                     
                     return (
@@ -2330,12 +2340,47 @@ const BedWarsMMRCalculator = () => {
                       strokeDasharray="3 3"
                     />
                   ))}
+                  {/* Additional reference lines for extended range */}
+                  {(() => {
+                    const maxMMR = Math.max(2600, calculatedMMR.rating + 100);
+                    const additionalLines = [];
+                    
+                    if (maxMMR > 2600) {
+                      for (let i = 2600; i <= maxMMR; i += 100) {
+                        additionalLines.push(
+                          <ReferenceLine
+                            key={`line-${i}`}
+                            x={compressBronzeTiers(i)}
+                            stroke="#6b7280"
+                            strokeDasharray="3 3"
+                            strokeOpacity={0.5}
+                          />
+                        );
+                      }
+                    }
+                    
+                    return additionalLines;
+                  })()}
                   {/* X Axis: MMR scale with compressed ticks */}
                   <XAxis
                     type="number"
                     dataKey="mmr"
-                    domain={[0, 2600]}
-                    ticks={[0, 500, 900, 1100, 1400, 1480, 1550, 1620, 1700, 1800, 1880, 1960, 2020, 2070, 2100, 2150, 2170, 2230, 2300, 2370, 2500].map(compressBronzeTiers)}
+                    domain={[0, Math.max(2600, calculatedMMR.rating + 100)]} // Dynamic domain to include player's MMR
+                    ticks={(() => {
+                      // Generate ticks dynamically based on the domain
+                      const maxMMR = Math.max(2600, calculatedMMR.rating + 100);
+                      const baseTicks = [0, 500, 900, 1100, 1400, 1480, 1550, 1620, 1700, 1800, 1880, 1960, 2020, 2070, 2100, 2150, 2170, 2230, 2300, 2370, 2500];
+                      
+                      // Add additional ticks if player's MMR exceeds the base range
+                      if (maxMMR > 2600) {
+                        // Add ticks at 2600, 2700, 2800, etc. up to maxMMR
+                        for (let i = 2600; i <= maxMMR; i += 100) {
+                          baseTicks.push(i);
+                        }
+                      }
+                      
+                      return baseTicks.map(compressBronzeTiers);
+                    })()}
                     interval={0}
                     tick={({ x, y, payload }) => {
                       const compressedValue = payload.value;
