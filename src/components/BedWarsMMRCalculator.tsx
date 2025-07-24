@@ -607,6 +607,7 @@ const BedWarsMMRCalculator = () => {
     const reversedMatches = [...matchHistory].reverse(); // Oldest to newest
     let trackedRP = currentRP;
     let trackedRank = currentRank;
+    let currentRD = 1.8; // Initialize RD tracking
     
     // Track RP gain trends for convergence detection
     const recentWinRPGains: number[] = [];
@@ -640,7 +641,10 @@ const BedWarsMMRCalculator = () => {
       
       // Adjust MMR based on how much RP change deviates from expected
       const rpDeviation = actualRPChange - expectedRPChange;
-      let mmrAdjustment = rpDeviation * 1.5 * matchWeight; // Reduced from 2 to be less aggressive
+      
+      // Use RD to scale the adjustment (higher RD = more uncertainty = larger adjustments)
+      const rdFactor = Math.max(0.5, Math.min(2.0, currentRD / 1.5));
+      let mmrAdjustment = rpDeviation * 1.5 * matchWeight * rdFactor;
       
       // Convergence detection: if recent RP gains are decreasing, reduce adjustment
       if (isRecentMatch && recentWinRPGains.length >= 3) {
@@ -878,9 +882,68 @@ const BedWarsMMRCalculator = () => {
     };
   };
 
+  // Calculate RD and Volatility based on match history with recency weighting
+  const calculateRDAndVolatility = (matchHistory: MatchData[], baseRD: number = 1.8, baseVol: number = 0.08) => {
+    if (matchHistory.length === 0) {
+      return { rd: baseRD, vol: baseVol };
+    }
+
+    // Enhanced RD calculation with recency weighting
+    const totalGames = matchHistory.length;
+    const recentGames = Math.min(5, totalGames); // Last 5 games weighted more heavily
+    
+    // RD decreases faster for recent activity
+    const recentRdDecay = Math.min(0.3, recentGames * 0.08); // Recent games have more impact
+    const totalRdDecay = Math.min(0.5, totalGames * 0.05); // Overall decay
+    let rd = Math.max(0.8, baseRD - (recentRdDecay + totalRdDecay * 0.5));
+
+    // Enhanced volatility calculation with recency weighting
+    const rpChanges = matchHistory.map(m => m.rpChange);
+    const meanRP = rpChanges.reduce((sum, rp) => sum + rp, 0) / rpChanges.length;
+    
+    // Weighted variance calculation (recent matches count more)
+    let weightedVariance = 0;
+    let totalWeight = 0;
+    
+    rpChanges.forEach((rp, index) => {
+      const recencyWeight = Math.max(0.5, 1.0 - (index * 0.1)); // Recent matches weighted 1.0, older matches down to 0.5
+      weightedVariance += Math.pow(rp - meanRP, 2) * recencyWeight;
+      totalWeight += recencyWeight;
+    });
+    
+    const weightedStdDev = Math.sqrt(weightedVariance / totalWeight);
+    
+    // Base volatility based on weighted consistency
+    let vol = baseVol;
+    if (weightedStdDev > 10) vol += 0.02; // High variance
+    if (weightedStdDev > 15) vol += 0.03; // Very high variance
+    if (weightedStdDev < 5) vol -= 0.01;  // Low variance
+    
+    // Recent performance affects volatility more (last 3 matches)
+    const recentMatches = matchHistory.slice(0, 3);
+    const recentVariance = recentMatches.reduce((sum, m) => sum + Math.pow(m.rpChange - meanRP, 2), 0) / recentMatches.length;
+    const recentStdDev = Math.sqrt(recentVariance);
+    
+    if (recentStdDev > weightedStdDev * 1.5) vol += 0.03; // Recent inconsistency (increased impact)
+    if (recentStdDev < weightedStdDev * 0.5) vol -= 0.02; // Recent consistency (increased impact)
+    
+    // Additional recency factor: if recent performance is very different from overall
+    const recentMean = recentMatches.reduce((sum, m) => sum + m.rpChange, 0) / recentMatches.length;
+    const overallMean = rpChanges.reduce((sum, rp) => sum + rp, 0) / rpChanges.length;
+    const meanDifference = Math.abs(recentMean - overallMean);
+    
+    if (meanDifference > 8) vol += 0.02; // Recent performance significantly different from overall
+    
+    return {
+      rd: Math.max(0.8, Math.min(2.0, rd)),
+      vol: Math.max(0.04, Math.min(0.15, vol))
+    };
+  };
+
   useEffect(() => {
     const mmr = calculateMMR(playerData.currentRank, playerData.currentRP, playerData.matchHistory);
-    setCalculatedMMR({ rating: mmr, rd: 1.7, vol: 0.1 }); // RD/vol: placeholder
+    const { rd, vol } = calculateRDAndVolatility(playerData.matchHistory);
+    setCalculatedMMR({ rating: mmr, rd, vol });
     setProjectedRP(projectRPGains(mmr, playerData.currentRank));
     
     const accuracy = calculateAccuracy(playerData);
