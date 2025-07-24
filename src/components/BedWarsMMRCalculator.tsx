@@ -1814,6 +1814,75 @@ const BedWarsMMRCalculator = () => {
                   />
                 </div>
               )}
+              
+              {/* Save Progress Button */}
+              <div className="mt-4">
+                <button 
+                  onClick={savePlayerSnapshot}
+                  disabled={!calculatedMMR || isSaving}
+                  className="w-full bg-green-600 text-white py-3 px-4 rounded-lg hover:bg-green-700 disabled:bg-gray-400 flex items-center justify-center gap-2 transition-colors"
+                >
+                  {isSaving ? (
+                    <>
+                      <Loader className="w-4 h-4 animate-spin" />
+                      Saving Progress...
+                    </>
+                  ) : (
+                    <>
+                      <Save className="w-4 h-4" />
+                      📸 Save My MMR Progress
+                    </>
+                  )}
+                </button>
+                
+                {!user && (
+                  <p className="text-sm text-gray-500 dark:text-gray-400 mt-2 text-center">
+                    <button onClick={() => setShowAuthModal(true)} className="text-blue-600 hover:underline dark:text-blue-400">
+                      Sign in
+                    </button> to save your progress and unlock premium features
+                  </p>
+                )}
+                
+                {user && userStats && (
+                  <div className="mt-2 text-sm text-center">
+                    <span className="text-green-600 dark:text-green-400">✓ {userStats.total_snapshots} snapshots contributed</span>
+                    {userStats.data_contribution_level > 0 && (
+                      <span className="ml-2 px-2 py-1 bg-blue-100 dark:bg-blue-900/20 text-blue-800 dark:text-blue-200 rounded text-xs">
+                        Level {userStats.data_contribution_level} Contributor
+                      </span>
+                    )}
+                  </div>
+                )}
+
+                {/* User Notes Input */}
+                <div className="mt-3">
+                  <label className="block text-xs font-semibold text-gray-600 dark:text-gray-300 mb-1">
+                    Notes (optional)
+                  </label>
+                  <textarea
+                    value={userNotes}
+                    onChange={(e) => setUserNotes(e.target.value)}
+                    placeholder="Add notes about this snapshot..."
+                    className="w-full p-2 text-xs bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-md focus:ring-2 focus:ring-green-500 focus:border-green-500 dark:focus:ring-green-400 dark:focus:border-green-400 transition resize-none"
+                    rows={2}
+                  />
+                  <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                    💡 Tip: Write down your account name so you don't lose track of which snapshot is which
+                  </p>
+                </div>
+
+                {/* Success/Error Messages */}
+                {successMessage && (
+                  <div className="mt-2 p-2 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-700 rounded text-sm text-green-700 dark:text-green-300">
+                    {successMessage}
+                  </div>
+                )}
+                {errorMessage && (
+                  <div className="mt-2 p-2 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-700 rounded text-sm text-red-700 dark:text-red-300">
+                    {errorMessage}
+                  </div>
+                )}
+              </div>
             </div>
             {/* MMR Analysis */}
             <div className="bg-gray-50 dark:bg-gray-800/80 rounded-2xl p-8 border border-gray-100 dark:border-gray-700 shadow-md flex flex-col gap-6 animate-fade-in">
@@ -2017,72 +2086,6 @@ const BedWarsMMRCalculator = () => {
                       )}
                     </div>
                   )}
-                  
-                  {/* Save Progress Button */}
-                  <div className="mt-4">
-                    <button 
-                      onClick={savePlayerSnapshot}
-                      disabled={!calculatedMMR || isSaving}
-                      className="w-full bg-green-600 text-white py-3 px-4 rounded-lg hover:bg-green-700 disabled:bg-gray-400 flex items-center justify-center gap-2 transition-colors"
-                    >
-                      {isSaving ? (
-                        <>
-                          <Loader className="w-4 h-4 animate-spin" />
-                          Saving Progress...
-                        </>
-                      ) : (
-                        <>
-                          <Save className="w-4 h-4" />
-                          📸 Save My MMR Progress
-                        </>
-                      )}
-                    </button>
-                    
-                    {!user && (
-                      <p className="text-sm text-gray-500 dark:text-gray-400 mt-2 text-center">
-                        <button onClick={() => setShowAuthModal(true)} className="text-blue-600 hover:underline dark:text-blue-400">
-                          Sign in
-                        </button> to save your progress and unlock premium features
-                      </p>
-                    )}
-                    
-                    {user && userStats && (
-                      <div className="mt-2 text-sm text-center">
-                        <span className="text-green-600 dark:text-green-400">✓ {userStats.total_snapshots} snapshots contributed</span>
-                        {userStats.data_contribution_level > 0 && (
-                          <span className="ml-2 px-2 py-1 bg-blue-100 dark:bg-blue-900/20 text-blue-800 dark:text-blue-200 rounded text-xs">
-                            Level {userStats.data_contribution_level} Contributor
-                          </span>
-                        )}
-                      </div>
-                    )}
-
-                    {/* User Notes Input */}
-                    <div className="mt-3">
-                      <label className="block text-xs font-semibold text-gray-600 dark:text-gray-300 mb-1">
-                        Notes (optional)
-                      </label>
-                      <textarea
-                        value={userNotes}
-                        onChange={(e) => setUserNotes(e.target.value)}
-                        placeholder="Add notes about this snapshot..."
-                        className="w-full p-2 text-xs bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-md focus:ring-2 focus:ring-green-500 focus:border-green-500 dark:focus:ring-green-400 dark:focus:border-green-400 transition resize-none"
-                        rows={2}
-                      />
-                    </div>
-
-                    {/* Success/Error Messages */}
-                    {successMessage && (
-                      <div className="mt-2 p-2 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-700 rounded text-sm text-green-700 dark:text-green-300">
-                        {successMessage}
-                      </div>
-                    )}
-                    {errorMessage && (
-                      <div className="mt-2 p-2 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-700 rounded text-sm text-red-700 dark:text-red-300">
-                        {errorMessage}
-                      </div>
-                    )}
-                  </div>
                 </div>
               )}
             </div>
