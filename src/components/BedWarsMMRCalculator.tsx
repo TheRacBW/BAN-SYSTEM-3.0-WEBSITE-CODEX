@@ -47,14 +47,24 @@ const calculateExpectedMMR = (currentRank: string, currentRP: number): number =>
   const division = RANK_DIVISIONS[currentRank as keyof typeof RANK_DIVISIONS];
   const base = GLICKO_RATINGS[division];
   
-  // Handle Nightmare rank edge case (no next rank to interpolate to)
+  // Handle Nightmare rank edge case with Glicko-2 principles
   if (currentRank === 'NIGHTMARE_1') {
-    // For Nightmare, use a reasonable progression beyond the baseline
-    // Nightmare baseline is 2500, so we can extend it by a reasonable amount
-    const nightmarerpProgress = Math.max(0, Math.min(1, currentRP / 100));
-    // Extend beyond 2500 by up to 500 MMR (reasonable for very high RP)
+    // For Nightmare, use extension beyond base rating
+    // Note: Glicko-2 doesn't have special scaling above 2500, so we maintain linear progression
     const maxExtension = 500;
-    return Math.round(base + (maxExtension * nightmarerpProgress));
+    const rpProgress = Math.max(0, Math.min(1, currentRP / 100));
+    const expectedMMR = Math.round(base + (maxExtension * rpProgress));
+    
+    // For extreme cases (RP > 100), continue linear progression
+    // This prevents the system from incorrectly flagging high-skill players as "overranked"
+    // Declaration: The system will not consistently think Nightmare players with high RP are overranked
+    if (currentRP > 100) {
+      const additionalRP = currentRP - 100;
+      const additionalMMR = (maxExtension / 100) * additionalRP; // Linear continuation
+      return Math.round(expectedMMR + additionalMMR);
+    }
+    
+    return expectedMMR;
   }
   
   // Normal calculation for all other ranks
@@ -698,10 +708,11 @@ const BedWarsMMRCalculator = () => {
     const division = RANK_DIVISIONS[rank as keyof typeof RANK_DIVISIONS];
     const rankBaseline = GLICKO_RATINGS[division];
     
-    // Handle Nightmare rank edge case
+    // Handle Nightmare rank edge case with Glicko-2 principles
     let mmrRatio: number;
     if (rank === 'NIGHTMARE_1') {
       // For Nightmare, use the same extension logic as calculateExpectedMMR
+      // Glicko-2 treats all ratings equally, so we maintain linear progression above 2500
       const maxExtension = 500;
       const mmrDifference = mmr - rankBaseline;
       mmrRatio = mmrDifference / maxExtension;
