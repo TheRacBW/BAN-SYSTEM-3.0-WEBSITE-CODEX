@@ -2405,8 +2405,24 @@ const BedWarsMMRCalculator = () => {
               <div className="bg-gray-50 dark:bg-gray-800/80 p-4 rounded-lg text-center border border-gray-100 dark:border-gray-700">
                 <div className="text-lg font-bold text-gray-700 dark:text-gray-200 mb-1">RP Insights</div>
                 <div className="text-sm">
-                  <span className="block">Total RP gain: <span className="text-green-700 dark:text-green-400 font-semibold">{simulation.finalRP - playerData.currentRP >= 0 ? '+' : ''}{simulation.finalRP - playerData.currentRP}</span></span>
-                  <span className="block">Avg RP per match: <span className={((simulation.finalRP - playerData.currentRP) / gamesToPredict) >= 0 ? 'text-green-700 dark:text-green-400' : 'text-red-700 dark:text-red-400'}>{((simulation.finalRP - playerData.currentRP) / gamesToPredict).toFixed(2)}</span></span>
+                  {(() => {
+                    // Calculate total RP gained by summing all rpChange values, excluding large negative changes
+                    // that are likely rank-up resets (bigger than -60)
+                    const totalRPGained = simulation.data.reduce((total, match) => {
+                      const rpChange = match.rpChange;
+                      if (rpChange > -60) {
+                        return total + rpChange;
+                      }
+                      return total;
+                    }, 0);
+                    
+                    return (
+                      <>
+                        <span className="block">Total RP gain: <span className="text-green-700 dark:text-green-400 font-semibold">{totalRPGained >= 0 ? '+' : ''}{totalRPGained}</span></span>
+                        <span className="block">Avg RP per match: <span className={(totalRPGained / gamesToPredict) >= 0 ? 'text-green-700 dark:text-green-400' : 'text-red-700 dark:text-red-400'}>{(totalRPGained / gamesToPredict).toFixed(2)}</span></span>
+                      </>
+                    );
+                  })()}
                 </div>
               </div>
             </div>
