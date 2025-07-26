@@ -663,8 +663,8 @@ const BedWarsMMRCalculator = () => {
       const matchWeight = isRecentMatch ? 1.5 : 1.0;
       
       // Calculate expected RP change for this rank/MMR with rank difficulty scaling
-      const expectedWinRP = getExpectedRPForRankWithScaling(trackedRank, estimatedMMR, 'win');
-      const expectedLossRP = getExpectedRPForRankWithScaling(trackedRank, estimatedMMR, 'loss');
+      const expectedWinRP = getExpectedRPForRankWithScaling(trackedRank, estimatedMMR, 'win', false);
+      const expectedLossRP = getExpectedRPForRankWithScaling(trackedRank, estimatedMMR, 'loss', false);
       
       // Compare actual vs expected RP change
       const actualRPChange = match.rpChange;
@@ -731,77 +731,126 @@ const BedWarsMMRCalculator = () => {
     return Math.round(estimatedMMR);
   };
 
-  // Enhanced helper function with rank difficulty scaling
-  const getExpectedRPForRankWithScaling = (rank: string, mmr: number, outcome: 'win' | 'loss'): number => {
+  // Enhanced RP calculation system based on real data patterns
+  const getExpectedRPForRankWithScaling = (rank: string, mmr: number, outcome: 'win' | 'loss', isNorm: boolean = false): number => {
     const division = RANK_DIVISIONS[rank as keyof typeof RANK_DIVISIONS];
     const rankBaseline = GLICKO_RATINGS[division];
     
-    // Handle Nightmare rank edge case with Glicko-2 principles
-    let mmrRatio: number;
-    if (rank === 'NIGHTMARE_1') {
-      // For Nightmare, use the same extension logic as calculateExpectedMMR
-      // Glicko-2 treats all ratings equally, so we maintain linear progression above 2500
-      const maxExtension = 500;
-      const mmrDifference = mmr - rankBaseline;
-      mmrRatio = mmrDifference / maxExtension;
-    } else {
-      // Normal calculation for all other ranks
-      const nextRankBaseline = GLICKO_RATINGS[Math.min(division + 1, RANK_NAMES.length - 1)];
-      const mmrDifference = mmr - rankBaseline;
-      const rankRange = nextRankBaseline - rankBaseline;
-      mmrRatio = mmrDifference / rankRange;
-    }
+    // Get rank-specific RP values based on real data analysis
+    const { baseWinRP, baseLossRP } = getRankSpecificRPValues(rank);
     
-    // Rank difficulty scaling: different ranks have different base RP expectations
-    const rankDifficultyMultiplier = getRankDifficultyMultiplier(rank);
-    
-    // Base RP values adjusted for rank difficulty
-    const baseWinRP = 12 * rankDifficultyMultiplier; // Reduced from 15 to match real data
-    const baseLossRP = -20 * rankDifficultyMultiplier; // Increased from -12 to match real data
-    
-    // Adjust based on MMR difference
-    const winAdjustment = mmrRatio * 8 * rankDifficultyMultiplier;
-    const lossAdjustment = mmrRatio * 6 * rankDifficultyMultiplier;
-    
-    // Add dynamic difficulty penalty for Nightmare players
+    let winAdjustment = 0;
+    let lossAdjustment = 0;
     let rpModifier = 1.0;
-    if (rank === 'NIGHTMARE_1') {
-      const expectedMMR = calculateExpectedMMR(rank, 50); // Use 50 RP as baseline
-      const mmrGap = mmr - expectedMMR;
-      // Penalty curve: overranked players get reduced gains, underranked get bonuses
-      rpModifier = Math.max(0.75, Math.min(1.25, 1 - (mmrGap / 500))); // Clamps at 75% to 125%
+    
+    if (isNorm) {
+      // For "norm" calculations, we want to show what a typical player at this rank/RP would expect
+      // This means we should have slightly lower gains and higher losses as RP increases within a rank
+      // Extract RP progress within the rank (0-99, except Nightmare)
+      const rpProgress = rank === 'NIGHTMARE_1' ? Math.min(mmr - rankBaseline, 500) / 500 : (mmr - rankBaseline) / 100;
+      
+      // As RP increases within a rank, gains should decrease slightly and losses should increase slightly
+      // This creates the typical ranked system behavior where higher RP = harder to gain, easier to lose
+      winAdjustment = -rpProgress * 2; // Decrease gains as RP increases
+      lossAdjustment = rpProgress * 2;  // Increase losses as RP increases
+    } else {
+      // For personalized calculations, use the original MMR-based adjustment logic
+      let mmrRatio: number;
+      if (rank === 'NIGHTMARE_1') {
+        // For Nightmare, use the same extension logic as calculateExpectedMMR
+        // Glicko-2 treats all ratings equally, so we maintain linear progression above 2500
+        const maxExtension = 500;
+        const mmrDifference = mmr - rankBaseline;
+        mmrRatio = mmrDifference / maxExtension;
+      } else {
+        // Normal calculation for all other ranks
+        const nextRankBaseline = GLICKO_RATINGS[Math.min(division + 1, RANK_NAMES.length - 1)];
+        const mmrDifference = mmr - rankBaseline;
+        const rankRange = nextRankBaseline - rankBaseline;
+        mmrRatio = mmrDifference / rankRange;
+      }
+      
+      // Adjust based on MMR difference (how much above/below expected for this rank)
+      winAdjustment = mmrRatio * 8;
+      lossAdjustment = mmrRatio * 6;
+      
+      // Add dynamic difficulty penalty for Nightmare players
+      if (rank === 'NIGHTMARE_1') {
+        const expectedMMR = calculateExpectedMMR(rank, 50); // Use 50 RP as baseline
+        const mmrGap = mmr - expectedMMR;
+        // Penalty curve: overranked players get reduced gains, underranked get bonuses
+        rpModifier = Math.max(0.75, Math.min(1.25, 1 - (mmrGap / 500))); // Clamps at 75% to 125%
+      }
     }
     
     if (outcome === 'win') {
-      return Math.round((baseWinRP + winAdjustment) * rpModifier);
+      const calculatedRP = Math.round((baseWinRP + winAdjustment) * rpModifier);
+      // Apply +10 RP gain floor
+      return Math.max(10, calculatedRP);
     } else {
       return Math.round((baseLossRP + lossAdjustment) * rpModifier);
     }
   };
 
-  // Helper function for rank difficulty scaling
-  const getRankDifficultyMultiplier = (rank: string): number => {
+  // New function: Get rank-specific RP values based on real data analysis
+  const getRankSpecificRPValues = (rank: string): { baseWinRP: number; baseLossRP: number } => {
     const rankTier = getRankTier(rank);
-    switch (rankTier) {
-      case 'BRONZE': return 0.8; // Easier ranks, lower RP gains
-      case 'SILVER': return 0.9;
-      case 'GOLD': return 1.0; // Baseline
-      case 'PLATINUM': return 1.0; // Adjusted based on real data
-      case 'DIAMOND': return 0.8; // Adjusted based on real data
-      case 'EMERALD': return 0.7; // Adjusted based on real data
-      case 'NIGHTMARE': return 0.6; // Adjusted based on real data
-      default: return 1.0;
-    }
+    
+    // Enhanced to provide sub-tier specific values for more granular progression
+    // This allows gradual changes between sub-tiers (e.g., GOLD_1 vs GOLD_3) even at same RP
+    
+    // Extract sub-tier number (1, 2, 3) from rank string
+    const subTierMatch = rank.match(/_(\d+)$/);
+    const subTier = subTierMatch ? parseInt(subTierMatch[1]) : 1;
+    
+    // Base values per major rank tier
+    const baseValues = {
+      'BRONZE': { baseWinRP: 18, baseLossRP: -15 },
+      'SILVER': { baseWinRP: 16, baseLossRP: -18 },
+      'GOLD': { baseWinRP: 21, baseLossRP: -20 },
+      'PLATINUM': { baseWinRP: 14, baseLossRP: -27 },
+      'DIAMOND': { baseWinRP: 12, baseLossRP: -30 },
+      'EMERALD': { baseWinRP: 10, baseLossRP: -20 },
+      'NIGHTMARE': { baseWinRP: 10, baseLossRP: -16 }
+    };
+    
+    const baseValue = baseValues[rankTier as keyof typeof baseValues] || { baseWinRP: 15, baseLossRP: -20 };
+    
+    // Apply sub-tier progression within the major rank
+    // Higher sub-tiers (3) get slightly higher base values than lower sub-tiers (1)
+    // This creates the gradual change the user expects between sub-tiers
+    // Reduced multiplier to prevent excessive values
+    const subTierMultiplier = 1 + (subTier - 1) * 0.05; // 1.0 for tier 1, 1.05 for tier 2, 1.1 for tier 3
+    
+    return {
+      baseWinRP: Math.round(baseValue.baseWinRP * subTierMultiplier),
+      baseLossRP: Math.round(baseValue.baseLossRP * subTierMultiplier)
+    };
   };
 
-  // Calculate expected RP gain based on current MMR and rank difficulty
-  const calculateExpectedRPGain = (playerMMR: number, currentRank: string): number => {
-    return getExpectedRPForRankWithScaling(currentRank, playerMMR, 'win');
+  // New function: Calculate expected RP changes using baseline MMR for the rank (norm)
+  const calculateExpectedRPNorm = (currentRank: string, currentRP: number, outcome: 'win' | 'loss'): number => {
+    // Calculate the expected MMR for this rank and RP combination
+    // This ensures the "norm" values are based on the expected MMR for a typical player at this rank/RP
+    const expectedMMR = calculateExpectedMMR(currentRank, currentRP);
+    
+    // Use the norm-specific scaling logic that shows typical progression within a rank
+    return getExpectedRPForRankWithScaling(currentRank, expectedMMR, outcome, true);
   };
 
-  // Calculate expected RP loss based on current MMR and rank difficulty  
-  const calculateExpectedRPLoss = (playerMMR: number, currentRank: string): number => {
-    return getExpectedRPForRankWithScaling(currentRank, playerMMR, 'loss');
+  // New function: Calculate expected RP changes using player's actual MMR (personalized)
+  const calculateExpectedRPPersonalized = (playerMMR: number, currentRank: string, currentRP: number, outcome: 'win' | 'loss'): number => {
+    return getExpectedRPForRankWithScaling(currentRank, playerMMR, outcome, false);
+  };
+
+  // Updated function: Calculate expected RP gain based on current MMR and rank difficulty
+  const calculateExpectedRPGain = (playerMMR: number, currentRank: string, currentRP: number): number => {
+    return getExpectedRPForRankWithScaling(currentRank, playerMMR, 'win', false);
+  };
+
+  // Updated function: Calculate expected RP loss based on current MMR and rank difficulty  
+  const calculateExpectedRPLoss = (playerMMR: number, currentRank: string, currentRP: number): number => {
+    return getExpectedRPForRankWithScaling(currentRank, playerMMR, 'loss', false);
   };
 
   // Calculate weighted average RP gain from recent match history (recent matches weighted more)
@@ -845,20 +894,8 @@ const BedWarsMMRCalculator = () => {
   };
 
   const projectRPGains = (playerMMR: number, currentRank: string): number => {
-    const division = RANK_DIVISIONS[currentRank as keyof typeof RANK_DIVISIONS];
-    const baseline = GLICKO_RATINGS[division];
-    const mmrGap = playerMMR - baseline;
-
-    let baseGain;
-    if (mmrGap > 200) baseGain = 20;
-    else if (mmrGap > 100) baseGain = 16;
-    else if (mmrGap > -100) baseGain = 12;
-    else if (mmrGap > -200) baseGain = 8;
-    else baseGain = 6;
-    if (getRankTier(currentRank) === 'NIGHTMARE') baseGain = 4;
-
-    const multiplier = RANK_DIFFICULTY_MULTIPLIERS[getRankTier(currentRank)] || 1.0;
-    return Math.round(baseGain * multiplier);
+    // Use the new rank-specific RP calculation system
+    return calculateExpectedRPGain(playerMMR, currentRank, playerData.currentRP);
   };
 
   const getStatus = (playerMMR: number, currentRank: string): { status: string; diff: number } => {
@@ -1306,7 +1343,10 @@ const BedWarsMMRCalculator = () => {
 
   // --- Dynamic RP Calculation (continuous, with stronger within-rank scaling) ---
   function calculateDynamicRP(currentGlicko: number, currentRank: string, currentRP: number, matchResult: 'win' | 'loss') {
-    const baseRP = matchResult === 'win' ? 15 : -12;
+    // Get rank-specific base RP values instead of using old difficulty multipliers
+    const { baseWinRP, baseLossRP } = getRankSpecificRPValues(currentRank);
+    const baseRP = matchResult === 'win' ? baseWinRP : baseLossRP;
+    
     // 1. Skill gap multiplier (continuous within ranks)
     const skillGap = calculateSkillGap(currentGlicko, currentRank, currentRP);
     let skillMultiplier = 1.0;
@@ -1315,13 +1355,19 @@ const BedWarsMMRCalculator = () => {
     } else {
       skillMultiplier = Math.min(1.4, 1.0 + Math.abs(skillGap) / 500);
     }
-    // 2. Rank difficulty multiplier
-    const rankTier = getRankTier(currentRank);
-    const difficultyMultiplier = RANK_DIFFICULTY_MULTIPLIERS[rankTier];
-    // 3. Within-rank difficulty progression (now 15% harder at 99 RP)
-    const rpProgress = currentRP / 100;
+    
+    // 2. Within-rank difficulty progression (now 15% harder at 99 RP)
+    const rpProgress = currentRank === 'NIGHTMARE_1' ? Math.min(currentRP / 100, 1) : currentRP / 100;
     const withinRankMultiplier = 1.0 - (rpProgress * 0.15); // 15% harder at 99 RP vs 0 RP
-    return Math.round(baseRP * skillMultiplier * difficultyMultiplier * withinRankMultiplier);
+    
+    const calculatedRP = Math.round(baseRP * skillMultiplier * withinRankMultiplier);
+    
+    // Apply +10 RP gain floor for wins
+    if (matchResult === 'win') {
+      return Math.max(10, calculatedRP);
+    } else {
+      return calculatedRP;
+    }
   }
 
   // --- Promotion/Demotion RP Adjustment (using new rank's interpolated Glicko) ---
@@ -1417,7 +1463,7 @@ const BedWarsMMRCalculator = () => {
       let newRank = currentRank;
       let newDivision = division;
       // Promotion
-      if (newRP >= 100) {
+      if (newRP >= 100 && currentRank !== 'NIGHTMARE_1') {
         newRP -= 100;
         newDivision = Math.min(division + 1, rankNames.length - 1);
         newRank = rankNames[newDivision];
@@ -1460,7 +1506,7 @@ const BedWarsMMRCalculator = () => {
       data.push({
         game: i,
         result: matchResult === 'win' ? 'Win' : 'Loss',
-        rp: Math.max(0, Math.min(99, newRP)),
+        rp: currentRank === 'NIGHTMARE_1' ? newRP : Math.max(0, Math.min(99, newRP)),
         rank: newRank,
         glicko: Math.round(expectedMMRForCurrentState), // Use expected MMR, not inflated actual MMR
         rpChange: shieldEffects.visibleRPChange,
@@ -1962,7 +2008,7 @@ const BedWarsMMRCalculator = () => {
                       <div className="flex flex-col items-center">
                         <span className="text-xs font-medium text-green-700 dark:text-green-300 mb-1">Gain</span>
                         <span className="text-xl font-bold text-green-900 dark:text-green-100">
-                          +{calculatedMMR ? calculateExpectedRPGain(calculateExpectedMMR(playerData.currentRank, playerData.currentRP), playerData.currentRank) : projectedRP}
+                          +{calculateExpectedRPNorm(playerData.currentRank, playerData.currentRP, 'win')}
                         </span>
                         {playerData.matchHistory.length > 0 && (
                           <span className="text-xs text-gray-500 dark:text-gray-400 mt-1">
@@ -1978,7 +2024,7 @@ const BedWarsMMRCalculator = () => {
                       <div className="flex flex-col items-center">
                         <span className="text-xs font-medium text-red-700 dark:text-red-300 mb-1">Loss</span>
                         <span className="text-xl font-bold text-red-900 dark:text-red-100">
-                          {calculatedMMR ? calculateExpectedRPLoss(calculateExpectedMMR(playerData.currentRank, playerData.currentRP), playerData.currentRank) : -12}
+                          {calculateExpectedRPNorm(playerData.currentRank, playerData.currentRP, 'loss')}
                         </span>
                         {playerData.matchHistory.length > 0 && (
                           <span className="text-xs text-gray-500 dark:text-gray-400 mt-1">
@@ -1988,8 +2034,24 @@ const BedWarsMMRCalculator = () => {
                       </div>
                     </div>
                     <span className="text-xs text-gray-600 dark:text-gray-400 mt-2 text-center">
-                      Based on your MMR and rank difficulty
+                      Norm: Expected for typical {playerData.currentRank} player at {playerData.currentRP} RP (based on expected MMR) | Recent: Your actual results
                     </span>
+                    {calculatedMMR && (
+                      <div className="mt-3 p-2 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-700 rounded text-center">
+                        <span className="text-xs font-medium text-blue-700 dark:text-blue-300">Personalized (Your MMR)</span>
+                        <div className="flex items-center justify-center gap-4 mt-1">
+                          <span className="text-sm text-green-700 dark:text-green-300">
+                            +{calculateExpectedRPPersonalized(calculatedMMR.rating, playerData.currentRank, playerData.currentRP, 'win')}
+                          </span>
+                          <span className="text-sm text-red-700 dark:text-red-300">
+                            {calculateExpectedRPPersonalized(calculatedMMR.rating, playerData.currentRank, playerData.currentRP, 'loss')}
+                          </span>
+                        </div>
+                        <span className="text-xs text-blue-600 dark:text-blue-400 mt-1 block">
+                          Prediction based on your calculated MMR ({calculatedMMR.rating > calculateExpectedMMR(playerData.currentRank, playerData.currentRP) ? 'above' : 'below'} typical) - shows what you should expect based on your skill level
+                        </span>
+                      </div>
+                    )}
                   </div>
                   {/* Fix accuracy score coloring: */}
                   <div className={`border rounded-lg p-4 flex flex-col items-center mt-2 ${
