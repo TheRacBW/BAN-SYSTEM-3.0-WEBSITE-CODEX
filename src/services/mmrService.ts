@@ -24,10 +24,9 @@ export interface MMRSnapshot {
 }
 
 export interface UserMatch {
-  id: string;
   user_id: string;
-  snapshot_id: string;
   match_number: number;
+  recorded_in_snapshot: string;
   outcome: 'win' | 'loss' | 'draw';
   rp_change: number;
   was_shielded: boolean;
@@ -60,6 +59,7 @@ export const getUserMMRHistory = async (userId: string, limit = 20): Promise<MMR
     .limit(limit);
   
   if (error) throw error;
+  console.log('📊 Raw data from database:', data?.length, 'snapshots');
   return data || [];
 };
 
@@ -78,7 +78,7 @@ export const getUserMatches = async (userId: string, snapshotId: string): Promis
     .from('user_matches')
     .select('*')
     .eq('user_id', userId)
-    .eq('snapshot_id', snapshotId)
+    .eq('recorded_in_snapshot', snapshotId)
     .order('match_number', { ascending: true });
   
   if (error) throw error;
@@ -111,6 +111,37 @@ export const processMatchHistory = async (
     });
   
   if (error) throw error;
+};
+
+// Delete MMR snapshot and associated matches
+export const deleteMMRSnapshot = async (snapshotId: string): Promise<void> => {
+  console.log('🗑️ Starting deletion of snapshot:', snapshotId);
+  
+  // Delete associated matches first (due to foreign key constraint)
+  const { error: matchesError } = await supabase
+    .from('user_matches')
+    .delete()
+    .eq('recorded_in_snapshot', snapshotId);
+  
+  if (matchesError) {
+    console.error('❌ Error deleting matches:', matchesError);
+    throw matchesError;
+  }
+  
+  console.log('✅ Matches deleted successfully');
+  
+  // Delete the snapshot
+  const { error: snapshotError } = await supabase
+    .from('mmr_snapshots')
+    .delete()
+    .eq('id', snapshotId);
+  
+  if (snapshotError) {
+    console.error('❌ Error deleting snapshot:', snapshotError);
+    throw snapshotError;
+  }
+  
+  console.log('✅ Snapshot deleted successfully');
 };
 
 // Get rank difficulty analysis

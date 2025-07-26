@@ -13,7 +13,8 @@ import {
   Clock,
   Target,
   Zap,
-  Shield
+  Shield,
+  Trash2
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { 
@@ -21,11 +22,12 @@ import {
   getUserMatchStats, 
   getUserMatches,
   exportUserData,
+  deleteMMRSnapshot,
   type MMRSnapshot,
   type UserMMRStats,
   type UserMatch
 } from '../../services/mmrService';
-import { ResponsiveContainer, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ReferenceLine } from 'recharts';
+import { ResponsiveContainer, LineChart, ComposedChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ReferenceLine } from 'recharts';
 import RankBadge from '../leaderboard/RankBadge';
 
 interface StatCardProps {
@@ -97,9 +99,11 @@ const MMRTooltip: React.FC<MMRTooltipProps> = ({ active, payload, label }) => {
 interface ExpandableRowProps {
   snapshot: MMRSnapshot;
   onExpand: (snapshot: MMRSnapshot) => void;
+  onDelete: (snapshotId: string) => void;
+  isDeleting: boolean;
 }
 
-const ExpandableRow: React.FC<ExpandableRowProps> = ({ snapshot, onExpand }) => {
+const ExpandableRow: React.FC<ExpandableRowProps> = ({ snapshot, onExpand, onDelete, isDeleting }) => {
   const [isExpanded, setIsExpanded] = useState(false);
   const [matches, setMatches] = useState<UserMatch[]>([]);
   const [loading, setLoading] = useState(false);
@@ -152,17 +156,43 @@ const ExpandableRow: React.FC<ExpandableRowProps> = ({ snapshot, onExpand }) => 
             {snapshot.accuracy_score}%
           </span>
         </td>
-        <td className="px-4 py-3">
-          {isExpanded ? (
-            <ChevronUp className="w-4 h-4 text-gray-500" />
+        <td className="px-4 py-3 text-sm text-gray-600 dark:text-gray-400">
+          {snapshot.user_notes ? (
+            <span className="truncate block max-w-xs" title={snapshot.user_notes}>
+              {snapshot.user_notes}
+            </span>
           ) : (
-            <ChevronDown className="w-4 h-4 text-gray-500" />
+            <span className="text-gray-400 italic">No notes</span>
           )}
+        </td>
+        <td className="px-4 py-3">
+          <div className="flex items-center gap-2">
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                onDelete(snapshot.id);
+              }}
+              disabled={isDeleting}
+              className="p-1 text-red-500 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-900/20 rounded transition-colors disabled:opacity-50"
+              title="Delete snapshot"
+            >
+              {isDeleting ? (
+                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-red-500"></div>
+              ) : (
+                <Trash2 className="w-4 h-4" />
+              )}
+            </button>
+            {isExpanded ? (
+              <ChevronUp className="w-4 h-4 text-gray-500" />
+            ) : (
+              <ChevronDown className="w-4 h-4 text-gray-500" />
+            )}
+          </div>
         </td>
       </tr>
       {isExpanded && (
         <tr>
-          <td colSpan={6} className="px-4 py-3 bg-gray-50 dark:bg-gray-800/50">
+          <td colSpan={7} className="px-4 py-3 bg-gray-50 dark:bg-gray-800/50">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
                 <h4 className="font-semibold mb-2 text-gray-900 dark:text-gray-100">MMR Details</h4>
@@ -181,7 +211,7 @@ const ExpandableRow: React.FC<ExpandableRowProps> = ({ snapshot, onExpand }) => 
                 ) : matches.length > 0 ? (
                   <div className="space-y-1 max-h-32 overflow-y-auto">
                     {matches.map((match, index) => (
-                      <div key={match.id} className="flex items-center justify-between text-sm">
+                      <div key={`${match.user_id}-${match.match_number}-${match.recorded_in_snapshot}`} className="flex items-center justify-between text-sm">
                         <span className={`font-medium ${
                           match.outcome === 'win' ? 'text-green-600' : 
                           match.outcome === 'loss' ? 'text-red-600' : 'text-yellow-600'
@@ -238,6 +268,9 @@ const MMRHistoryTab: React.FC = () => {
   const [dateRange, setDateRange] = useState('30d');
   const [showMatchHistory, setShowMatchHistory] = useState(false);
   const [exporting, setExporting] = useState(false);
+  const [noteFilter, setNoteFilter] = useState<string>('');
+  const [selectedUsernames, setSelectedUsernames] = useState<string[]>([]);
+  const [deletingSnapshot, setDeletingSnapshot] = useState<string | null>(null);
 
   useEffect(() => {
     if (user) {
@@ -245,20 +278,30 @@ const MMRHistoryTab: React.FC = () => {
     }
   }, [user]);
 
-  const loadUserData = async () => {
+  const loadUserData = async (forceRefresh = false) => {
     if (!user) return;
     
     setLoading(true);
     try {
+      console.log('📥 Loading user data for user:', user.id, forceRefresh ? '(force refresh)' : '');
+      
+      // Add a small delay to ensure database changes are propagated
+      if (forceRefresh) {
+        await new Promise(resolve => setTimeout(resolve, 100));
+      }
+      
       const [historyData, statsData] = await Promise.all([
         getUserMMRHistory(user.id, 50),
         getUserMatchStats(user.id)
       ]);
       
+      console.log('📊 Loaded snapshots:', historyData.length);
+      console.log('📈 Loaded stats:', statsData);
+      
       setSnapshots(historyData);
       setUserStats(statsData);
     } catch (error) {
-      console.error('Error loading MMR history:', error);
+      console.error('❌ Error loading MMR history:', error);
     } finally {
       setLoading(false);
     }
@@ -290,6 +333,32 @@ const MMRHistoryTab: React.FC = () => {
     }
   };
 
+  const handleDeleteSnapshot = async (snapshotId: string) => {
+    if (!user || !confirm('Are you sure you want to delete this snapshot? This action cannot be undone.')) {
+      return;
+    }
+    
+    setDeletingSnapshot(snapshotId);
+    try {
+      console.log('🗑️ Deleting snapshot:', snapshotId);
+      await deleteMMRSnapshot(snapshotId);
+      console.log('✅ Snapshot deleted successfully');
+      
+      // Immediately remove from local state
+      setSnapshots(prev => prev.filter(s => s.id !== snapshotId));
+      
+      // Refresh the data with force refresh
+      console.log('🔄 Refreshing data with force refresh...');
+      await loadUserData(true);
+      console.log('✅ Data refreshed');
+    } catch (error) {
+      console.error('❌ Error deleting snapshot:', error);
+      alert('Failed to delete snapshot. Please try again.');
+    } finally {
+      setDeletingSnapshot(null);
+    }
+  };
+
   const formatDate = (dateString: string) => {
     return new Date(dateString).toLocaleDateString('en-US', {
       month: 'short',
@@ -307,7 +376,49 @@ const MMRHistoryTab: React.FC = () => {
     return snapshots.filter(snapshot => new Date(snapshot.created_at) >= cutoffDate);
   };
 
-  const filteredSnapshots = filterSnapshotsByDateRange(snapshots, dateRange);
+  // Extract unique usernames from notes
+  const getUniqueUsernames = (snapshots: MMRSnapshot[]) => {
+    const usernames = new Set<string>();
+    snapshots.forEach(snapshot => {
+      if (snapshot.user_notes && snapshot.user_notes.trim()) {
+        usernames.add(snapshot.user_notes.trim());
+      }
+    });
+    return Array.from(usernames).sort();
+  };
+
+  // Filter snapshots by notes/username
+  const filterSnapshotsByNotes = (snapshots: MMRSnapshot[], filter: string) => {
+    if (!filter.trim()) return snapshots;
+    return snapshots.filter(snapshot => 
+      snapshot.user_notes && 
+      snapshot.user_notes.toLowerCase().includes(filter.toLowerCase())
+    );
+  };
+
+  // Group snapshots by username for colored lines
+  const groupSnapshotsByUsername = (snapshots: MMRSnapshot[]) => {
+    const groups: { [username: string]: MMRSnapshot[] } = {};
+    
+    snapshots.forEach(snapshot => {
+      const username = snapshot.user_notes?.trim() || 'Unknown';
+      if (!groups[username]) {
+        groups[username] = [];
+      }
+      groups[username].push(snapshot);
+    });
+    
+    return groups;
+  };
+
+  // Apply all filters
+  const filteredSnapshots = filterSnapshotsByNotes(
+    filterSnapshotsByDateRange(snapshots, dateRange), 
+    noteFilter
+  );
+
+  const groupedSnapshots = groupSnapshotsByUsername(filteredSnapshots);
+  const uniqueUsernames = getUniqueUsernames(snapshots);
 
   // Authentication Check
   if (!user) {
@@ -390,6 +501,49 @@ const MMRHistoryTab: React.FC = () => {
         </button>
       </div>
 
+      {/* Filter Controls */}
+      <div className="bg-white dark:bg-gray-800 rounded-lg p-4 border border-gray-200 dark:border-gray-700">
+        <div className="flex flex-col md:flex-row gap-4 items-start md:items-center">
+          <div className="flex-1">
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+              Filter by Username/Notes
+            </label>
+            <input
+              type="text"
+              value={noteFilter}
+              onChange={(e) => setNoteFilter(e.target.value)}
+              placeholder="Type username to filter..."
+              className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:text-white"
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+              Quick Username Filters
+            </label>
+            <div className="flex flex-wrap gap-2">
+              {uniqueUsernames.slice(0, 5).map(username => (
+                <button
+                  key={username}
+                  onClick={() => setNoteFilter(noteFilter === username ? '' : username)}
+                  className={`px-3 py-1 text-xs rounded-full transition-colors ${
+                    noteFilter === username
+                      ? 'bg-blue-600 text-white'
+                      : 'bg-gray-200 dark:bg-gray-600 text-gray-700 dark:text-gray-300 hover:bg-gray-300 dark:hover:bg-gray-500'
+                  }`}
+                >
+                  {username}
+                </button>
+              ))}
+              {uniqueUsernames.length > 5 && (
+                <span className="text-xs text-gray-500 dark:text-gray-400 px-2 py-1">
+                  +{uniqueUsernames.length - 5} more
+                </span>
+              )}
+            </div>
+          </div>
+        </div>
+      </div>
+
       {/* MMR Timeline Chart */}
       {filteredSnapshots.length > 0 && (
         <div className="bg-white dark:bg-gray-800 rounded-lg p-6 mb-6 border border-gray-200 dark:border-gray-700">
@@ -401,7 +555,7 @@ const MMRHistoryTab: React.FC = () => {
             <DateRangeSelector value={dateRange} onChange={setDateRange} />
           </div>
           <ResponsiveContainer width="100%" height={300}>
-            <LineChart data={filteredSnapshots}>
+            <ComposedChart data={filteredSnapshots}>
               <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
               <XAxis 
                 dataKey="created_at" 
@@ -415,16 +569,48 @@ const MMRHistoryTab: React.FC = () => {
                 fontSize={12}
               />
               <Tooltip content={<MMRTooltip />} />
-              <Line 
-                type="monotone" 
-                dataKey="estimated_glicko" 
-                stroke="#3B82F6" 
-                strokeWidth={2}
-                dot={{ fill: '#3B82F6', strokeWidth: 2, r: 4 }}
-                activeDot={{ r: 6, stroke: '#3B82F6', strokeWidth: 2, fill: '#3B82F6' }}
-              />
-            </LineChart>
+              {Object.entries(groupedSnapshots).map(([username, userSnapshots], index) => {
+                const colors = ['#3B82F6', '#EF4444', '#10B981', '#F59E0B', '#8B5CF6', '#EC4899', '#06B6D4', '#84CC16'];
+                const color = colors[index % colors.length];
+                
+                return (
+                  <Line 
+                    key={username}
+                    type="monotone" 
+                    dataKey="estimated_glicko" 
+                    data={userSnapshots}
+                    stroke={color}
+                    strokeWidth={2}
+                    dot={{ fill: color, strokeWidth: 2, r: 4 }}
+                    activeDot={{ r: 6, stroke: color, strokeWidth: 2, fill: color }}
+                    name={username}
+                  />
+                );
+              })}
+            </ComposedChart>
           </ResponsiveContainer>
+          
+          {/* Username Legend */}
+          {Object.keys(groupedSnapshots).length > 1 && (
+            <div className="mt-4 flex flex-wrap gap-3 justify-center">
+              {Object.entries(groupedSnapshots).map(([username, userSnapshots], index) => {
+                const colors = ['#3B82F6', '#EF4444', '#10B981', '#F59E0B', '#8B5CF6', '#EC4899', '#06B6D4', '#84CC16'];
+                const color = colors[index % colors.length];
+                
+                return (
+                  <div key={username} className="flex items-center gap-2">
+                    <div 
+                      className="w-3 h-3 rounded-full" 
+                      style={{ backgroundColor: color }}
+                    />
+                    <span className="text-sm text-gray-600 dark:text-gray-400">
+                      {username} ({userSnapshots.length} snapshots)
+                    </span>
+                  </div>
+                );
+              })}
+            </div>
+          )}
         </div>
       )}
 
@@ -446,6 +632,7 @@ const MMRHistoryTab: React.FC = () => {
                   <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">RP</th>
                   <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">MMR</th>
                   <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Accuracy</th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Notes</th>
                   <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Actions</th>
                 </tr>
               </thead>
@@ -455,6 +642,8 @@ const MMRHistoryTab: React.FC = () => {
                     key={snapshot.id} 
                     snapshot={snapshot}
                     onExpand={setSelectedSnapshot}
+                    onDelete={handleDeleteSnapshot}
+                    isDeleting={deletingSnapshot === snapshot.id}
                   />
                 ))}
               </tbody>
