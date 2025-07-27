@@ -1984,7 +1984,7 @@ const BedWarsMMRCalculator = () => {
                         : 'You are perfectly ranked.'}
                     </span>
                     <span className="text-xs text-gray-500 dark:text-gray-400 mt-2 text-center">
-                      This is the system's expected MMR for your current rank and RP. If your estimated MMR is much higher, you are likely to rank up quickly. If much lower, you may lose RP faster.
+                      This is the typical MMR expected for a player at your current rank and RP (the "norm"). If your estimated MMR is much higher, you are likely to rank up quickly. If much lower, you may lose RP faster.
                     </span>
                     {/* Nightmare survival mode warning */}
                     {playerData.currentRank === 'NIGHTMARE_1' && playerData.currentRP >= 50 && (
