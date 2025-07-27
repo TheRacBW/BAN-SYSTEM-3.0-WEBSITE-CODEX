@@ -751,8 +751,9 @@ const BedWarsMMRCalculator = () => {
       
       // As RP increases within a rank, gains should decrease slightly and losses should increase slightly
       // This creates the typical ranked system behavior where higher RP = harder to gain, easier to lose
-      winAdjustment = -rpProgress * 2; // Decrease gains as RP increases
-      lossAdjustment = rpProgress * 2;  // Increase losses as RP increases
+      // Reduced adjustment factor to be less aggressive since base values are now more accurate
+      winAdjustment = -rpProgress * 1.5; // Decrease gains as RP increases
+      lossAdjustment = rpProgress * 1.5;  // Increase losses as RP increases
     } else {
       // For personalized calculations, use the original MMR-based adjustment logic
       let mmrRatio: number;
@@ -803,14 +804,15 @@ const BedWarsMMRCalculator = () => {
     const subTierMatch = rank.match(/_(\d+)$/);
     const subTier = subTierMatch ? parseInt(subTierMatch[1]) : 1;
     
-    // Base values per major rank tier
+    // Base values per major rank tier - adjusted based on sample data analysis
+    // These values account for the win/loss ratios and MMR variations observed in real data
     const baseValues = {
       'BRONZE': { baseWinRP: 18, baseLossRP: -15 },
       'SILVER': { baseWinRP: 16, baseLossRP: -18 },
-      'GOLD': { baseWinRP: 21, baseLossRP: -20 },
-      'PLATINUM': { baseWinRP: 14, baseLossRP: -27 },
-      'DIAMOND': { baseWinRP: 12, baseLossRP: -30 },
-      'EMERALD': { baseWinRP: 10, baseLossRP: -20 },
+      'GOLD': { baseWinRP: 21, baseLossRP: -22 }, // Adjusted based on Gold 2/3 sample data
+      'PLATINUM': { baseWinRP: 14, baseLossRP: -27 }, // Matches sample data well
+      'DIAMOND': { baseWinRP: 12, baseLossRP: -21 }, // Reduced from -30 based on sample data
+      'EMERALD': { baseWinRP: 10, baseLossRP: -20 }, // Matches sample data
       'NIGHTMARE': { baseWinRP: 10, baseLossRP: -16 }
     };
     
@@ -819,8 +821,8 @@ const BedWarsMMRCalculator = () => {
     // Apply sub-tier progression within the major rank
     // Higher sub-tiers (3) get slightly higher base values than lower sub-tiers (1)
     // This creates the gradual change the user expects between sub-tiers
-    // Reduced multiplier to prevent excessive values
-    const subTierMultiplier = 1 + (subTier - 1) * 0.05; // 1.0 for tier 1, 1.05 for tier 2, 1.1 for tier 3
+    // Further reduced multiplier to prevent excessive values and better match sample data
+    const subTierMultiplier = 1 + (subTier - 1) * 0.03; // 1.0 for tier 1, 1.03 for tier 2, 1.06 for tier 3
     
     return {
       baseWinRP: Math.round(baseValue.baseWinRP * subTierMultiplier),
