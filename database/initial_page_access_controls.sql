@@ -4,7 +4,8 @@
 -- Insert initial page access controls
 INSERT INTO page_access_controls (page_path, page_name, description, min_trust_level, requires_discord_verification, requires_paid_verification, is_active) VALUES
   ('/', 'Home Page', 'Main landing page - accessible to all users', 0, false, false, true),
-  ('/leaderboard', 'Leaderboard', 'Public leaderboard - accessible to all users', 0, false, false, true),
+  ('/leaderboard', 'Leaderboard', 'Leaderboard - requires Discord verification', 0.5, true, false, true),
+  ('/mmr-calculator', 'MMR Calculator', 'MMR calculation tools - requires Discord verification', 0.5, true, false, true),
   ('/contact', 'Contact Page', 'Contact form - accessible to all users', 0, false, false, true),
   ('/auth', 'Authentication', 'Login/register pages - accessible to all users', 0, false, false, true),
   ('/settings', 'User Settings', 'User profile and settings - accessible to all users', 0, false, false, true),

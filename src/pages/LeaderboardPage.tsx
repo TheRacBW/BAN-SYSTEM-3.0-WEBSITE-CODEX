@@ -11,6 +11,7 @@ import { supabase } from '../lib/supabase';
 import { CSSTransition, TransitionGroup } from 'react-transition-group';
 import { AnimatePresence, motion } from 'framer-motion';
 import { getRecentRPChanges } from '../services/leaderboardService';
+import { VerificationGuard } from '../components/auth';
 
 // Move these helpers to the top of the file:
 const getDisplayPercentage = (player: any) => {
@@ -1121,152 +1122,154 @@ const LeaderboardPage: React.FC = () => {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
-      {/* Notification Toast */}
-      {notification && (
-        <div className={`fixed top-4 right-4 z-50 px-4 py-3 rounded-lg shadow-lg transition-all duration-300 ${
-          notification.type === 'success' 
-            ? 'bg-green-100 text-green-800 border border-green-200' 
-            : 'bg-red-100 text-red-800 border border-red-200'
-        }`}>
-          <div className="flex items-center justify-between">
-            <span className="font-medium">{notification.message}</span>
-            <button
-              onClick={() => setNotification(null)}
-              className="ml-4 text-gray-500 hover:text-gray-700"
-            >
-              ×
-            </button>
-          </div>
-        </div>
-      )}
-
-      {/* Header */}
-      <div className="w-full bg-[#232B39] dark:bg-gray-800 border-b border-gray-200/10 dark:border-gray-700/40 px-0">
-        <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4 px-8 py-6 w-full">
-          <div className="flex flex-col gap-2">
-            <h1 className="text-3xl font-semibold text-gray-900 dark:text-white tracking-wide mb-1" style={{letterSpacing: '0.01em'}}>Leaderboard</h1>
-            <div className="flex items-center gap-3 flex-wrap">
-              <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-200 text-xs font-medium">
-                <Clock size={16} className="mr-1" />
-                Last updated: {formatLastUpdate(lastUpdate)}
-              </span>
-              <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-medium"
-                style={{ background: isLive ? 'rgba(34,197,94,0.12)' : 'rgba(156,163,175,0.12)' }}>
-                <span className={`w-2 h-2 rounded-full ${isLive ? 'bg-green-500' : 'bg-gray-400'} inline-block`}></span>
-                <span className={isLive ? 'text-green-600 dark:text-green-400' : 'text-gray-500 dark:text-gray-400'}>
-                  {isLive ? 'Online' : 'Offline'}
-                </span>
-              </span>
-            </div>
-          </div>
-
-          <div className="flex items-center gap-4 flex-wrap justify-end">
-            {/* Cache status indicator */}
-            
-            <button
-              onClick={async () => {
-                if (isRefreshingInsights) return;
-                setIsRefreshingInsights(true);
-                try {
-                  const { data, error } = await supabase.functions.invoke('populate-leaderboard-insights', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: {},
-                  });
-                  if (error) {
-                    setNotification({ message: `❌ Failed to refresh insights: ${error.message}`, type: 'error' });
-                  } else {
-                    refresh();
-                    setNotification({ message: '✅ Leaderboard insights refreshed successfully!', type: 'success' });
-                  }
-                } catch (error) {
-                  setNotification({ message: '❌ Error calling populate-leaderboard-insights.', type: 'error' });
-                } finally {
-                  setIsRefreshingInsights(false);
-                }
-              }}
-              disabled={isRefreshingInsights}
-              className={`inline-flex items-center gap-2 px-4 py-2 rounded-lg font-medium transition text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-400 focus:ring-offset-2 dark:focus:ring-offset-gray-900 ${isRefreshingInsights ? 'opacity-60 cursor-not-allowed' : ''}`}
-              title="Manually trigger the populate-leaderboard-insights edge function to refresh gainers/losers data from rp_changes_optimized"
-            >
-              {isRefreshingInsights ? <RefreshCw size={18} className="animate-spin" /> : <RefreshCw size={18} />} Refresh Insights
-            </button>
-          </div>
-        </div>
-      </div>
-
-      <div className="container mx-auto px-4 py-6">
-        {/* Search Bar */}
-        <div className="mb-6">
-          <div className="relative max-w-md">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={20} />
-            <input
-              type="text"
-              placeholder="Search players..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full pl-10 pr-4 py-3 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-            />
-          </div>
-        </div>
-
-        {/* Tabs */}
-        <div className="mb-6">
-          <div className="flex space-x-1 bg-gray-100 dark:bg-gray-700 p-1 rounded-lg">
-            {tabs.map((tab) => (
+    <VerificationGuard pagePath="/leaderboard">
+      <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
+        {/* Notification Toast */}
+        {notification && (
+          <div className={`fixed top-4 right-4 z-50 px-4 py-3 rounded-lg shadow-lg transition-all duration-300 ${
+            notification.type === 'success' 
+              ? 'bg-green-100 text-green-800 border border-green-200' 
+              : 'bg-red-100 text-red-800 border border-red-200'
+          }`}>
+            <div className="flex items-center justify-between">
+              <span className="font-medium">{notification.message}</span>
               <button
-                key={tab.id}
-                onClick={() => setActiveTab(tab.id)}
-                className={`flex items-center gap-2 px-4 py-2 rounded-md text-sm font-medium transition-all ${
-                  activeTab === tab.id
-                    ? 'bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 shadow-sm'
-                    : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100'
-                }`}
+                onClick={() => setNotification(null)}
+                className="ml-4 text-gray-500 hover:text-gray-700"
               >
-                {tab.icon}
-                <span className="hidden sm:inline">{tab.label}</span>
+                ×
               </button>
-            ))}
+            </div>
+          </div>
+        )}
+
+        {/* Header */}
+        <div className="w-full bg-[#232B39] dark:bg-gray-800 border-b border-gray-200/10 dark:border-gray-700/40 px-0">
+          <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4 px-8 py-6 w-full">
+            <div className="flex flex-col gap-2">
+              <h1 className="text-3xl font-semibold text-gray-900 dark:text-white tracking-wide mb-1" style={{letterSpacing: '0.01em'}}>Leaderboard</h1>
+              <div className="flex items-center gap-3 flex-wrap">
+                <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-200 text-xs font-medium">
+                  <Clock size={16} className="mr-1" />
+                  Last updated: {formatLastUpdate(lastUpdate)}
+                </span>
+                <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-medium"
+                  style={{ background: isLive ? 'rgba(34,197,94,0.12)' : 'rgba(156,163,175,0.12)' }}>
+                  <span className={`w-2 h-2 rounded-full ${isLive ? 'bg-green-500' : 'bg-gray-400'} inline-block`}></span>
+                  <span className={isLive ? 'text-green-600 dark:text-green-400' : 'text-gray-500 dark:text-gray-400'}>
+                    {isLive ? 'Online' : 'Offline'}
+                  </span>
+                </span>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-4 flex-wrap justify-end">
+              {/* Cache status indicator */}
+              
+              <button
+                onClick={async () => {
+                  if (isRefreshingInsights) return;
+                  setIsRefreshingInsights(true);
+                  try {
+                    const { data, error } = await supabase.functions.invoke('populate-leaderboard-insights', {
+                      method: 'POST',
+                      headers: { 'Content-Type': 'application/json' },
+                      body: {},
+                    });
+                    if (error) {
+                      setNotification({ message: `❌ Failed to refresh insights: ${error.message}`, type: 'error' });
+                    } else {
+                      refresh();
+                      setNotification({ message: '✅ Leaderboard insights refreshed successfully!', type: 'success' });
+                    }
+                  } catch (error) {
+                    setNotification({ message: '❌ Error calling populate-leaderboard-insights.', type: 'error' });
+                  } finally {
+                    setIsRefreshingInsights(false);
+                  }
+                }}
+                disabled={isRefreshingInsights}
+                className={`inline-flex items-center gap-2 px-4 py-2 rounded-lg font-medium transition text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-400 focus:ring-offset-2 dark:focus:ring-offset-gray-900 ${isRefreshingInsights ? 'opacity-60 cursor-not-allowed' : ''}`}
+                title="Manually trigger the populate-leaderboard-insights edge function to refresh gainers/losers data from rp_changes_optimized"
+              >
+                {isRefreshingInsights ? <RefreshCw size={18} className="animate-spin" /> : <RefreshCw size={18} />} Refresh Insights
+              </button>
+            </div>
           </div>
         </div>
 
-        {/* Content */}
-        {isInitialLoading ? (
-          <div className="flex items-center justify-center py-12">
-            <div className="text-center">
-              <span className="animate-spin text-blue-600 dark:text-blue-400 mx-auto mb-4">🔄</span>
-              <p className="text-gray-600 dark:text-gray-400">Loading leaderboard...</p>
+        <div className="container mx-auto px-4 py-6">
+          {/* Search Bar */}
+          <div className="mb-6">
+            <div className="relative max-w-md">
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={20} />
+              <input
+                type="text"
+                placeholder="Search players..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="w-full pl-10 pr-4 py-3 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              />
             </div>
           </div>
-        ) : (
-          <div className="space-y-6 relative">
-            {isRefreshing && (
-              <div className="refresh-indicator">
-                <span>Updating...</span>
+
+          {/* Tabs */}
+          <div className="mb-6">
+            <div className="flex space-x-1 bg-gray-100 dark:bg-gray-700 p-1 rounded-lg">
+              {tabs.map((tab) => (
+                <button
+                  key={tab.id}
+                  onClick={() => setActiveTab(tab.id)}
+                  className={`flex items-center gap-2 px-4 py-2 rounded-md text-sm font-medium transition-all ${
+                    activeTab === tab.id
+                      ? 'bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 shadow-sm'
+                      : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100'
+                  }`}
+                >
+                  {tab.icon}
+                  <span className="hidden sm:inline">{tab.label}</span>
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Content */}
+          {isInitialLoading ? (
+            <div className="flex items-center justify-center py-12">
+              <div className="text-center">
+                <span className="animate-spin text-blue-600 dark:text-blue-400 mx-auto mb-4">🔄</span>
+                <p className="text-gray-600 dark:text-gray-400">Loading leaderboard...</p>
               </div>
-            )}
-            <AnimatePresence mode="wait">
-              <motion.div
-                key={activeTab}
-                initial={{ x: 40, opacity: 0 }}
-                animate={{ x: 0, opacity: 1 }}
-                exit={{ x: -40, opacity: 0 }}
-                transition={{ duration: 0.28, ease: 'easeInOut' }}
-                className="w-full"
-              >
-                {tabContent}
-              </motion.div>
-            </AnimatePresence>
+            </div>
+          ) : (
+            <div className="space-y-6 relative">
+              {isRefreshing && (
+                <div className="refresh-indicator">
+                  <span>Updating...</span>
+                </div>
+              )}
+              <AnimatePresence mode="wait">
+                <motion.div
+                  key={activeTab}
+                  initial={{ x: 40, opacity: 0 }}
+                  animate={{ x: 0, opacity: 1 }}
+                  exit={{ x: -40, opacity: 0 }}
+                  transition={{ duration: 0.28, ease: 'easeInOut' }}
+                  className="w-full"
+                >
+                  {tabContent}
+                </motion.div>
+              </AnimatePresence>
+            </div>
+          )}
+        </div>
+        {showRealtimeToast && (
+          <div className="fixed top-20 right-4 z-50 px-4 py-3 rounded-lg shadow-lg bg-blue-100 text-blue-800 border border-blue-200 transition-all duration-300">
+            <span className="font-medium">Leaderboard insights just updated!</span>
           </div>
         )}
       </div>
-      {showRealtimeToast && (
-        <div className="fixed top-20 right-4 z-50 px-4 py-3 rounded-lg shadow-lg bg-blue-100 text-blue-800 border border-blue-200 transition-all duration-300">
-          <span className="font-medium">Leaderboard insights just updated!</span>
-        </div>
-      )}
-    </div>
+    </VerificationGuard>
   );
 };
 
