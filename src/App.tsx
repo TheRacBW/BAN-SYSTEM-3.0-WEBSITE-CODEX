@@ -6,6 +6,7 @@ import { BanProvider } from './context/BanContext';
 import { KitProvider } from './context/KitContext';
 import Header from './components/Header';
 import Footer from './components/Footer';
+import { CacheStatusIndicator } from './components/auth';
 import HomePage from './pages/HomePage';
 import CreateStrategyPage from './pages/CreateStrategyPage';
 import TrendingPage from './pages/TrendingPage';
@@ -45,6 +46,7 @@ function App() {
                 </main>
                 
                 <Footer />
+                <CacheStatusIndicator />
               </div>
             </KitProvider>
           </BanProvider>

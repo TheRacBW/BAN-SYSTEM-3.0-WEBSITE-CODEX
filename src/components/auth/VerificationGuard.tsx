@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
-import { usePageAccess, UserVerificationStatus, PageAccessRequirements } from '../../hooks/usePageAccess';
+import { useCachedPageAccess } from '../../hooks/useCachedPageAccess';
 import { VerificationPopup } from './VerificationPopup';
 import { useAuth } from '../../context/AuthContext';
+import { usePageAccess, UserVerificationStatus, PageAccessRequirements } from '../../hooks/usePageAccess';
 
 interface VerificationGuardProps {
   children: React.ReactNode;
@@ -15,17 +16,15 @@ export const VerificationGuard: React.FC<VerificationGuardProps> = ({
   fallbackComponent
 }) => {
   const { user } = useAuth();
-  const { hasAccess, requirement, userStatus, loading, error, recheckAccess } = usePageAccess(pagePath);
+  const { hasAccess, loading, error, requirement, recheckAccess } = useCachedPageAccess(pagePath);
+  const { userStatus } = usePageAccess(pagePath); // Keep for user status details
   const [showPopup, setShowPopup] = useState(false);
 
-  // Show loading spinner while checking access
+  // Much faster loading - only shows for uncached pages
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-[200px]">
-        <div className="flex flex-col items-center gap-4">
-          <div className="loading loading-spinner loading-lg"></div>
-          <p className="text-gray-400">Checking access...</p>
-        </div>
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
       </div>
     );
   }
@@ -80,7 +79,7 @@ export const VerificationGuard: React.FC<VerificationGuardProps> = ({
               <h2 className="text-xl font-bold text-gray-200 mb-2">Account Required</h2>
               <p className="text-gray-400 mb-4">
                 You need to create an account to access this page. 
-                {requirement.requires_discord_verification && ' After creating an account, you\'ll also need to verify through Discord.'}
+                {requirement.requiresDiscordVerification && ' After creating an account, you\'ll also need to verify through Discord.'}
               </p>
               <div className="space-y-3">
                 <button 
@@ -110,7 +109,7 @@ export const VerificationGuard: React.FC<VerificationGuardProps> = ({
               <div className="text-gray-400 mb-4 text-4xl">🔒</div>
               <h2 className="text-xl font-bold text-gray-200 mb-2">Verification Required</h2>
               <p className="text-gray-400 mb-4">
-                {requirement.requires_discord_verification && !userStatus.is_discord_verified 
+                {requirement.requiresDiscordVerification && !userStatus.is_discord_verified 
                   ? 'This page requires Discord verification. Join our Discord server and verify your account to continue.'
                   : 'This page requires additional verification to access.'
                 }
@@ -128,7 +127,13 @@ export const VerificationGuard: React.FC<VerificationGuardProps> = ({
         {showPopup && (
           <VerificationPopup
             userStatus={userStatus}
-            requirement={requirement}
+            requirement={{
+              page_path: pagePath,
+              min_trust_level: requirement.minTrustLevel,
+              requires_discord_verification: requirement.requiresDiscordVerification,
+              requires_paid_verification: requirement.requiresPaidVerification,
+              description: ''
+            }}
             onClose={() => setShowPopup(false)}
             onRecheck={async () => {
               await recheckAccess();
