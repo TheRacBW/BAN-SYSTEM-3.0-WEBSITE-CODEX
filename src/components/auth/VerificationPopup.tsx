@@ -1,5 +1,5 @@
 import React from 'react';
-import { Shield, Lock, ExternalLink, CheckCircle, AlertCircle, User, Crown, X } from 'lucide-react';
+import { Shield, Lock, ExternalLink, CheckCircle, AlertCircle, User, Crown, X, ArrowRight } from 'lucide-react';
 import { UserVerificationStatus, PageAccessRequirements } from '../../hooks/usePageAccess';
 import { VerificationStatusBadge } from './VerificationStatusBadge';
 import { getTrustLevelConfig } from '../../types/trustLevels';
@@ -61,9 +61,49 @@ export const VerificationPopup: React.FC<VerificationPopupProps> = ({
 
   const actionButton = getActionButton();
 
+  const getProgressSteps = () => {
+    const steps = [];
+    
+    // Step 1: Account created (always completed if userStatus exists)
+    steps.push({
+      completed: true,
+      title: 'Account Created',
+      description: 'You have successfully created an account',
+      icon: CheckCircle
+    });
+
+    // Step 2: Discord verification
+    if (requirement.requires_discord_verification) {
+      steps.push({
+        completed: userStatus.is_discord_verified,
+        title: 'Discord Verification',
+        description: userStatus.is_discord_verified 
+          ? 'Discord account verified successfully'
+          : 'Join Discord server and use /verify command',
+        icon: userStatus.is_discord_verified ? CheckCircle : Shield
+      });
+    }
+
+    // Step 3: Paid tracker verification (if required)
+    if (requirement.requires_paid_verification) {
+      steps.push({
+        completed: userStatus.is_paid_tracker_verified,
+        title: 'Paid Tracker Verification',
+        description: userStatus.is_paid_tracker_verified
+          ? 'Paid tracker subscription verified'
+          : 'Purchase paid tracker subscription',
+        icon: userStatus.is_paid_tracker_verified ? CheckCircle : Crown
+      });
+    }
+
+    return steps;
+  };
+
+  const progressSteps = getProgressSteps();
+
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-      <div className="bg-[#232b36] rounded-lg p-6 max-w-md w-full border border-[#3a4250] shadow-xl">
+      <div className="bg-[#232b36] rounded-lg p-6 max-w-lg w-full border border-[#3a4250] shadow-xl max-h-[90vh] overflow-y-auto">
         <div className="flex justify-between items-start mb-4">
           <h2 className="text-xl font-bold text-gray-200">Access Required</h2>
           <button
@@ -72,6 +112,37 @@ export const VerificationPopup: React.FC<VerificationPopupProps> = ({
           >
             <X size={20} />
           </button>
+        </div>
+
+        {/* Progress Steps */}
+        <div className="mb-6">
+          <h3 className="text-sm font-medium text-gray-400 mb-3">Verification Progress</h3>
+          <div className="space-y-3">
+            {progressSteps.map((step, index) => (
+              <div key={index} className="flex items-center gap-3">
+                <div className={`flex items-center justify-center w-8 h-8 rounded-full ${
+                  step.completed 
+                    ? 'bg-green-500 text-white' 
+                    : 'bg-gray-600 text-gray-300'
+                }`}>
+                  <step.icon size={16} />
+                </div>
+                <div className="flex-1">
+                  <div className={`text-sm font-medium ${
+                    step.completed ? 'text-green-400' : 'text-gray-200'
+                  }`}>
+                    {step.title}
+                  </div>
+                  <div className="text-xs text-gray-400">
+                    {step.description}
+                  </div>
+                </div>
+                {index < progressSteps.length - 1 && (
+                  <ArrowRight size={16} className="text-gray-500" />
+                )}
+              </div>
+            ))}
+          </div>
         </div>
 
         {/* Current Status */}
@@ -133,6 +204,9 @@ export const VerificationPopup: React.FC<VerificationPopupProps> = ({
               <li>2. Use the command: <code className="bg-blue-900/50 px-1 rounded">/verify {userStatus.email}</code></li>
               <li>3. Stay in the server to maintain verification</li>
             </ol>
+            <div className="mt-3 text-xs text-blue-300">
+              <strong>Note:</strong> After verifying, you may need to wait a few minutes for the verification to process.
+            </div>
           </div>
         )}
 

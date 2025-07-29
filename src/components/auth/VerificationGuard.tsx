@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { usePageAccess, UserVerificationStatus, PageAccessRequirements } from '../../hooks/usePageAccess';
 import { VerificationPopup } from './VerificationPopup';
+import { useAuth } from '../../context/AuthContext';
 
 interface VerificationGuardProps {
   children: React.ReactNode;
@@ -13,6 +14,7 @@ export const VerificationGuard: React.FC<VerificationGuardProps> = ({
   pagePath,
   fallbackComponent
 }) => {
+  const { user } = useAuth();
   const { hasAccess, requirement, userStatus, loading, error, recheckAccess } = usePageAccess(pagePath);
   const [showPopup, setShowPopup] = useState(false);
 
@@ -67,16 +69,51 @@ export const VerificationGuard: React.FC<VerificationGuardProps> = ({
     );
   }
 
-  // If user doesn't have access and we have requirements, show popup
+  // User is not logged in at all - show Account Required message
+  if (!user) {
+    return (
+      <>
+        {fallbackComponent || (
+          <div className="flex items-center justify-center min-h-[200px]">
+            <div className="text-center max-w-md">
+              <div className="text-gray-400 mb-4 text-4xl">🔐</div>
+              <h2 className="text-xl font-bold text-gray-200 mb-2">Account Required</h2>
+              <p className="text-gray-400 mb-4">
+                You need to create an account to access this page. 
+                {requirement.requires_discord_verification && ' After creating an account, you\'ll also need to verify through Discord.'}
+              </p>
+              <div className="space-y-3">
+                <button 
+                  onClick={() => window.location.href = '/auth'}
+                  className="btn btn-primary w-full"
+                >
+                  Create Account
+                </button>
+                <p className="text-xs text-gray-500">
+                  Already have an account? <a href="/auth" className="text-blue-400 hover:underline">Sign in</a>
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
+      </>
+    );
+  }
+
+  // User is logged in but doesn't meet requirements - show Verification Required message
   if (userStatus && requirement) {
     return (
       <>
         {fallbackComponent || (
           <div className="flex items-center justify-center min-h-[200px]">
-            <div className="text-center">
-              <div className="text-gray-400 mb-2">🔒 Access Required</div>
-              <p className="text-gray-500 text-sm mb-4">
-                This page requires {requirement.min_trust_level >= 0.5 ? 'Discord verification' : 'higher trust level'}.
+            <div className="text-center max-w-md">
+              <div className="text-gray-400 mb-4 text-4xl">🔒</div>
+              <h2 className="text-xl font-bold text-gray-200 mb-2">Verification Required</h2>
+              <p className="text-gray-400 mb-4">
+                {requirement.requires_discord_verification && !userStatus.is_discord_verified 
+                  ? 'This page requires Discord verification. Join our Discord server and verify your account to continue.'
+                  : 'This page requires additional verification to access.'
+                }
               </p>
               <button 
                 onClick={() => setShowPopup(true)}
