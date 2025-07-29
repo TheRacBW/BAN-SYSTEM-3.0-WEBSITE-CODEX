@@ -53,23 +53,32 @@ const UserPrivilegeEditor: React.FC<Props> = ({ userId, onClose, onUpdated }) =>
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-      <div className="bg-white dark:bg-gray-800 rounded-lg p-6 max-w-md w-full mx-4">
-        <h3 className="text-xl font-bold mb-4">Edit User Privileges</h3>
+      <div className="bg-[#232b36] dark:bg-gray-800 rounded-lg p-6 max-w-md w-full mx-4 border border-[#3a4250]">
+        <h3 className="text-xl font-bold mb-4 text-gray-200">Edit User Privileges</h3>
         {loading ? (
-          <div>Loading...</div>
+          <div className="text-gray-200">Loading...</div>
         ) : user ? (
           <>
-            <div className="mb-2">Username: <b>{user.username}</b></div>
-            <div className="mb-2">Email: {user.email}</div>
+            <div className="mb-2 text-gray-200">Username: <b className="text-white">{user.username}</b></div>
+            <div className="mb-2 text-gray-200">Email: <span className="text-white">{user.email}</span></div>
             <div className="mb-4">
-              <label className="flex items-center gap-2">
-                <input type="checkbox" checked={isAdmin} onChange={e => setIsAdmin(e.target.checked)} />
+              <label className="flex items-center gap-2 text-gray-200">
+                <input 
+                  type="checkbox" 
+                  checked={isAdmin} 
+                  onChange={e => setIsAdmin(e.target.checked)}
+                  className="checkbox checkbox-sm"
+                />
                 <span>Admin</span>
               </label>
             </div>
             <div className="mb-4">
-              <label className="block mb-1">Trust Level:</label>
-              <select className="w-full p-2 border rounded dark:bg-gray-700 dark:border-gray-600" value={trustLevel} onChange={e => setTrustLevel(Number(e.target.value) as TrustLevel)}>
+              <label className="block mb-1 text-gray-200">Trust Level:</label>
+              <select 
+                className="w-full p-2 border rounded bg-[#323a45] text-gray-200 border-[#3a4250] focus:outline-none focus:ring-2 focus:ring-blue-500" 
+                value={trustLevel} 
+                onChange={e => setTrustLevel(Number(e.target.value) as TrustLevel)}
+              >
                 {TRUST_LEVEL_CONFIGS.map(config => (
                   <option key={config.level} value={config.level}>
                     {config.icon} {config.label}
@@ -79,11 +88,11 @@ const UserPrivilegeEditor: React.FC<Props> = ({ userId, onClose, onUpdated }) =>
             </div>
             <div className="flex justify-end gap-2 mt-6">
               <button className="btn btn-primary" onClick={handleSave}>Save</button>
-              <button className="btn" onClick={onClose}>Cancel</button>
+              <button className="btn btn-ghost text-gray-200" onClick={onClose}>Cancel</button>
             </div>
           </>
         ) : (
-          <div>User not found.</div>
+          <div className="text-gray-200">User not found.</div>
         )}
       </div>
     </div>

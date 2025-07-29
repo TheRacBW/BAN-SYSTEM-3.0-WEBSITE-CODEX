@@ -2,6 +2,7 @@ import React, { useEffect, useState } from "react";
 import { supabase } from "../../lib/supabase";
 import { FaCheck, FaTimes, FaInfoCircle } from "react-icons/fa";
 import { TRUST_LEVEL_CONFIGS, getTrustLevelBadge } from "../../types/trustLevels";
+import './UserListTable.css'; // For custom transitions and modern styles
 
 interface User {
   id: string;
@@ -65,38 +66,36 @@ const UserListTable: React.FC<Props> = ({ onEditUser, bulkSelection, setBulkSele
   };
 
   return (
-    <div className="space-y-4">
-      <div className="flex flex-col md:flex-row gap-4 items-start md:items-center justify-between">
-        <div className="flex flex-col md:flex-row gap-4 items-start md:items-center">
-          <input
-            type="text"
-            placeholder="Search users..."
-            className="input input-bordered input-sm"
-            value={search}
-            onChange={e => setSearch(e.target.value)}
-          />
-          <select className="select select-sm" value={sort} onChange={e => setSort(e.target.value as any)}>
-            <option value="created_at">Created</option>
-            <option value="last_login">Last Login</option>
-            <option value="trust_level">Trust Level</option>
-          </select>
-          <select className="select select-sm" value={order} onChange={e => setOrder(e.target.value as any)}>
-            <option value="desc">Desc</option>
-            <option value="asc">Asc</option>
-          </select>
-          <select className="select select-sm" value={trustFilter} onChange={e => setTrustFilter(e.target.value === "" ? "" : Number(e.target.value))}>
-            <option value="">All Trust Levels</option>
-            {TRUST_LEVEL_CONFIGS.map(config => (
-              <option key={config.level} value={config.level}>
-                {config.icon} {config.label}
-              </option>
-            ))}
-          </select>
-        </div>
-        <div className="flex items-center gap-2">
-          <span className="text-sm text-gray-600">Trust Level Guide:</span>
-          <span className="tooltip ml-2" data-tip="Trust Level: 0=New (lowest), 3=Moderator (highest)"><FaInfoCircle color="#3b82f6" /></span>
-        </div>
+    <div className="rounded-xl shadow-lg p-8 mb-8" style={{ background: '#232b36' }}>
+      <div className="flex items-center mb-4 gap-2">
+        <input
+          className="input input-bordered flex-1 rounded-md px-4 py-2 bg-[#323a45] text-gray-200 placeholder:text-gray-400 border border-[#3a4250] focus:outline-none focus:ring-2 focus:ring-blue-500"
+          placeholder="Search username/email"
+          value={search}
+          onChange={e => setSearch(e.target.value)}
+        />
+        <select value={sort} onChange={e => setSort(e.target.value as any)} className="select select-bordered modern-select rounded-md px-4 py-2 bg-[#323a45] text-gray-200 border border-[#3a4250] focus:outline-none focus:ring-2 focus:ring-blue-500">
+          <option value="created_at">Registration Date</option>
+          <option value="last_login">Last Login</option>
+          <option value="trust_level">Trust Level</option>
+        </select>
+        <select value={order} onChange={e => setOrder(e.target.value as any)} className="select select-bordered modern-select rounded-md px-4 py-2 bg-[#323a45] text-gray-200 border border-[#3a4250] focus:outline-none focus:ring-2 focus:ring-blue-500">
+          <option value="desc">Desc</option>
+          <option value="asc">Asc</option>
+        </select>
+        <select
+          value={trustFilter}
+          onChange={e => setTrustFilter(e.target.value === "" ? "" : Number(e.target.value))}
+          className="select select-bordered modern-select rounded-md px-4 py-2 bg-[#323a45] text-gray-200 border border-[#3a4250] focus:outline-none focus:ring-2 focus:ring-blue-500"
+        >
+          <option value="">All Trust Levels</option>
+          {TRUST_LEVEL_CONFIGS.map(config => (
+            <option key={config.level} value={config.level}>
+              {config.icon} {config.label}
+            </option>
+          ))}
+        </select>
+        <span className="tooltip ml-2" data-tip="Trust Level: 0=New (lowest), 3=Moderator (highest)"><FaInfoCircle color="#3b82f6" /></span>
       </div>
       <div className="overflow-x-auto user-list-scrollbar" style={{ maxHeight: '500px', overflowY: 'scroll', width: '100%' }}>
         <table className="table w-full modern-table">
@@ -117,17 +116,18 @@ const UserListTable: React.FC<Props> = ({ onEditUser, bulkSelection, setBulkSele
             ) : users.length === 0 ? (
               <tr><td colSpan={7}>No users found.</td></tr>
             ) : (
-              users.map(u => (
-                <tr key={u.id} className="hover:bg-base-300 transition-colors">
+              users.map((u, index) => (
+                <tr key={u.id} className={`hover:bg-base-300 transition-colors ${index % 2 === 0 ? 'bg-[#2a323c]' : 'bg-[#232b36]'}`}>
                   <td>
                     <input
                       type="checkbox"
                       checked={bulkSelection.includes(u.id)}
                       onChange={() => toggleSelect(u.id)}
+                      className="checkbox checkbox-sm"
                     />
                   </td>
-                  <td>{u.username}</td>
-                  <td>{u.email}</td>
+                  <td className="text-gray-200">{u.username}</td>
+                  <td className="text-gray-200">{u.email}</td>
                   <td>{u.is_admin ? <FaCheck color="#22c55e" /> : <FaTimes color="#ef4444" />}</td>
                   <td>
                     {(() => {
@@ -139,7 +139,7 @@ const UserListTable: React.FC<Props> = ({ onEditUser, bulkSelection, setBulkSele
                       );
                     })()}
                   </td>
-                  <td>{new Date(u.created_at).toLocaleDateString()}</td>
+                  <td className="text-gray-200">{new Date(u.created_at).toLocaleDateString()}</td>
                   <td>
                     <button className="btn btn-xs btn-primary rounded-lg shadow" onClick={() => onEditUser(u.id)}>
                       Edit
