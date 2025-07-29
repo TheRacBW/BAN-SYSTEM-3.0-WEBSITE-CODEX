@@ -4,12 +4,15 @@ import { Moon, Sun, User, LogOut, Plus, TrendingUp, Settings, Home, Users, Troph
 import { useTheme } from '../context/ThemeContext';
 import { useAuth } from '../context/AuthContext';
 import { useRef, useEffect, useState } from 'react';
+import { VerificationStatusBadge } from './auth';
+import { usePageAccess } from '../hooks/usePageAccess';
 
 const Header: React.FC = () => {
   const { theme, toggleTheme } = useTheme();
   const { user, signOut, isAdmin } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
+  const { userStatus } = usePageAccess('/');
 
   // For sliding selection bar
   const navContainerRef = useRef<HTMLDivElement>(null);
@@ -141,6 +144,9 @@ const Header: React.FC = () => {
             
             {user ? (
               <div className="flex items-center gap-2 mr-6">
+                <div className="flex items-center gap-2 mr-2">
+                  <VerificationStatusBadge userStatus={userStatus} showDetails={false} />
+                </div>
                 <Link
                   to="/dashboard"
                   className="btn btn-outline flex items-center gap-2"

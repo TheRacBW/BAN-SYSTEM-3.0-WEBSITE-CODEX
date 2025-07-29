@@ -3,10 +3,13 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { supabase } from '../lib/supabase';
 import { Save, Lock, User, AlertCircle, Check } from 'lucide-react';
+import { UserVerificationDashboard } from '../components/auth';
+import { usePageAccess } from '../hooks/usePageAccess';
 
 const SettingsPage = () => {
   const { user } = useAuth();
   const navigate = useNavigate();
+  const { userStatus } = usePageAccess('/settings');
   const [currentPassword, setCurrentPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
@@ -168,24 +171,15 @@ const SettingsPage = () => {
   }
 
   return (
-    <div className="max-w-2xl mx-auto">
-      <h1 className="text-2xl font-bold mb-6">Account Settings</h1>
+    <div className="container mx-auto px-4 py-8">
+      <h1 className="text-3xl font-bold text-gray-200 mb-8">Settings</h1>
 
-      {error && (
-        <div className="mb-6 p-4 bg-red-50 dark:bg-red-900/20 text-red-700 dark:text-red-300 rounded-lg flex items-center gap-2">
-          <AlertCircle size={20} />
-          {error}
-        </div>
-      )}
+      {/* Verification Dashboard */}
+      <div className="mb-8">
+        <UserVerificationDashboard userStatus={userStatus} />
+      </div>
 
-      {success && (
-        <div className="mb-6 p-4 bg-green-50 dark:bg-green-900/20 text-green-700 dark:text-green-300 rounded-lg flex items-center gap-2">
-          <Check size={20} />
-          {success}
-        </div>
-      )}
-
-      <div className="space-y-6">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
         {/* Username Change Form */}
         <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
           <h2 className="text-xl font-semibold mb-4 flex items-center gap-2">

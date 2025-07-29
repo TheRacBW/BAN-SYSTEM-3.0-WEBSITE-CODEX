@@ -8,6 +8,7 @@ import PlayerCard from '../components/PlayerCard';
 import { BEDWARS_PLACE_ID, BEDWARS_UNIVERSE_ID } from '../constants/bedwars';
 import { useUserPins } from '../hooks/useUserPins';
 import RobloxStatus from '../components/RobloxStatus';
+import { VerificationGuard } from '../components/auth';
 
 // Shared refresh hook for coordinated player tracking refresh
 function useSharedPlayerRefresh(user: any) {
@@ -641,277 +642,279 @@ export default function PlayersPage() {
   }
 
   return (
-    <div className="relative space-y-6">
-      {isRefreshing && (
-        <div className="absolute top-2 right-2 z-10">
-          <div className="bg-blue-500/90 text-white px-3 py-1 rounded-full text-sm flex items-center gap-2">
-            <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24" stroke="currentColor"><circle cx="12" cy="12" r="10" strokeWidth="4" className="opacity-25" /><path d="M4 12a8 8 0 018-8v8z" className="opacity-75" /></svg>
-            Updating...
-          </div>
-        </div>
-      )}
-      <div className="flex justify-between items-center">
-        <h2 className="text-2xl font-bold">Players</h2>
-        <div className="flex gap-2">
-          <button
-            onClick={handleRefreshAll}
-            disabled={isRefreshing}
-            className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50"
-          >
-            {isRefreshing ? (
-              <>
-                <RefreshCw className="w-4 h-4 animate-spin" />
-                Refreshing...
-              </>
-            ) : (
-              <>
-                <RefreshCw className="w-4 h-4" />
-                Refresh All
-              </>
-            )}
-          </button>
-          <button
-            onClick={() => setShowAddModal(true)}
-            className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
-          >
-            <Plus size={16} />
-            Add Player
-          </button>
-        </div>
-      </div>
-
-      <div className="mb-6 space-y-4">
-        <div className="flex flex-col md:flex-row gap-4 items-start md:items-center">
-          <div className="relative flex-1">
-            <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-              <Search size={18} className="text-gray-400" />
+    <VerificationGuard pagePath="/tracker">
+      <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
+        {isRefreshing && (
+          <div className="absolute top-2 right-2 z-10">
+            <div className="bg-blue-500/90 text-white px-3 py-1 rounded-full text-sm flex items-center gap-2">
+              <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24" stroke="currentColor"><circle cx="12" cy="12" r="10" strokeWidth="4" className="opacity-25" /><path d="M4 12a8 8 0 018-8v8z" className="opacity-75" /></svg>
+              Updating...
             </div>
-            <input
-              type="text"
-              placeholder="Search players by alias or Roblox username..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="pl-10 pr-4 py-2 w-full border border-gray-300 dark:border-gray-600 rounded-md 
-                bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100"
-            />
           </div>
-          
-          <div className="flex flex-wrap gap-2">
-            <select
-              value={sortBy}
-              onChange={(e) => setSortBy(e.target.value as SortOption)}
-              className="px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md 
-                bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100"
-            >
-              <option value="alias_asc">Name (A-Z)</option>
-              <option value="alias_desc">Name (Z-A)</option>
-              <option value="online">Online Status</option>
-              <option value="rank">Highest Rank</option>
-            </select>
-
+        )}
+        <div className="flex justify-between items-center">
+          <h2 className="text-2xl font-bold">Players</h2>
+          <div className="flex gap-2">
             <button
-              onClick={() => setShowOnlineOnly(!showOnlineOnly)}
-              className={`btn ${
-                showOnlineOnly 
-                  ? 'bg-green-500 hover:bg-green-600 text-white' 
-                  : 'btn-outline'
-              } flex items-center gap-2`}
+              onClick={handleRefreshAll}
+              disabled={isRefreshing}
+              className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50"
             >
-              <Users size={18} />
-              Online Only
+              {isRefreshing ? (
+                <>
+                  <RefreshCw className="w-4 h-4 animate-spin" />
+                  Refreshing...
+                </>
+              ) : (
+                <>
+                  <RefreshCw className="w-4 h-4" />
+                  Refresh All
+                </>
+              )}
             </button>
-
             <button
-              onClick={() => setShowInBedwarsOnly(!showInBedwarsOnly)}
-              className={`btn ${
-                showInBedwarsOnly 
-                  ? 'bg-blue-500 hover:bg-blue-600 text-white' 
-                  : 'btn-outline'
-              } flex items-center gap-2`}
+              onClick={() => setShowAddModal(true)}
+              className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
             >
-              <Gamepad2 size={18} />
-              In Bedwars
+              <Plus size={16} />
+              Add Player
             </button>
+          </div>
+        </div>
 
-            {user && (
+        <div className="mb-6 space-y-4">
+          <div className="flex flex-col md:flex-row gap-4 items-start md:items-center">
+            <div className="relative flex-1">
+              <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                <Search size={18} className="text-gray-400" />
+              </div>
+              <input
+                type="text"
+                placeholder="Search players by alias or Roblox username..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="pl-10 pr-4 py-2 w-full border border-gray-300 dark:border-gray-600 rounded-md 
+                  bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100"
+              />
+            </div>
+            
+            <div className="flex flex-wrap gap-2">
+              <select
+                value={sortBy}
+                onChange={(e) => setSortBy(e.target.value as SortOption)}
+                className="px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md 
+                  bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100"
+              >
+                <option value="alias_asc">Name (A-Z)</option>
+                <option value="alias_desc">Name (Z-A)</option>
+                <option value="online">Online Status</option>
+                <option value="rank">Highest Rank</option>
+              </select>
+
               <button
-                onClick={() => setShowPinnedOnly(!showPinnedOnly)}
+                onClick={() => setShowOnlineOnly(!showOnlineOnly)}
                 className={`btn ${
-                  showPinnedOnly 
-                    ? 'bg-yellow-500 hover:bg-yellow-600 text-white' 
+                  showOnlineOnly 
+                    ? 'bg-green-500 hover:bg-green-600 text-white' 
                     : 'btn-outline'
                 } flex items-center gap-2`}
               >
-                <Pin size={18} />
-                Pinned Only
+                <Users size={18} />
+                Online Only
               </button>
-            )}
-          </div>
-        </div>
-      </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {sortedPlayers.map(player => (
-          <div key={player.id} onClick={() => setModalPlayer(player)}>
-            <PlayerCard
-              player={player}
-              isAdmin={isAdmin}
-              onDelete={handleDeletePlayer}
-              isPinned={isPinned(player.id)}
-              onPinToggle={handlePinToggle}
-              showPinIcon={!!user}
-              onPlayerUpdate={handlePlayerUpdate}
-            />
-          </div>
-        ))}
-      </div>
-
-      {modalPlayer && (
-        <PlayerCard
-          key={modalPlayer.id}
-          player={modalPlayer}
-          isAdmin={isAdmin}
-          onDelete={handleDeletePlayer}
-          isPinned={isPinned(modalPlayer.id)}
-          onPinToggle={handlePinToggle}
-          showPinIcon={!!user}
-          onPlayerUpdate={handlePlayerUpdate}
-          onNavigateToPlayer={handleNavigateToPlayer}
-          onClose={() => setModalPlayer(null)}
-          isModal={true}
-        />
-      )}
-
-      {showAddModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white dark:bg-gray-800 rounded-lg p-6 max-w-md w-full mx-4">
-            <h3 className="text-xl font-bold mb-4">Add New Player</h3>
-            
-            <div className="space-y-4">
-              <div>
-                <label className="block text-sm font-medium mb-1">
-                  Player Alias
-                </label>
-                <input
-                  type="text"
-                  value={newAlias}
-                  onChange={(e) => setNewAlias(e.target.value)}
-                  className="w-full p-2 border rounded dark:bg-gray-700 dark:border-gray-600"
-                  placeholder="Enter player alias"
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium mb-1">
-                  YouTube Channel (Optional)
-                </label>
-                <input
-                  type="text"
-                  value={newYoutubeChannel}
-                  onChange={(e) => setNewYoutubeChannel(e.target.value)}
-                  className="w-full p-2 border rounded dark:bg-gray-700 dark:border-gray-600"
-                  placeholder="Enter YouTube channel URL"
-                />
-              </div>
-
-              <div className="flex justify-end gap-3">
-                <button
-                  onClick={() => {
-                    setShowAddModal(false);
-                    setNewAlias('');
-                    setNewYoutubeChannel('');
-                  }}
-                  className="btn btn-outline"
-                >
-                  Cancel
-                </button>
-                <button
-                  onClick={handleAddPlayer}
-                  className="btn btn-primary"
-                >
-                  Add Player
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Teammate Modal */}
-      {selectedTeammate && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white dark:bg-gray-800 rounded-lg p-6 max-w-4xl w-full mx-4 max-h-[90vh] overflow-y-auto">
-            <div className="flex justify-between items-start mb-6">
-              <div>
-                <h2 className="text-2xl font-bold">{selectedTeammate.alias}</h2>
-                <div className="flex items-center gap-2 mt-2">
-                  <Users size={18} className="text-gray-500" />
-                  <span className="text-gray-600 dark:text-gray-400">
-                    Teammate of {players.find(p => p.id === selectedTeammate.id)?.alias || 'Unknown'}
-                  </span>
-                </div>
-              </div>
               <button
-                onClick={() => setSelectedTeammate(null)}
-                className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
+                onClick={() => setShowInBedwarsOnly(!showInBedwarsOnly)}
+                className={`btn ${
+                  showInBedwarsOnly 
+                    ? 'bg-blue-500 hover:bg-blue-600 text-white' 
+                    : 'btn-outline'
+                } flex items-center gap-2`}
               >
-                <X size={24} />
+                <Gamepad2 size={18} />
+                In Bedwars
               </button>
+
+              {user && (
+                <button
+                  onClick={() => setShowPinnedOnly(!showPinnedOnly)}
+                  className={`btn ${
+                    showPinnedOnly 
+                      ? 'bg-yellow-500 hover:bg-yellow-600 text-white' 
+                      : 'btn-outline'
+                  } flex items-center gap-2`}
+                >
+                  <Pin size={18} />
+                  Pinned Only
+                </button>
+              )}
             </div>
+          </div>
+        </div>
 
-            <div className="space-y-8">
-              <section>
-                <h3 className="text-lg font-semibold mb-4">Known Accounts</h3>
-                <div className="space-y-4">
-                  {selectedTeammate.accounts?.map(account => (
-                    <div 
-                      key={account.id}
-                      className="flex items-center justify-between bg-gray-50 dark:bg-gray-700/50 p-4 rounded-lg"
-                    >
-                      <div className="flex items-center gap-4">
-                        <div>
-                          <RobloxStatus 
-                            username={account.status?.username || account.user_id.toString()}
-                            isOnline={account.status?.isOnline || false}
-                            isInGame={account.status?.isInGame || false}
-                            inBedwars={account.status?.inBedwars || false}
-                            lastUpdated={account.status?.lastUpdated}
-                          />
-                        </div>
-                        {account.rank && Array.isArray(account.rank) && account.rank.length > 0 && (
-                          <img
-                            src={account.rank[0].account_ranks.image_url}
-                            alt={account.rank[0].account_ranks.name}
-                            className="w-8 h-8"
-                            title={account.rank[0].account_ranks.name}
-                          />
-                        )}
-                        {account.status?.inBedwars && (
-                          <img
-                            src="https://cdn2.steamgriddb.com/icon/3ad9ecf4b4a26b7671e09283f001d626.png"
-                            alt="BedWars"
-                            className="w-8 h-8"
-                            title="In BedWars"
-                          />
-                        )}
-                      </div>
-                    </div>
-                  ))}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          {sortedPlayers.map(player => (
+            <div key={player.id} onClick={() => setModalPlayer(player)}>
+              <PlayerCard
+                player={player}
+                isAdmin={isAdmin}
+                onDelete={handleDeletePlayer}
+                isPinned={isPinned(player.id)}
+                onPinToggle={handlePinToggle}
+                showPinIcon={!!user}
+                onPlayerUpdate={handlePlayerUpdate}
+              />
+            </div>
+          ))}
+        </div>
+
+        {modalPlayer && (
+          <PlayerCard
+            key={modalPlayer.id}
+            player={modalPlayer}
+            isAdmin={isAdmin}
+            onDelete={handleDeletePlayer}
+            isPinned={isPinned(modalPlayer.id)}
+            onPinToggle={handlePinToggle}
+            showPinIcon={!!user}
+            onPlayerUpdate={handlePlayerUpdate}
+            onNavigateToPlayer={handleNavigateToPlayer}
+            onClose={() => setModalPlayer(null)}
+            isModal={true}
+          />
+        )}
+
+        {showAddModal && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+            <div className="bg-white dark:bg-gray-800 rounded-lg p-6 max-w-md w-full mx-4">
+              <h3 className="text-xl font-bold mb-4">Add New Player</h3>
+              
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium mb-1">
+                    Player Alias
+                  </label>
+                  <input
+                    type="text"
+                    value={newAlias}
+                    onChange={(e) => setNewAlias(e.target.value)}
+                    className="w-full p-2 border rounded dark:bg-gray-700 dark:border-gray-600"
+                    placeholder="Enter player alias"
+                  />
                 </div>
-              </section>
 
-              <div className="flex justify-center pt-4">
+                <div>
+                  <label className="block text-sm font-medium mb-1">
+                    YouTube Channel (Optional)
+                  </label>
+                  <input
+                    type="text"
+                    value={newYoutubeChannel}
+                    onChange={(e) => setNewYoutubeChannel(e.target.value)}
+                    className="w-full p-2 border rounded dark:bg-gray-700 dark:border-gray-600"
+                    placeholder="Enter YouTube channel URL"
+                  />
+                </div>
+
+                <div className="flex justify-end gap-3">
+                  <button
+                    onClick={() => {
+                      setShowAddModal(false);
+                      setNewAlias('');
+                      setNewYoutubeChannel('');
+                    }}
+                    className="btn btn-outline"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    onClick={handleAddPlayer}
+                    className="btn btn-primary"
+                  >
+                    Add Player
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Teammate Modal */}
+        {selectedTeammate && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+            <div className="bg-white dark:bg-gray-800 rounded-lg p-6 max-w-4xl w-full mx-4 max-h-[90vh] overflow-y-auto">
+              <div className="flex justify-between items-start mb-6">
+                <div>
+                  <h2 className="text-2xl font-bold">{selectedTeammate.alias}</h2>
+                  <div className="flex items-center gap-2 mt-2">
+                    <Users size={18} className="text-gray-500" />
+                    <span className="text-gray-600 dark:text-gray-400">
+                      Teammate of {players.find(p => p.id === selectedTeammate.id)?.alias || 'Unknown'}
+                    </span>
+                  </div>
+                </div>
                 <button
                   onClick={() => setSelectedTeammate(null)}
-                  className="btn btn-outline"
+                  className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
                 >
-                  Close
+                  <X size={24} />
                 </button>
+              </div>
+
+              <div className="space-y-8">
+                <section>
+                  <h3 className="text-lg font-semibold mb-4">Known Accounts</h3>
+                  <div className="space-y-4">
+                    {selectedTeammate.accounts?.map(account => (
+                      <div 
+                        key={account.id}
+                        className="flex items-center justify-between bg-gray-50 dark:bg-gray-700/50 p-4 rounded-lg"
+                      >
+                        <div className="flex items-center gap-4">
+                          <div>
+                            <RobloxStatus 
+                              username={account.status?.username || account.user_id.toString()}
+                              isOnline={account.status?.isOnline || false}
+                              isInGame={account.status?.isInGame || false}
+                              inBedwars={account.status?.inBedwars || false}
+                              lastUpdated={account.status?.lastUpdated}
+                            />
+                          </div>
+                          {account.rank && Array.isArray(account.rank) && account.rank.length > 0 && (
+                            <img
+                              src={account.rank[0].account_ranks.image_url}
+                              alt={account.rank[0].account_ranks.name}
+                              className="w-8 h-8"
+                              title={account.rank[0].account_ranks.name}
+                            />
+                          )}
+                          {account.status?.inBedwars && (
+                            <img
+                              src="https://cdn2.steamgriddb.com/icon/3ad9ecf4b4a26b7671e09283f001d626.png"
+                              alt="BedWars"
+                              className="w-8 h-8"
+                              title="In BedWars"
+                            />
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </section>
+
+                <div className="flex justify-center pt-4">
+                  <button
+                    onClick={() => setSelectedTeammate(null)}
+                    className="btn btn-outline"
+                  >
+                    Close
+                  </button>
+                </div>
               </div>
             </div>
           </div>
-        </div>
-      )}
-    </div>
+        )}
+      </div>
+    </VerificationGuard>
   );
 }

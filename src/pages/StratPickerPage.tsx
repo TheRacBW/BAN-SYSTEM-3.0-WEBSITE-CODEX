@@ -12,6 +12,7 @@ import { supabase } from '../lib/supabase';
 import { useKitReload } from '../hooks/useKitReload';
 import { useNavigate } from 'react-router-dom';
 import { KitType, KitTypeColors, KitTypeIcons } from '../types';
+import { VerificationGuard } from '../components/auth';
 
 const TABS = [
   { id: 'banaware', label: 'Ban-Aware Kit Recommendations', icon: <Lightbulb size={20} /> },
@@ -434,51 +435,53 @@ const StratPickerPage: React.FC = () => {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
-      <div className="w-full bg-[#232B39] dark:bg-gray-800 border-b border-gray-200/10 dark:border-gray-700/40 px-0">
-        <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4 px-8 py-6 w-full">
-          <h1 className="text-3xl font-semibold text-gray-900 dark:text-white tracking-wide mb-1" style={{ letterSpacing: '0.01em' }}>
-            Strat Picker
-          </h1>
-        </div>
-      </div>
-      <div className="container mx-auto px-4 py-6">
-        {/* Tabs */}
-        <div className="mb-6">
-          <div className="flex space-x-1 bg-gray-100 dark:bg-gray-700 p-1 rounded-lg">
-            {TABS.map((tab) => (
-              <button
-                key={tab.id}
-                onClick={() => setActiveTab(tab.id)}
-                className={`flex items-center gap-2 px-4 py-2 rounded-md text-sm font-medium transition-all ${
-                  activeTab === tab.id
-                    ? 'bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 shadow-sm'
-                    : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100'
-                }`}
-              >
-                {tab.icon}
-                <span className="hidden sm:inline">{tab.label}</span>
-              </button>
-            ))}
+    <VerificationGuard pagePath="/strategies">
+      <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
+        <div className="w-full bg-[#232B39] dark:bg-gray-800 border-b border-gray-200/10 dark:border-gray-700/40 px-0">
+          <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4 px-8 py-6 w-full">
+            <h1 className="text-3xl font-semibold text-gray-900 dark:text-white tracking-wide mb-1" style={{ letterSpacing: '0.01em' }}>
+              Strat Picker
+            </h1>
           </div>
         </div>
-        {/* Tab Content with Animation */}
-        <div className="space-y-6 relative">
-          <AnimatePresence mode="wait">
-            <motion.div
-              key={activeTab}
-              initial={{ x: 40, opacity: 0 }}
-              animate={{ x: 0, opacity: 1 }}
-              exit={{ x: -40, opacity: 0 }}
-              transition={{ duration: 0.28, ease: 'easeInOut' }}
-              className="w-full"
-            >
-              {tabContent}
-            </motion.div>
-          </AnimatePresence>
+        <div className="container mx-auto px-4 py-6">
+          {/* Tabs */}
+          <div className="mb-6">
+            <div className="flex space-x-1 bg-gray-100 dark:bg-gray-700 p-1 rounded-lg">
+              {TABS.map((tab) => (
+                <button
+                  key={tab.id}
+                  onClick={() => setActiveTab(tab.id)}
+                  className={`flex items-center gap-2 px-4 py-2 rounded-md text-sm font-medium transition-all ${
+                    activeTab === tab.id
+                      ? 'bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 shadow-sm'
+                      : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100'
+                  }`}
+                >
+                  {tab.icon}
+                  <span className="hidden sm:inline">{tab.label}</span>
+                </button>
+              ))}
+            </div>
+          </div>
+          {/* Tab Content with Animation */}
+          <div className="space-y-6 relative">
+            <AnimatePresence mode="wait">
+              <motion.div
+                key={activeTab}
+                initial={{ x: 40, opacity: 0 }}
+                animate={{ x: 0, opacity: 1 }}
+                exit={{ x: -40, opacity: 0 }}
+                transition={{ duration: 0.28, ease: 'easeInOut' }}
+                className="w-full"
+              >
+                {tabContent}
+              </motion.div>
+            </AnimatePresence>
+          </div>
         </div>
       </div>
-    </div>
+    </VerificationGuard>
   );
 };
 
