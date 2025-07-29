@@ -1,7 +1,6 @@
 import React, { useState } from "react";
 import { supabase } from "../../lib/supabase";
-
-type TrustLevel = 0 | 1 | 2;
+import { TrustLevel, TRUST_LEVEL_CONFIGS } from "../../types/trustLevels";
 
 interface Props {
   selectedUserIds: string[];
@@ -46,9 +45,11 @@ const BulkUserActions: React.FC<Props> = ({ selectedUserIds, onActionComplete })
       <button className="btn btn-xs btn-info ml-2" onClick={() => handleBulkAdmin(true)}>Make Admin</button>
       <button className="btn btn-xs btn-warning ml-2" onClick={() => handleBulkAdmin(false)}>Remove Admin</button>
       <select className="select select-xs ml-2" value={trustLevel} onChange={e => setTrustLevel(Number(e.target.value) as TrustLevel)}>
-        <option value={0}>New</option>
-        <option value={1}>Trusted</option>
-        <option value={2}>Moderator</option>
+        {TRUST_LEVEL_CONFIGS.map(config => (
+          <option key={config.level} value={config.level}>
+            {config.icon} {config.label}
+          </option>
+        ))}
       </select>
       <button className="btn btn-xs btn-success ml-2" onClick={handleBulkTrust}>Set Trust Level</button>
     </div>

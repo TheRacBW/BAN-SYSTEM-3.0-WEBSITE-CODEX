@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { supabase } from "../../lib/supabase";
+import { TrustLevel, TRUST_LEVEL_CONFIGS } from "../../types/trustLevels";
 
 interface User {
   id: string;
@@ -8,8 +9,6 @@ interface User {
   is_admin: boolean;
   trust_level: number;
 }
-
-type TrustLevel = 0 | 1 | 2;
 
 interface Props {
   userId: string | null;
@@ -71,9 +70,11 @@ const UserPrivilegeEditor: React.FC<Props> = ({ userId, onClose, onUpdated }) =>
             <div className="mb-4">
               <label className="block mb-1">Trust Level:</label>
               <select className="w-full p-2 border rounded dark:bg-gray-700 dark:border-gray-600" value={trustLevel} onChange={e => setTrustLevel(Number(e.target.value) as TrustLevel)}>
-                <option value={0}>New</option>
-                <option value={1}>Trusted</option>
-                <option value={2}>Moderator</option>
+                {TRUST_LEVEL_CONFIGS.map(config => (
+                  <option key={config.level} value={config.level}>
+                    {config.icon} {config.label}
+                  </option>
+                ))}
               </select>
             </div>
             <div className="flex justify-end gap-2 mt-6">
