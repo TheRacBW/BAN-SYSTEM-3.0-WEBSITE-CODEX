@@ -800,17 +800,19 @@ export const getRecentRPChanges = async (usernames: string[]): Promise<Record<st
  * Updated to support user_id-based tracking
  */
 export async function getCurrentlyRankingPlayers(): Promise<LeaderboardEntry[]> {
-  // 1. Get the most recent leaderboard update time
+  // 1. Get the second-to-last leaderboard update time (wider net)
   const { data: leaderboardRows, error: leaderboardError } = await supabase
     .from('leaderboard')
     .select('inserted_at')
     .order('inserted_at', { ascending: false })
-    .limit(1);
+    .limit(2);
   if (leaderboardError) {
     console.error('❌ Error fetching leaderboard update time:', leaderboardError);
     return [];
   }
-  const lastUpdate = leaderboardRows && leaderboardRows.length > 0 ? leaderboardRows[0].inserted_at : null;
+  // Use the second-to-last update time (index 1) instead of the most recent (index 0)
+  const lastUpdate = leaderboardRows && leaderboardRows.length > 1 ? leaderboardRows[1].inserted_at : 
+                    (leaderboardRows && leaderboardRows.length > 0 ? leaderboardRows[0].inserted_at : null);
   if (!lastUpdate) return [];
 
   // 2. Get all RP changes since that time (only where rp_change != 0)
