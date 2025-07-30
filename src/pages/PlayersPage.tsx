@@ -9,6 +9,7 @@ import { BEDWARS_PLACE_ID, BEDWARS_UNIVERSE_ID } from '../constants/bedwars';
 import { useUserPins } from '../hooks/useUserPins';
 import RobloxStatus from '../components/RobloxStatus';
 import { VerificationGuard } from '../components/auth';
+import { calculateActivityPulse, calculateAggregatedActivityPulse, type UserStatusData } from '../lib/activityPulseCalculator';
 
 // Shared refresh hook for coordinated player tracking refresh
 function useSharedPlayerRefresh(user: any) {
@@ -94,22 +95,7 @@ function useSharedPlayerRefresh(user: any) {
     try {
       console.log('🚀 fetchAccountStatuses: Starting with players:', playersList.length);
       
-      // First, call the roblox-status function to update the database
-      console.log('📞 fetchAccountStatuses: Calling roblox-status function to update database...');
-      const { error: functionError } = await supabase.functions.invoke('roblox-status', {
-        body: {} // No parameters needed - function processes all accounts
-      });
-      
-      if (functionError) {
-        console.error('❌ fetchAccountStatuses: Error calling roblox-status function:', functionError);
-        // Continue anyway - we'll try to read existing data
-      } else {
-        console.log('✅ fetchAccountStatuses: Successfully called roblox-status function');
-        // Small delay to ensure database has time to update
-        await new Promise(resolve => setTimeout(resolve, 1000));
-      }
-      
-      // Now read the status data from the roblox_user_status table
+      // Read the status data from the roblox_user_status table
       console.log('📖 fetchAccountStatuses: Reading status data from roblox_user_status table...');
       const { data: statusData, error: statusError } = await supabase
         .from('roblox_user_status')
@@ -136,12 +122,16 @@ function useSharedPlayerRefresh(user: any) {
       
       console.log('🗺️ fetchAccountStatuses: Created status map with', statusMap.size, 'entries');
       
-      // Update players with their account statuses
+      // Update players with their account statuses and calculated activity pulse
       const updatedPlayers = playersList.map(player => {
         const updatedAccounts = (player.accounts || []).map(acc => {
           const status = statusMap.get(acc.user_id);
           if (status) {
             console.log('✅ fetchAccountStatuses: Found status for account:', acc.user_id, status);
+            
+            // Calculate activity pulse data for this account
+            const activityPulseData = calculateActivityPulse(status as UserStatusData);
+            
             return {
               ...acc,
               status: {
@@ -161,16 +151,16 @@ function useSharedPlayerRefresh(user: any) {
                 presenceMethod: status.presence_method,
                 username: status.username,
                 lastUpdated: new Date(status.last_updated).getTime(),
-                // Activity Pulse Data
-                dailyMinutesToday: status.daily_minutes_today || 0,
-                weeklyAverage: status.weekly_average || 0,
-                activityTrend: status.activity_trend || 'stable',
-                preferredTimePeriod: status.preferred_time_period || 'unknown',
-                detectedTimezone: status.detected_timezone,
-                peakHoursStart: status.peak_hours_start,
-                peakHoursEnd: status.peak_hours_end,
-                activityDistribution: status.activity_distribution || {},
-                lastDisconnectTime: status.last_disconnect_time,
+                // Activity Pulse Data (calculated on-demand)
+                dailyMinutesToday: activityPulseData.dailyMinutesToday,
+                weeklyAverage: activityPulseData.weeklyAverage,
+                activityTrend: activityPulseData.activityTrend,
+                preferredTimePeriod: activityPulseData.preferredTimePeriod,
+                detectedTimezone: activityPulseData.detectedTimezone,
+                peakHoursStart: activityPulseData.peakHoursStart,
+                peakHoursEnd: activityPulseData.peakHoursEnd,
+                activityDistribution: activityPulseData.activityDistribution,
+                lastDisconnectTime: activityPulseData.lastOnlineTimestamp,
                 sessionStartTime: status.session_start_time,
               },
             };
@@ -179,6 +169,17 @@ function useSharedPlayerRefresh(user: any) {
           }
           return acc;
         });
+        
+        // Calculate aggregated activity pulse for the player across all accounts
+        const accountStatuses = updatedAccounts
+          .filter((acc: any) => acc.status)
+          .map((acc: any) => acc.status as any);
+        
+        if (accountStatuses.length > 0) {
+          const aggregatedPulse = calculateAggregatedActivityPulse(accountStatuses);
+          console.log('📊 fetchAccountStatuses: Aggregated pulse for player', player.alias, ':', aggregatedPulse);
+        }
+        
         return { ...player, accounts: updatedAccounts };
       });
 
@@ -532,7 +533,7 @@ export default function PlayersPage() {
 
       if (playerData) {
         // Fetch status data for this player's accounts
-        const accountUserIds = playerData.accounts?.map(acc => acc.user_id) || [];
+        const accountUserIds = playerData.accounts?.map((acc: any) => acc.user_id) || [];
         
         if (accountUserIds.length > 0) {
           const { data: statusData, error: statusError } = await supabase
