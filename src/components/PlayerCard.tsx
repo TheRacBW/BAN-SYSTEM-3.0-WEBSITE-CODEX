@@ -6,6 +6,8 @@ import { useKits } from '../context/KitContext';
 import { supabase } from '../lib/supabase';
 import KitCard from './KitCard';
 import RobloxStatus from './RobloxStatus';
+import ActivityPulse from './ActivityPulse';
+import { aggregatePlayerActivity } from '../lib/activityTracking';
 import { BEDWARS_PLACE_ID, BEDWARS_UNIVERSE_ID } from '../constants/bedwars';
 import { 
   Edit2, 
@@ -1270,6 +1272,28 @@ function PlayerCard({ player, onDelete, isAdmin, isPinned, onPinToggle, showPinI
           )}
         </div>
 
+        {/* Activity Pulse */}
+        {playerData.accounts && playerData.accounts.length > 0 && (
+          <div className="mb-3">
+            <ActivityPulse
+              dailyMinutesToday={playerData.accounts.reduce((sum, acc) => 
+                sum + (acc.status?.dailyMinutesToday || 0), 0)}
+              weeklyAverage={playerData.accounts.reduce((sum, acc) => 
+                sum + (acc.status?.weeklyAverage || 0), 0) / playerData.accounts.length}
+              activityTrend={playerData.accounts.some(acc => acc.status?.activityTrend === 'increasing') ? 'increasing' :
+                           playerData.accounts.some(acc => acc.status?.activityTrend === 'stable') ? 'stable' : 'decreasing'}
+              preferredTimePeriod={playerData.accounts[0]?.status?.preferredTimePeriod || 'unknown'}
+              lastOnlineTimestamp={playerData.accounts
+                .map(acc => acc.status?.lastDisconnectTime)
+                .filter(Boolean)
+                .sort((a, b) => new Date(b!).getTime() - new Date(a!).getTime())[0]}
+              isCurrentlyOnline={playerData.accounts.some(acc => 
+                acc.status?.isOnline || acc.status?.isInGame || acc.status?.inBedwars)}
+              compact={true}
+            />
+          </div>
+        )}
+
         {/* Known Accounts section with proper spacing */}
         {accountCount > 0 && (
           <div className="flex-1 min-h-0 mb-4">
@@ -1387,6 +1411,43 @@ function PlayerCard({ player, onDelete, isAdmin, isPinned, onPinToggle, showPinI
         </div>
 
         <div className="space-y-8">
+          {/* Activity Overview Section */}
+          {playerData.accounts && playerData.accounts.length > 0 && (
+            <section>
+              <h3 className="text-lg font-semibold mb-4">Activity Overview</h3>
+              <div className="bg-gray-50 dark:bg-gray-800/50 rounded-lg p-4">
+                <ActivityPulse
+                  dailyMinutesToday={playerData.accounts.reduce((sum, acc) => 
+                    sum + (acc.status?.dailyMinutesToday || 0), 0)}
+                  weeklyAverage={playerData.accounts.reduce((sum, acc) => 
+                    sum + (acc.status?.weeklyAverage || 0), 0) / playerData.accounts.length}
+                  activityTrend={playerData.accounts.some(acc => acc.status?.activityTrend === 'increasing') ? 'increasing' :
+                               playerData.accounts.some(acc => acc.status?.activityTrend === 'stable') ? 'stable' : 'decreasing'}
+                  preferredTimePeriod={playerData.accounts[0]?.status?.preferredTimePeriod || 'unknown'}
+                  lastOnlineTimestamp={playerData.accounts
+                    .map(acc => acc.status?.lastDisconnectTime)
+                    .filter(Boolean)
+                    .sort((a, b) => new Date(b!).getTime() - new Date(a!).getTime())[0]}
+                  isCurrentlyOnline={playerData.accounts.some(acc => 
+                    acc.status?.isOnline || acc.status?.isInGame || acc.status?.inBedwars)}
+                  detectedTimezone={playerData.accounts[0]?.status?.detectedTimezone}
+                  peakHoursStart={playerData.accounts[0]?.status?.peakHoursStart}
+                  peakHoursEnd={playerData.accounts[0]?.status?.peakHoursEnd}
+                  activityDistribution={playerData.accounts.reduce((combined, acc) => {
+                    const dist = acc.status?.activityDistribution || {};
+                    Object.entries(dist).forEach(([hour, minutes]) => {
+                      combined[hour] = (combined[hour] || 0) + minutes;
+                    });
+                    return combined;
+                  }, {} as Record<string, number>)}
+                  compact={false}
+                  showTimezoneAnalysis={true}
+                  showDetailedStats={true}
+                />
+              </div>
+            </section>
+          )}
+
           <section>
             <h3 className="text-lg font-semibold mb-4">Known Accounts</h3>
             <AccountListWithProfiles 

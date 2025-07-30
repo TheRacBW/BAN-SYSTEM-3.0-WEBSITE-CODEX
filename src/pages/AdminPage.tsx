@@ -10,6 +10,7 @@ import RobloxCookiePanel from '../components/RobloxCookiePanel';
 import UserManagementPanel from '../components/admin/UserManagementPanel';
 import RestrictedUsersManager from '../components/admin/RestrictedUsersManager';
 import { PageAccessControlManager } from '../components/admin/PageAccessControlManager';
+import ActivityPulseManager from '../components/admin/ActivityPulseManager';
 import { TRUST_LEVEL_CONFIGS } from "../types/trustLevels";
 
 interface AdminStats {
@@ -296,6 +297,10 @@ const AdminPage = () => {
 
         <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
           <PageAccessControlManager />
+        </div>
+
+        <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
+          <ActivityPulseManager isAdmin={isAdmin} />
         </div>
 
         <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6">

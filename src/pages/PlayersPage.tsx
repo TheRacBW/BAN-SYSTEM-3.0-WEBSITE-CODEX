@@ -161,6 +161,17 @@ function useSharedPlayerRefresh(user: any) {
                 presenceMethod: status.presence_method,
                 username: status.username,
                 lastUpdated: new Date(status.last_updated).getTime(),
+                // Activity Pulse Data
+                dailyMinutesToday: status.daily_minutes_today || 0,
+                weeklyAverage: status.weekly_average || 0,
+                activityTrend: status.activity_trend || 'stable',
+                preferredTimePeriod: status.preferred_time_period || 'unknown',
+                detectedTimezone: status.detected_timezone,
+                peakHoursStart: status.peak_hours_start,
+                peakHoursEnd: status.peak_hours_end,
+                activityDistribution: status.activity_distribution || {},
+                lastDisconnectTime: status.last_disconnect_time,
+                sessionStartTime: status.session_start_time,
               },
             };
           } else {

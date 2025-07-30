@@ -32,6 +32,17 @@ export interface PlayerAccount {
     presenceMethod?: 'primary' | 'fallback' | 'direct';
     username: string;
     lastUpdated: number;
+    // Activity Pulse Data
+    dailyMinutesToday?: number;
+    weeklyAverage?: number;
+    activityTrend?: 'increasing' | 'decreasing' | 'stable';
+    preferredTimePeriod?: 'morning' | 'afternoon' | 'evening' | 'night' | 'unknown';
+    detectedTimezone?: string;
+    peakHoursStart?: number;
+    peakHoursEnd?: number;
+    activityDistribution?: Record<string, number>;
+    lastDisconnectTime?: string;
+    sessionStartTime?: string;
   };
 }
 

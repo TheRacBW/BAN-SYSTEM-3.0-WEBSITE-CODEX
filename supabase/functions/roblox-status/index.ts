@@ -336,33 +336,155 @@ Deno.serve(async (req) => {
       })
     }
 
-    // Update database with results using proper UPSERT
-    console.log('💾 About to upsert', userStatuses.length, 'status records')
+    // Update database with results using proper UPSERT and activity pulse tracking
+    console.log('💾 About to upsert', userStatuses.length, 'status records with activity pulse')
     for (const status of userStatuses) {
       console.log(`📝 Upserting status for user ${status.userId}`)
       
+      const now = new Date();
+      const today = now.toISOString().split('T')[0];
+      const currentHour = now.getHours();
+      
+      // Get existing status for activity pulse calculations
+      const { data: existingStatus } = await supabaseClient
+        .from('roblox_user_status')
+        .select(`
+          is_online, is_in_game, in_bedwars, 
+          daily_minutes_today, daily_minutes_yesterday,
+          weekly_total_minutes, weekly_average,
+          activity_trend, preferred_time_period,
+          last_reset_date, last_updated,
+          activity_distribution, session_start_time
+        `)
+        .eq('user_id', status.userId)
+        .single();
+
+      const wasOnlineState = existingStatus?.is_online || existingStatus?.is_in_game || existingStatus?.in_bedwars;
+      const isNowOnlineState = status.isOnline || status.isInGame || status.inBedwars;
+      
+      let updateData: any = {
+        user_id: status.userId,
+        username: status.username,
+        is_online: status.isOnline,
+        is_in_game: status.isInGame,
+        in_bedwars: status.inBedwars,
+        user_presence_type: status.userPresenceType,
+        place_id: status.placeId,
+        root_place_id: status.rootPlaceId,
+        universe_id: status.universeId,
+        last_updated: now.toISOString(),
+        presence_method: status.presenceMethod
+      };
+
+      // Handle day reset for activity pulse
+      const needsDayReset = !existingStatus?.last_reset_date || 
+                           existingStatus.last_reset_date !== today;
+      
+      if (needsDayReset) {
+        updateData.daily_minutes_yesterday = existingStatus?.daily_minutes_today || 0;
+        updateData.daily_minutes_today = 0;
+        updateData.last_reset_date = today;
+      } else {
+        updateData.daily_minutes_today = existingStatus?.daily_minutes_today || 0;
+        updateData.daily_minutes_yesterday = existingStatus?.daily_minutes_yesterday || 0;
+      }
+
+      // Handle session tracking
+      if (isNowOnlineState && !wasOnlineState) {
+        // Starting new session
+        updateData.session_start_time = now.toISOString();
+      } else if (!isNowOnlineState && wasOnlineState) {
+        // Ending session
+        updateData.last_disconnect_time = now.toISOString();
+      }
+
+      // Calculate time online (when currently online)
+      if (isNowOnlineState && existingStatus?.last_updated) {
+        const lastUpdate = new Date(existingStatus.last_updated);
+        const minutesSinceUpdate = Math.min(30, Math.max(0, (now.getTime() - lastUpdate.getTime()) / 60000));
+        
+        updateData.daily_minutes_today = (updateData.daily_minutes_today || 0) + minutesSinceUpdate;
+        
+        // Update activity distribution
+        const currentDistribution = existingStatus?.activity_distribution || {};
+        const hourKey = currentHour.toString();
+        currentDistribution[hourKey] = (currentDistribution[hourKey] || 0) + minutesSinceUpdate;
+        updateData.activity_distribution = currentDistribution;
+      }
+
+      // Update preferred time period based on current activity
+      if (isNowOnlineState) {
+        const getTimePeriod = (hour: number) => {
+          if (hour >= 6 && hour < 12) return 'morning';
+          if (hour >= 12 && hour < 17) return 'afternoon';
+          if (hour >= 17 && hour < 22) return 'evening';
+          if (hour >= 22 || hour < 6) return 'night';
+          return 'unknown';
+        };
+        updateData.preferred_time_period = getTimePeriod(currentHour);
+      }
+
+      // Calculate weekly stats and trends
+      const yesterdayMinutes = existingStatus?.daily_minutes_yesterday || 0;
+      const previousAverage = existingStatus?.weekly_average || 0;
+      const estimatedWeeklyTotal = (updateData.daily_minutes_today + yesterdayMinutes) * 3.5;
+      const newAverage = estimatedWeeklyTotal / 7;
+      
+      let trend = 'stable';
+      if (newAverage > previousAverage * 1.2) trend = 'increasing';
+      else if (newAverage < previousAverage * 0.8) trend = 'decreasing';
+      
+      updateData.weekly_total_minutes = estimatedWeeklyTotal;
+      updateData.weekly_average = Math.round(newAverage * 100) / 100;
+      updateData.activity_trend = trend;
+
+      // Detect timezone and peak hours
+      const activityDistribution = updateData.activity_distribution || existingStatus?.activity_distribution || {};
+      if (Object.keys(activityDistribution).length > 0) {
+        // Find peak activity hours
+        const peakHours = Object.entries(activityDistribution)
+          .sort(([,a], [,b]) => b - a)
+          .slice(0, 4)
+          .map(([hour]) => parseInt(hour));
+        
+        if (peakHours.length > 0) {
+          const avgPeakHour = peakHours.reduce((sum, hour) => sum + hour, 0) / peakHours.length;
+          
+          // Map peak hours to likely timezones
+          let detectedTimezone = 'unknown';
+          if (avgPeakHour >= 14 && avgPeakHour <= 18) detectedTimezone = 'EST (US East)';
+          else if (avgPeakHour >= 17 && avgPeakHour <= 21) detectedTimezone = 'PST (US West)';
+          else if (avgPeakHour >= 19 && avgPeakHour <= 23) detectedTimezone = 'GMT (UK)';
+          else if (avgPeakHour >= 21 && avgPeakHour <= 1) detectedTimezone = 'CET (EU)';
+          else if (avgPeakHour >= 0 && avgPeakHour <= 4) detectedTimezone = 'JST (Japan)';
+          else if (avgPeakHour >= 6 && avgPeakHour <= 10) detectedTimezone = 'AEST (Australia)';
+          
+          updateData.detected_timezone = detectedTimezone;
+          
+          // Calculate peak hours range
+          const threshold = Math.max(...Object.values(activityDistribution)) * 0.7;
+          const highActivityHours = Object.entries(activityDistribution)
+            .filter(([, minutes]) => minutes >= threshold)
+            .map(([hour]) => parseInt(hour))
+            .sort((a, b) => a - b);
+          
+          if (highActivityHours.length > 0) {
+            updateData.peak_hours_start = highActivityHours[0];
+            updateData.peak_hours_end = highActivityHours[highActivityHours.length - 1];
+          }
+        }
+      }
+      
       const { error } = await supabaseClient
         .from('roblox_user_status')
-        .upsert({
-          user_id: status.userId,
-          username: status.username,
-          is_online: status.isOnline,
-          is_in_game: status.isInGame,
-          in_bedwars: status.inBedwars,
-          user_presence_type: status.userPresenceType,
-          place_id: status.placeId,
-          root_place_id: status.rootPlaceId,
-          universe_id: status.universeId,
-          last_updated: new Date(status.lastUpdated).toISOString(),
-          presence_method: status.presenceMethod
-        }, {
+        .upsert(updateData, {
           onConflict: 'user_id'
         })
 
       if (error) {
         console.error(`❌ Failed to update user ${status.userId}:`, error)
       } else {
-        console.log(`✅ Successfully updated user ${status.userId}`)
+        console.log(`✅ Successfully updated user ${status.userId} with activity pulse data`)
       }
     }
 

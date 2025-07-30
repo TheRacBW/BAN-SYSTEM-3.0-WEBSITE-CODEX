@@ -106,3 +106,66 @@ await fetch("/functions/v1/roblox-status", {
 });
 ```
 
+## Activity Pulse System
+
+The Activity Pulse system provides intelligent activity tracking and insights for players across multiple Roblox accounts. It tracks daily and weekly activity patterns, detects timezones, identifies peak hours, and provides trend analysis.
+
+### Features
+
+- **Activity Level Tracking**: Very Active (120+ min/day), Moderately Active (60-120 min/day), Lightly Active (15-60 min/day), Inactive (<15 min/day)
+- **Trend Analysis**: Increasing, decreasing, or stable activity patterns
+- **Timezone Detection**: Automatically detects player timezones based on activity patterns
+- **Peak Hours Analysis**: Identifies when players are most active
+- **Multi-Account Aggregation**: Combines activity data across all player accounts
+- **Temporary Disconnect Handling**: Intelligently handles brief disconnections
+
+### Database Schema
+
+The system uses the `roblox_user_status` table with additional columns:
+
+```sql
+-- Activity pulse columns
+daily_minutes_today INTEGER DEFAULT 0,
+daily_minutes_yesterday INTEGER DEFAULT 0,
+weekly_total_minutes INTEGER DEFAULT 0,
+weekly_average DECIMAL(5,2) DEFAULT 0,
+activity_trend TEXT DEFAULT 'stable',
+preferred_time_period TEXT DEFAULT 'unknown',
+detected_timezone TEXT DEFAULT 'unknown',
+peak_hours_start INTEGER DEFAULT NULL,
+peak_hours_end INTEGER DEFAULT NULL,
+activity_distribution JSONB DEFAULT '{}',
+last_disconnect_time TIMESTAMP WITH TIME ZONE,
+session_start_time TIMESTAMP WITH TIME ZONE
+```
+
+### Maintenance
+
+The system includes automated maintenance functions:
+
+- **Daily Reset**: `reset_daily_activity_data()` - Runs at midnight to reset daily metrics
+- **Data Cleanup**: `cleanup_activity_data()` - Runs weekly to clean up inactive users
+- **Health Monitoring**: `activity_pulse_health` view for system monitoring
+
+### Admin Interface
+
+Access the Activity Pulse Manager in the Admin Dashboard to:
+- Monitor system health
+- Manually trigger maintenance tasks
+- View activity statistics
+- Set up automated scheduling
+
+### Scheduling Setup
+
+For automatic maintenance, you can:
+
+1. **Use pg_cron** (recommended):
+   ```sql
+   CREATE EXTENSION IF NOT EXISTS pg_cron;
+   SELECT setup_activity_pulse_scheduling();
+   ```
+
+2. **Manual scheduling** via cron, Windows Task Scheduler, or external services
+
+See the Activity Pulse Manager in the Admin Dashboard for detailed setup instructions.
+
