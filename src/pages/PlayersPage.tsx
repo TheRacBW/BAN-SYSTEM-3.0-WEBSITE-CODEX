@@ -547,10 +547,13 @@ export default function PlayersPage() {
               statusMap.set(status.user_id, status);
             });
 
-            // Update player's accounts with status data
+            // Update player's accounts with status data and calculated activity pulse
             const updatedAccounts = (playerData.accounts || []).map((acc: any) => {
               const status = statusMap.get(acc.user_id);
               if (status) {
+                // Calculate activity pulse data for this account
+                const activityPulseData = calculateActivityPulse(status as UserStatusData);
+                
                 return {
                   ...acc,
                   status: {
@@ -570,6 +573,17 @@ export default function PlayersPage() {
                     presenceMethod: status.presence_method,
                     username: status.username,
                     lastUpdated: new Date(status.last_updated).getTime(),
+                    // Activity Pulse Data (calculated on-demand)
+                    dailyMinutesToday: activityPulseData.dailyMinutesToday,
+                    weeklyAverage: activityPulseData.weeklyAverage,
+                    activityTrend: activityPulseData.activityTrend,
+                    preferredTimePeriod: activityPulseData.preferredTimePeriod,
+                    detectedTimezone: activityPulseData.detectedTimezone,
+                    peakHoursStart: activityPulseData.peakHoursStart,
+                    peakHoursEnd: activityPulseData.peakHoursEnd,
+                    activityDistribution: activityPulseData.activityDistribution,
+                    lastDisconnectTime: activityPulseData.lastOnlineTimestamp,
+                    sessionStartTime: status.session_start_time,
                   },
                 };
               }

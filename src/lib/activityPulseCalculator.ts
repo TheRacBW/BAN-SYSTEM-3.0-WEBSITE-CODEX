@@ -5,6 +5,17 @@
  * without relying on the Edge Function for real-time updates.
  */
 
+import {
+  formatDuration,
+  calculateDailyMinutes,
+  getActivityLevel,
+  detectTimezone,
+  calculatePeakHours,
+  validateActivityData,
+  formatLastSeen,
+  getTimePeriodDisplay
+} from './activityPulseUtils';
+
 export interface ActivityPulseData {
   dailyMinutesToday: number;
   weeklyAverage: number;
@@ -41,82 +52,60 @@ export interface UserStatusData {
  * Calculate activity pulse data for a single user
  */
 export const calculateActivityPulse = (statusData: UserStatusData): ActivityPulseData => {
-  const now = new Date();
-  const lastUpdated = new Date(statusData.last_updated);
-  const isCurrentlyOnline = statusData.is_online || statusData.is_in_game || statusData.in_bedwars;
+  // Validate input data
+  const validatedData = validateActivityData({
+    dailyMinutesToday: statusData.daily_minutes_today || 0,
+    weeklyAverage: statusData.weekly_average || 0,
+    isOnline: statusData.is_online || statusData.is_in_game || statusData.in_bedwars,
+    lastUpdated: statusData.last_updated,
+    activityTrend: statusData.activity_trend || 'stable',
+    preferredTimePeriod: statusData.preferred_time_period || 'unknown',
+    detectedTimezone: statusData.detected_timezone || 'unknown',
+    activityDistribution: statusData.activity_distribution || {},
+  });
+
+  const isCurrentlyOnline = validatedData.isOnline;
   
-  // Calculate daily minutes based on current online status
-  let dailyMinutesToday = statusData.daily_minutes_today || 0;
+  // Calculate actual daily minutes using improved utility
+  const actualDailyMinutes = calculateDailyMinutes(
+    validatedData.lastUpdated,
+    isCurrentlyOnline,
+    validatedData.dailyMinutesToday
+  );
   
-  if (isCurrentlyOnline) {
-    // If currently online, add time since last update (max 30 minutes)
-    const minutesSinceUpdate = Math.min(30, Math.max(0, (now.getTime() - lastUpdated.getTime()) / 60000));
-    dailyMinutesToday += minutesSinceUpdate;
-  }
-  
-  // Calculate weekly average (simplified - you could enhance this with historical data)
-  const weeklyAverage = statusData.weekly_average || 0;
+  // Get activity level using improved logic
+  const activityLevel = getActivityLevel(actualDailyMinutes, validatedData.weeklyAverage);
   
   // Determine activity trend based on current vs previous activity
   let activityTrend: 'increasing' | 'decreasing' | 'stable' = 'stable';
-  if (dailyMinutesToday > weeklyAverage * 1.2) {
+  if (actualDailyMinutes > validatedData.weeklyAverage * 1.2) {
     activityTrend = 'increasing';
-  } else if (dailyMinutesToday < weeklyAverage * 0.8) {
+  } else if (actualDailyMinutes < validatedData.weeklyAverage * 0.8) {
     activityTrend = 'decreasing';
   }
   
-  // Determine preferred time period based on current hour
-  const currentHour = now.getHours();
-  const getTimePeriod = (hour: number): 'morning' | 'afternoon' | 'evening' | 'night' | 'unknown' => {
-    if (hour >= 6 && hour < 12) return 'morning';
-    if (hour >= 12 && hour < 17) return 'afternoon';
-    if (hour >= 17 && hour < 22) return 'evening';
-    if (hour >= 22 || hour < 6) return 'night';
-    return 'unknown';
-  };
+  // Get timezone using improved detection
+  const currentHour = new Date().getHours();
+  const detectedTimezone = detectTimezone(currentHour, isCurrentlyOnline);
   
-  const preferredTimePeriod = isCurrentlyOnline ? getTimePeriod(currentHour) : (statusData.preferred_time_period as any) || 'unknown';
+  // Calculate peak hours using improved utility
+  const peakHours = calculatePeakHours(validatedData.activityDistribution);
   
-  // Detect timezone based on current activity (simplified)
-  let detectedTimezone = statusData.detected_timezone || 'unknown';
-  if (isCurrentlyOnline) {
-    if (currentHour >= 14 && currentHour <= 18) detectedTimezone = 'EST (US East)';
-    else if (currentHour >= 17 && currentHour <= 21) detectedTimezone = 'PST (US West)';
-    else if (currentHour >= 19 && currentHour <= 23) detectedTimezone = 'GMT (UK)';
-    else if (currentHour >= 21 || currentHour <= 1) detectedTimezone = 'CET (EU)';
-    else if (currentHour >= 0 && currentHour <= 4) detectedTimezone = 'JST (Japan)';
-    else if (currentHour >= 6 && currentHour <= 10) detectedTimezone = 'AEST (Australia)';
-  }
+  // Get time period display
+  const timePeriod = getTimePeriodDisplay(validatedData.preferredTimePeriod);
   
-  // Calculate peak hours (simplified)
-  let peakHoursStart: number | undefined;
-  let peakHoursEnd: number | undefined;
-  
-  if (isCurrentlyOnline) {
-    // If currently online, consider this hour as peak
-    peakHoursStart = currentHour;
-    peakHoursEnd = currentHour;
-  } else if (statusData.peak_hours_start !== undefined && statusData.peak_hours_end !== undefined) {
-    peakHoursStart = statusData.peak_hours_start;
-    peakHoursEnd = statusData.peak_hours_end;
-  }
-  
-  // Activity distribution (simplified)
-  const activityDistribution = statusData.activity_distribution || {};
-  if (isCurrentlyOnline) {
-    const hourKey = currentHour.toString();
-    activityDistribution[hourKey] = (activityDistribution[hourKey] || 0) + 1; // Add 1 minute for current activity
-  }
+  // Format last seen
+  const lastSeen = formatLastSeen(statusData.last_disconnect_time);
   
   return {
-    dailyMinutesToday,
-    weeklyAverage,
+    dailyMinutesToday: actualDailyMinutes,
+    weeklyAverage: validatedData.weeklyAverage,
     activityTrend,
-    preferredTimePeriod,
+    preferredTimePeriod: validatedData.preferredTimePeriod,
     detectedTimezone,
-    peakHoursStart,
-    peakHoursEnd,
-    activityDistribution,
+    peakHoursStart: peakHours.start || undefined,
+    peakHoursEnd: peakHours.end || undefined,
+    activityDistribution: validatedData.activityDistribution,
     isCurrentlyOnline,
     lastOnlineTimestamp: statusData.last_disconnect_time
   };

@@ -8,6 +8,7 @@ import KitCard from './KitCard';
 import RobloxStatus from './RobloxStatus';
 import ActivityPulse from './ActivityPulse';
 import { aggregatePlayerActivity } from '../lib/activityTracking';
+import { formatDuration, getActivityLevel, formatLastSeen } from '../lib/activityPulseUtils';
 import { BEDWARS_PLACE_ID, BEDWARS_UNIVERSE_ID } from '../constants/bedwars';
 import { 
   Edit2, 
@@ -77,6 +78,58 @@ interface RobloxProfile {
   cached_at: string;
   source?: 'cache' | 'status';
 }
+
+// Compact Activity Pulse Component for Player Cards
+const CompactActivityPulse: React.FC<{ accounts: PlayerAccount[] }> = ({ accounts }) => {
+  // Calculate aggregated data
+  const totalDailyMinutes = accounts.reduce((sum, acc) => 
+    sum + (acc.status?.dailyMinutesToday || 0), 0);
+  const avgWeeklyAverage = accounts.reduce((sum, acc) => 
+    sum + (acc.status?.weeklyAverage || 0), 0) / accounts.length;
+  const isCurrentlyOnline = accounts.some(acc => 
+    acc.status?.isOnline || acc.status?.isInGame || acc.status?.inBedwars);
+  const lastOnlineTimestamp = accounts
+    .map(acc => acc.status?.lastDisconnectTime)
+    .filter(Boolean)
+    .sort((a, b) => new Date(b!).getTime() - new Date(a!).getTime())[0];
+  
+  // Get activity level
+  const activityLevel = getActivityLevel(totalDailyMinutes, avgWeeklyAverage);
+  
+  // Get trend indicator
+  const hasIncreasing = accounts.some(acc => acc.status?.activityTrend === 'increasing');
+  const hasStable = accounts.some(acc => acc.status?.activityTrend === 'stable');
+  const trendIcon = hasIncreasing ? '↗' : hasStable ? '➖' : '↘';
+  
+  // Format last seen
+  const lastSeen = formatLastSeen(lastOnlineTimestamp);
+  
+  return (
+    <div className="flex items-center gap-2 text-sm">
+      <div className={`flex items-center gap-1 px-2 py-1 rounded-lg ${activityLevel.bgColor}`}>
+        <span className="text-sm">{activityLevel.icon}</span>
+        <span className={`font-medium ${activityLevel.color}`}>
+          {activityLevel.label}
+        </span>
+      </div>
+      
+      {trendIcon !== '➖' && (
+        <span className="text-xs text-gray-500">{trendIcon}</span>
+      )}
+      
+      {!isCurrentlyOnline && lastSeen && (
+        <span className="text-xs text-gray-500">• {lastSeen}</span>
+      )}
+      
+      {isCurrentlyOnline && (
+        <div className="flex items-center gap-1">
+          <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
+          <span className="text-xs text-green-600 dark:text-green-400">Online</span>
+        </div>
+      )}
+    </div>
+  );
+};
 
 const useRobloxProfiles = (playerAccounts: any[]) => {
   const [profiles, setProfiles] = useState<Map<string, RobloxProfile>>(new Map());
@@ -1272,24 +1325,11 @@ function PlayerCard({ player, onDelete, isAdmin, isPinned, onPinToggle, showPinI
           )}
         </div>
 
-        {/* Activity Pulse */}
+        {/* Activity Pulse - Compact for Cards */}
         {playerData.accounts && playerData.accounts.length > 0 && (
           <div className="mb-3">
-            <ActivityPulse
-              dailyMinutesToday={playerData.accounts.reduce((sum, acc) => 
-                sum + (acc.status?.dailyMinutesToday || 0), 0)}
-              weeklyAverage={playerData.accounts.reduce((sum, acc) => 
-                sum + (acc.status?.weeklyAverage || 0), 0) / playerData.accounts.length}
-              activityTrend={playerData.accounts.some(acc => acc.status?.activityTrend === 'increasing') ? 'increasing' :
-                           playerData.accounts.some(acc => acc.status?.activityTrend === 'stable') ? 'stable' : 'decreasing'}
-              preferredTimePeriod={playerData.accounts[0]?.status?.preferredTimePeriod || 'unknown'}
-              lastOnlineTimestamp={playerData.accounts
-                .map(acc => acc.status?.lastDisconnectTime)
-                .filter(Boolean)
-                .sort((a, b) => new Date(b!).getTime() - new Date(a!).getTime())[0]}
-              isCurrentlyOnline={playerData.accounts.some(acc => 
-                acc.status?.isOnline || acc.status?.isInGame || acc.status?.inBedwars)}
-              compact={true}
+            <CompactActivityPulse
+              accounts={playerData.accounts}
             />
           </div>
         )}
