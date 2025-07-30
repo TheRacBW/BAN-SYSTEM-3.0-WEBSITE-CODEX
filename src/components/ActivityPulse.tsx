@@ -39,10 +39,30 @@ const ActivityPulse: React.FC<ActivityPulseProps> = ({
 }) => {
   // Calculate activity level
   const getActivityLevel = () => {
-    if (weeklyAverage >= 120) return { level: 'Very Active', color: 'text-green-600', bgColor: 'bg-green-100', icon: '🔥' };
-    if (weeklyAverage >= 60) return { level: 'Moderately Active', color: 'text-yellow-600', bgColor: 'bg-yellow-100', icon: '⚡' };
-    if (weeklyAverage >= 15) return { level: 'Lightly Active', color: 'text-blue-600', bgColor: 'bg-blue-100', icon: '💧' };
-    return { level: 'Inactive', color: 'text-gray-600', bgColor: 'bg-gray-100', icon: '😴' };
+    if (weeklyAverage >= 120) return { 
+      level: 'Very Active', 
+      color: 'text-green-600 dark:text-green-400', 
+      bgColor: 'bg-green-100 dark:bg-green-900/30', 
+      icon: '🔥' 
+    };
+    if (weeklyAverage >= 60) return { 
+      level: 'Moderately Active', 
+      color: 'text-yellow-600 dark:text-yellow-400', 
+      bgColor: 'bg-yellow-100 dark:bg-yellow-900/30', 
+      icon: '⚡' 
+    };
+    if (weeklyAverage >= 15) return { 
+      level: 'Lightly Active', 
+      color: 'text-blue-600 dark:text-blue-400', 
+      bgColor: 'bg-blue-100 dark:bg-blue-900/30', 
+      icon: '💧' 
+    };
+    return { 
+      level: 'Inactive', 
+      color: 'text-gray-700 dark:text-gray-300', 
+      bgColor: 'bg-gray-200 dark:bg-gray-700', 
+      icon: '😴' 
+    };
   };
 
   // Get trend indicator
