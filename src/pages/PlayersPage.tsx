@@ -9,7 +9,7 @@ import { BEDWARS_PLACE_ID, BEDWARS_UNIVERSE_ID } from '../constants/bedwars';
 import { useUserPins } from '../hooks/useUserPins';
 import RobloxStatus from '../components/RobloxStatus';
 import { VerificationGuard } from '../components/auth';
-import { calculateActivityPulse, calculateAggregatedActivityPulse, type UserStatusData } from '../lib/activityPulseCalculator';
+import { calculateActivityPulse, calculateAggregatedActivityPulse, cleanupSessionData } from '../lib/activityPulseCalculator';
 
 // Shared refresh hook for coordinated player tracking refresh
 function useSharedPlayerRefresh(user: any) {
@@ -130,7 +130,7 @@ function useSharedPlayerRefresh(user: any) {
             console.log('✅ fetchAccountStatuses: Found status for account:', acc.user_id, status);
             
             // Calculate activity pulse data for this account
-            const activityPulseData = calculateActivityPulse(status as UserStatusData);
+            const activityPulseData = calculateActivityPulse(status);
             
             return {
               ...acc,
@@ -156,10 +156,8 @@ function useSharedPlayerRefresh(user: any) {
                 weeklyAverage: activityPulseData.weeklyAverage,
                 activityTrend: activityPulseData.activityTrend,
                 preferredTimePeriod: activityPulseData.preferredTimePeriod,
-                detectedTimezone: activityPulseData.detectedTimezone,
                 peakHoursStart: activityPulseData.peakHoursStart,
                 peakHoursEnd: activityPulseData.peakHoursEnd,
-                activityDistribution: activityPulseData.activityDistribution,
                 lastDisconnectTime: activityPulseData.lastOnlineTimestamp,
                 sessionStartTime: status.session_start_time,
               },
@@ -257,6 +255,12 @@ function useSharedPlayerRefresh(user: any) {
 
 export default function PlayersPage() {
   const navigate = useNavigate();
+
+  // Clean up old session data every 30 minutes
+  useEffect(() => {
+    const cleanup = setInterval(cleanupSessionData, 30 * 60 * 1000);
+    return () => clearInterval(cleanup);
+  }, []);
   const { user, isAdmin } = useAuth();
   const { pinnedPlayers, togglePin, isPinned, loading: pinsLoading } = useUserPins();
   const [searchQuery, setSearchQuery] = useState('');
@@ -551,8 +555,8 @@ export default function PlayersPage() {
             const updatedAccounts = (playerData.accounts || []).map((acc: any) => {
               const status = statusMap.get(acc.user_id);
               if (status) {
-                // Calculate activity pulse data for this account
-                const activityPulseData = calculateActivityPulse(status as UserStatusData);
+                            // Calculate activity pulse data for this account
+            const activityPulseData = calculateActivityPulse(status);
                 
                 return {
                   ...acc,
@@ -573,17 +577,15 @@ export default function PlayersPage() {
                     presenceMethod: status.presence_method,
                     username: status.username,
                     lastUpdated: new Date(status.last_updated).getTime(),
-                    // Activity Pulse Data (calculated on-demand)
-                    dailyMinutesToday: activityPulseData.dailyMinutesToday,
-                    weeklyAverage: activityPulseData.weeklyAverage,
-                    activityTrend: activityPulseData.activityTrend,
-                    preferredTimePeriod: activityPulseData.preferredTimePeriod,
-                    detectedTimezone: activityPulseData.detectedTimezone,
-                    peakHoursStart: activityPulseData.peakHoursStart,
-                    peakHoursEnd: activityPulseData.peakHoursEnd,
-                    activityDistribution: activityPulseData.activityDistribution,
-                    lastDisconnectTime: activityPulseData.lastOnlineTimestamp,
-                    sessionStartTime: status.session_start_time,
+                                    // Activity Pulse Data (calculated on-demand)
+                dailyMinutesToday: activityPulseData.dailyMinutesToday,
+                weeklyAverage: activityPulseData.weeklyAverage,
+                activityTrend: activityPulseData.activityTrend,
+                preferredTimePeriod: activityPulseData.preferredTimePeriod,
+                peakHoursStart: activityPulseData.peakHoursStart,
+                peakHoursEnd: activityPulseData.peakHoursEnd,
+                lastDisconnectTime: activityPulseData.lastOnlineTimestamp,
+                sessionStartTime: status.session_start_time,
                   },
                 };
               }

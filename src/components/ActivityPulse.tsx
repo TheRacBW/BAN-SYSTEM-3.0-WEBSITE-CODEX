@@ -1,227 +1,240 @@
-import React, { useMemo } from 'react';
-import { TrendingUp, TrendingDown, Minus, Clock, Globe, Activity } from 'lucide-react';
-import {
-  formatDuration,
-  calculateDailyMinutes,
-  getActivityLevel,
-  detectTimezone,
-  calculatePeakHours,
-  validateActivityData,
-  formatLastSeen,
-  getTimePeriodDisplay
-} from '../lib/activityPulseUtils';
+import React from 'react';
+import { TrendingUp, TrendingDown, Minus, Clock } from 'lucide-react';
 
-export interface ActivityPulseProps {
-  // Core activity data
+interface ActivityPulseProps {
   dailyMinutesToday: number;
   weeklyAverage: number;
   activityTrend: 'increasing' | 'decreasing' | 'stable';
-  preferredTimePeriod: 'morning' | 'afternoon' | 'evening' | 'night' | 'unknown';
+  preferredTimePeriod: string;
   lastOnlineTimestamp?: string;
   isCurrentlyOnline: boolean;
-  
-  // Timezone & hours data
+  compact?: boolean;
   detectedTimezone?: string;
   peakHoursStart?: number;
   peakHoursEnd?: number;
-  activityDistribution?: Record<string, number>;
-  
-  // Display options
-  compact?: boolean;
-  showTimezoneAnalysis?: boolean;
-  showDetailedStats?: boolean;
 }
 
-const ActivityPulse: React.FC<ActivityPulseProps> = (props) => {
-  // Validate and process input data
-  const validatedData = useMemo(() => {
-    return validateActivityData(props);
-  }, [props]);
+const ActivityPulse: React.FC<ActivityPulseProps> = ({
+  dailyMinutesToday,
+  weeklyAverage,
+  activityTrend,
+  preferredTimePeriod,
+  lastOnlineTimestamp,
+  isCurrentlyOnline,
+  compact = false,
+  peakHoursStart,
+  peakHoursEnd
+}) => {
+  // Format duration with exact times
+  const formatDuration = (minutes: number): string => {
+    if (isNaN(minutes) || minutes < 0) return '0m';
+    if (minutes < 1) return '<1m';
+    if (minutes < 60) return `${Math.round(minutes)}m`;
+    
+    const hours = Math.floor(minutes / 60);
+    const mins = Math.round(minutes % 60);
+    return mins > 0 ? `${hours}h ${mins}m` : `${hours}h`;
+  };
 
-  // Calculate processed data with memoization
-  const processedData = useMemo(() => {
-    const {
-      dailyMinutesToday,
-      weeklyAverage,
-      activityTrend,
-      preferredTimePeriod,
-      lastOnlineTimestamp,
-      isCurrentlyOnline,
-      detectedTimezone,
-      activityDistribution,
-      compact = false,
-      showTimezoneAnalysis = true,
-      showDetailedStats = true
-    } = validatedData;
+  // Get activity level
+  const getActivityLevel = (dailyMinutes: number, weeklyAvg: number, isCurrentlyOnline: boolean) => {
+    // If user is currently online, they cannot be "Inactive"
+    if (isCurrentlyOnline) {
+      // For online users, use higher threshold since they're actively playing
+      const activeMinutes = Math.max(dailyMinutes, weeklyAvg);
+      
+      if (activeMinutes >= 120) return { 
+        level: 'high', 
+        label: 'Very Active', 
+        color: 'text-green-400', 
+        icon: '🔥',
+        bgColor: 'bg-green-500'
+      };
+      if (activeMinutes >= 45) return { 
+        level: 'medium', 
+        label: 'Active', 
+        color: 'text-yellow-400', 
+        icon: '⚡',
+        bgColor: 'bg-yellow-500'
+      };
+      // Even if low historical data, online users get "Active" minimum
+      return { 
+        level: 'active_online', 
+        label: 'Active', 
+        color: 'text-blue-400', 
+        icon: '💧',
+        bgColor: 'bg-blue-500'
+      };
+    }
+    
+    // For offline users, use historical data
+    const activeMinutes = Math.max(dailyMinutes, weeklyAvg);
+    
+    if (activeMinutes >= 120) return { 
+      level: 'high', 
+      label: 'Very Active', 
+      color: 'text-green-400', 
+      icon: '🔥',
+      bgColor: 'bg-green-500'
+    };
+    if (activeMinutes >= 45) return { 
+      level: 'medium', 
+      label: 'Active', 
+      color: 'text-yellow-400', 
+      icon: '⚡',
+      bgColor: 'bg-yellow-500'
+    };
+    if (activeMinutes >= 10) return { 
+      level: 'low', 
+      label: 'Light Activity', 
+      color: 'text-blue-400', 
+      icon: '💧',
+      bgColor: 'bg-blue-500'
+    };
+    return { 
+      level: 'inactive', 
+      label: 'Inactive', 
+      color: 'text-gray-400', 
+      icon: '😴',
+      bgColor: 'bg-gray-400'
+    };
+  };
 
-    // Calculate actual daily minutes (including current online time)
-    const actualDailyMinutes = calculateDailyMinutes(
-      lastOnlineTimestamp || new Date().toISOString(),
-      isCurrentlyOnline,
-      dailyMinutesToday
-    );
-
-    // Get activity level using improved logic
-    const activityLevel = getActivityLevel(actualDailyMinutes, weeklyAverage);
-
-    // Get trend indicator
-    const getTrendIndicator = () => {
-      switch (activityTrend) {
-        case 'increasing':
-          return { icon: TrendingUp, color: 'text-green-600 dark:text-green-400', text: '📈 Trending up' };
-        case 'decreasing':
-          return { icon: TrendingDown, color: 'text-red-600 dark:text-red-400', text: '📉 Trending down' };
-        default:
-          return { icon: Minus, color: 'text-gray-600 dark:text-gray-400', text: '➖ Stable' };
-      }
+  // Format peak hours
+  const formatPeakHours = () => {
+    if (!peakHoursStart && !peakHoursEnd) return 'Not enough data';
+    
+    const formatHour = (hour: number) => {
+      const period = hour >= 12 ? 'PM' : 'AM';
+      const displayHour = hour === 0 ? 12 : hour > 12 ? hour - 12 : hour;
+      return `${displayHour}${period}`;
     };
 
-    // Calculate peak hours
-    const peakHours = calculatePeakHours(activityDistribution);
+    if (peakHoursStart === peakHoursEnd) {
+      return formatHour(peakHoursStart || 0);
+    }
+    
+    return `${formatHour(peakHoursStart || 0)}-${formatHour(peakHoursEnd || 0)}`;
+  };
 
-    // Get timezone display
-    const currentHour = new Date().getHours();
-    const timezoneDisplay = detectTimezone(currentHour, isCurrentlyOnline);
+  // Format last seen
+  const formatLastSeen = (timestamp: string): string => {
+    const date = new Date(timestamp);
+    const now = new Date();
+    const diffMs = now.getTime() - date.getTime();
+    const diffMins = Math.floor(diffMs / 60000);
+    
+    if (diffMins < 1) return 'Just now';
+    if (diffMins < 60) return `${diffMins}m ago`;
+    if (diffMins < 1440) return `${Math.floor(diffMins / 60)}h ago`;
+    if (diffMins < 10080) return `${Math.floor(diffMins / 1440)}d ago`;
+    return 'Long time ago';
+  };
 
-    // Get time period display
-    const timePeriod = getTimePeriodDisplay(preferredTimePeriod);
+  const activityLevel = getActivityLevel(dailyMinutesToday, weeklyAverage, isCurrentlyOnline);
+  const peakHours = formatPeakHours();
 
-    // Format last seen
-    const lastSeen = formatLastSeen(lastOnlineTimestamp);
-
-    return {
-      actualDailyMinutes,
-      weeklyAverage,
-      activityLevel,
-      trendIndicator: getTrendIndicator(),
-      peakHours,
-      timezoneDisplay,
-      timePeriod,
-      lastSeen,
-      isCurrentlyOnline,
-      compact,
-      showTimezoneAnalysis,
-      showDetailedStats
-    };
-  }, [validatedData]);
-
-  const {
-    actualDailyMinutes,
-    weeklyAverage,
-    activityLevel,
-    trendIndicator,
-    peakHours,
-    timezoneDisplay,
-    timePeriod,
-    lastSeen,
-    isCurrentlyOnline,
-    compact,
-    showTimezoneAnalysis,
-    showDetailedStats
-  } = processedData;
-
+  // Compact version for player cards
   if (compact) {
     return (
       <div className="flex items-center gap-2 text-sm">
-        <div className={`flex items-center gap-1 px-3 py-2 rounded-lg ${activityLevel.bgColor}`}>
-          <span className="text-sm">{activityLevel.icon}</span>
-          <span className={`font-medium ${activityLevel.color}`}>
-            {activityLevel.label}
+        <div className={`w-2 h-2 rounded-full ${isCurrentlyOnline ? `${activityLevel.bgColor} animate-pulse` : 'bg-gray-400'}`} />
+        <span className={activityLevel.color}>
+          {activityLevel.label}
+        </span>
+        {activityTrend !== 'stable' && (
+          <span className="text-xs text-gray-500">
+            {activityTrend === 'increasing' ? '↗' : '↘'}
           </span>
-        </div>
-        
-        <div className="flex items-center gap-1">
-          <trendIndicator.icon size={14} className={trendIndicator.color} />
-          <span className="text-xs text-gray-700 dark:text-gray-300">
-            {formatDuration(weeklyAverage)}/day
-          </span>
-        </div>
-        
-        {isCurrentlyOnline && (
-          <div className="flex items-center gap-1">
-            <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
-            <span className="text-xs text-green-600 dark:text-green-400">Online</span>
-          </div>
+        )}
+        {!isCurrentlyOnline && lastOnlineTimestamp && (
+          <span className="text-xs text-gray-500">• {formatLastSeen(lastOnlineTimestamp)}</span>
         )}
       </div>
     );
   }
 
+  // Full version for modal
   return (
-    <div className="space-y-3">
-      {/* Activity Level and Trend */}
+    <div className="bg-slate-800 rounded-lg p-4 space-y-4">
+      {/* Primary Status Line - ALWAYS SHOW */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
-          <div className={`flex items-center gap-2 px-3 py-2 rounded-lg ${activityLevel.bgColor}`}>
-            <span className="text-lg">{activityLevel.icon}</span>
-            <div>
-              <div className={`font-semibold ${activityLevel.color}`}>
-                {activityLevel.label}
-              </div>
-              <div className="text-xs text-gray-700 dark:text-gray-300">
-                {formatDuration(weeklyAverage)}/day average
-              </div>
-            </div>
-          </div>
-          
+          <div className={`w-3 h-3 rounded-full ${isCurrentlyOnline ? `${activityLevel.bgColor} animate-pulse` : 'bg-gray-400'}`} />
           <div className="flex items-center gap-2">
-            <trendIndicator.icon size={20} className={trendIndicator.color} />
-            <span className="text-sm text-gray-700 dark:text-gray-300">{trendIndicator.text}</span>
-          </div>
-        </div>
-        
-        {isCurrentlyOnline && (
-          <div className="flex items-center gap-2 px-3 py-2 bg-green-100 dark:bg-green-900/30 rounded-lg">
-            <div className="w-3 h-3 bg-green-500 rounded-full animate-pulse"></div>
-            <span className="text-sm font-medium text-green-700 dark:text-green-300">Online Now</span>
-          </div>
-        )}
-      </div>
-
-      {/* Today's Activity */}
-      <div className="flex items-center justify-between text-sm">
-        <div className="flex items-center gap-2">
-          <Activity size={16} className="text-gray-500 dark:text-gray-400" />
-          <span className="text-gray-600 dark:text-gray-400">Today:</span>
-          <span className="font-medium">{formatDuration(actualDailyMinutes)}</span>
-        </div>
-        
-        {lastSeen && !isCurrentlyOnline && (
-          <div className="flex items-center gap-1 text-gray-500 dark:text-gray-400">
-            <Clock size={14} />
-            <span className="text-xs">Last seen {lastSeen}</span>
-          </div>
-        )}
-      </div>
-
-      {/* Time Period */}
-      <div className="flex items-center gap-2 text-sm">
-        <span className="text-gray-600 dark:text-gray-400">Usually plays in:</span>
-        <span className="flex items-center gap-1">
-          <span>{timePeriod.emoji}</span>
-          <span className="font-medium">{timePeriod.text}</span>
-        </span>
-      </div>
-
-      {/* Peak Hours (only if we have meaningful data) */}
-      {showTimezoneAnalysis && peakHours.display !== 'Not enough data' && peakHours.display !== 'No activity' && (
-        <div className="flex items-center gap-2 text-sm">
-          <Globe size={16} className="text-gray-500 dark:text-gray-400" />
-          <span className="text-gray-600 dark:text-gray-400">Peak time:</span>
-          <span className="font-medium">{timezoneDisplay} • {peakHours.display}</span>
-        </div>
-      )}
-
-      {/* Detailed Stats (simplified) */}
-      {showDetailedStats && (
-        <div className="pt-2 border-t border-gray-200 dark:border-gray-700">
-          <div className="text-xs text-gray-500 dark:text-gray-400 space-y-1">
-            <div>Weekly total: {formatDuration(weeklyAverage * 7)}</div>
-            <div>Daily average: {formatDuration(weeklyAverage)}</div>
-            {peakHours.display !== 'Not enough data' && (
-              <div>Peak activity: {peakHours.display}</div>
+            <span className={`font-semibold ${activityLevel.color}`}>
+              {activityLevel.icon} {activityLevel.label}
+            </span>
+            {activityTrend !== 'stable' && (
+              <div className="flex items-center gap-1">
+                {activityTrend === 'increasing' ? (
+                  <TrendingUp size={14} className="text-green-400" />
+                ) : (
+                  <TrendingDown size={14} className="text-red-400" />
+                )}
+                <span className="text-xs text-gray-400">
+                  {activityTrend === 'increasing' ? 'Trending up' : 'Trending down'}
+                </span>
+              </div>
             )}
           </div>
+        </div>
+        {isCurrentlyOnline && (
+          <span className="bg-green-500/20 text-green-400 text-sm font-medium px-2 py-1 rounded">
+            Online Now
+          </span>
+        )}
+      </div>
+
+      {/* Stats Grid - ALWAYS SHOW */}
+      <div className="grid grid-cols-2 gap-4 text-sm">
+        <div className="space-y-1">
+          <div className="text-gray-400 flex items-center gap-1">
+            <Clock size={12} />
+            Today
+          </div>
+          <div className="font-medium text-white text-lg">
+            {formatDuration(dailyMinutesToday)}
+          </div>
+        </div>
+        <div className="space-y-1">
+          <div className="text-gray-400">Daily Average</div>
+          <div className="font-medium text-white text-lg">
+            {formatDuration(weeklyAverage)}
+          </div>
+        </div>
+      </div>
+
+      {/* Peak Time & Time Period - ALWAYS SHOW IF AVAILABLE */}
+      <div className="pt-2 border-t border-gray-700">
+        <div className="flex items-center gap-2 text-sm">
+          <span className="text-gray-400">Usually plays:</span>
+          <div className="flex items-center gap-2">
+            {preferredTimePeriod !== 'unknown' && preferredTimePeriod !== 'various times' ? (
+              <span className="text-white font-medium">
+                🕒 {preferredTimePeriod}
+              </span>
+            ) : null}
+            {peakHours !== 'Not enough data' && peakHours !== '4PM-6PM' ? (
+              <span className="text-white font-medium">
+                • {peakHours}
+              </span>
+            ) : null}
+            {/* Fallback for users with minimal data */}
+            {(preferredTimePeriod === 'unknown' || preferredTimePeriod === 'various times') && 
+             peakHours === 'Not enough data' && (
+              <span className="text-gray-400 italic">
+                Building pattern... Check back after some gameplay!
+              </span>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {/* Last Seen - ONLY FOR OFFLINE USERS */}
+      {!isCurrentlyOnline && lastOnlineTimestamp && (
+        <div className="text-xs text-gray-400 pt-2 border-t border-gray-700">
+          Last seen {formatLastSeen(lastOnlineTimestamp)}
         </div>
       )}
     </div>
