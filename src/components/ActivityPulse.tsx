@@ -69,11 +69,11 @@ const ActivityPulse: React.FC<ActivityPulseProps> = ({
   const getTrendIndicator = () => {
     switch (activityTrend) {
       case 'increasing':
-        return { icon: TrendingUp, color: 'text-green-600', text: '📈 Trending up' };
+        return { icon: TrendingUp, color: 'text-green-600 dark:text-green-400', text: '📈 Trending up' };
       case 'decreasing':
-        return { icon: TrendingDown, color: 'text-red-600', text: '📉 Trending down' };
+        return { icon: TrendingDown, color: 'text-red-600 dark:text-red-400', text: '📉 Trending down' };
       default:
-        return { icon: Minus, color: 'text-gray-600', text: '➖ Stable' };
+        return { icon: Minus, color: 'text-gray-600 dark:text-gray-400', text: '➖ Stable' };
     }
   };
 
@@ -138,16 +138,16 @@ const ActivityPulse: React.FC<ActivityPulseProps> = ({
   if (compact) {
     return (
       <div className="flex items-center gap-2 text-sm">
-        <div className={`flex items-center gap-1 px-2 py-1 rounded-full ${activityLevel.bgColor} dark:bg-opacity-20`}>
-          <span className="text-xs">{activityLevel.icon}</span>
-          <span className={`font-medium ${activityLevel.color} dark:text-opacity-90`}>
+        <div className={`flex items-center gap-1 px-3 py-2 rounded-lg ${activityLevel.bgColor}`}>
+          <span className="text-sm">{activityLevel.icon}</span>
+          <span className={`font-medium ${activityLevel.color}`}>
             {activityLevel.level}
           </span>
         </div>
         
         <div className="flex items-center gap-1">
           <trendIndicator.icon size={14} className={trendIndicator.color} />
-          <span className="text-xs text-gray-600 dark:text-gray-400">
+          <span className="text-xs text-gray-700 dark:text-gray-300">
             {Math.round(weeklyAverage)}m/day
           </span>
         </div>
@@ -167,13 +167,13 @@ const ActivityPulse: React.FC<ActivityPulseProps> = ({
       {/* Activity Level and Trend */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
-          <div className={`flex items-center gap-2 px-3 py-2 rounded-lg ${activityLevel.bgColor} dark:bg-opacity-20`}>
+          <div className={`flex items-center gap-2 px-3 py-2 rounded-lg ${activityLevel.bgColor}`}>
             <span className="text-lg">{activityLevel.icon}</span>
             <div>
-              <div className={`font-semibold ${activityLevel.color} dark:text-opacity-90`}>
+              <div className={`font-semibold ${activityLevel.color}`}>
                 {activityLevel.level}
               </div>
-              <div className="text-xs text-gray-600 dark:text-gray-400">
+              <div className="text-xs text-gray-700 dark:text-gray-300">
                 {Math.round(weeklyAverage)}m/day average
               </div>
             </div>
@@ -181,7 +181,7 @@ const ActivityPulse: React.FC<ActivityPulseProps> = ({
           
           <div className="flex items-center gap-2">
             <trendIndicator.icon size={20} className={trendIndicator.color} />
-            <span className="text-sm text-gray-600 dark:text-gray-400">{trendIndicator.text}</span>
+            <span className="text-sm text-gray-700 dark:text-gray-300">{trendIndicator.text}</span>
           </div>
         </div>
         
