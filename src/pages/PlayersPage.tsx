@@ -9,7 +9,7 @@ import { BEDWARS_PLACE_ID, BEDWARS_UNIVERSE_ID } from '../constants/bedwars';
 import { useUserPins } from '../hooks/useUserPins';
 import RobloxStatus from '../components/RobloxStatus';
 import { VerificationGuard } from '../components/auth';
-import { calculateActivityPulse, calculateAggregatedActivityPulse, cleanupSessionData } from '../lib/activityPulseCalculator';
+import { FrontendActivityTracker } from '../services/activityTracker';
 
 // Shared refresh hook for coordinated player tracking refresh
 function useSharedPlayerRefresh(user: any) {
@@ -122,64 +122,78 @@ function useSharedPlayerRefresh(user: any) {
       
       console.log('🗺️ fetchAccountStatuses: Created status map with', statusMap.size, 'entries');
       
-      // Update players with their account statuses and calculated activity pulse
-      const updatedPlayers = playersList.map(player => {
-        const updatedAccounts = (player.accounts || []).map(acc => {
-          const status = statusMap.get(acc.user_id);
-          if (status) {
-            console.log('✅ fetchAccountStatuses: Found status for account:', acc.user_id, status);
-            
-            // Calculate activity pulse data for this account
-            const activityPulseData = calculateActivityPulse(status);
-            
-            return {
-              ...acc,
-              status: {
-                isOnline: status.is_online,
-                isInGame: status.is_in_game ?? false,
-                inBedwars: typeof status.in_bedwars === 'boolean'
-                  ? status.in_bedwars
-                  : (status.is_in_game ?? false) && (
-                      Number(status.place_id) === BEDWARS_PLACE_ID ||
-                      Number(status.root_place_id) === BEDWARS_PLACE_ID ||
-                      Number(status.universe_id) === BEDWARS_UNIVERSE_ID
-                    ),
-                userPresenceType: status.user_presence_type,
-                placeId: status.place_id,
-                rootPlaceId: status.root_place_id,
-                universeId: status.universe_id,
-                presenceMethod: status.presence_method,
-                username: status.username,
-                lastUpdated: new Date(status.last_updated).getTime(),
-                // Activity Pulse Data (calculated on-demand)
-                dailyMinutesToday: activityPulseData.dailyMinutesToday,
-                weeklyAverage: activityPulseData.weeklyAverage,
-                activityTrend: activityPulseData.activityTrend,
-                preferredTimePeriod: activityPulseData.preferredTimePeriod,
-                peakHoursStart: activityPulseData.peakHoursStart,
-                peakHoursEnd: activityPulseData.peakHoursEnd,
-                lastDisconnectTime: activityPulseData.lastOnlineTimestamp,
-                sessionStartTime: status.session_start_time,
-              },
-            };
-          } else {
-            console.log('⚠️ fetchAccountStatuses: No status found for account:', acc.user_id);
-          }
-          return acc;
-        });
-        
-        // Calculate aggregated activity pulse for the player across all accounts
-        const accountStatuses = updatedAccounts
-          .filter((acc: any) => acc.status)
-          .map((acc: any) => acc.status as any);
-        
-        if (accountStatuses.length > 0) {
-          const aggregatedPulse = calculateAggregatedActivityPulse(accountStatuses);
-          console.log('📊 fetchAccountStatuses: Aggregated pulse for player', player.alias, ':', aggregatedPulse);
-        }
-        
-        return { ...player, accounts: updatedAccounts };
-      });
+      // Update players with their account statuses and activity tracking
+      const updatedPlayers = await Promise.all(
+        playersList.map(async player => {
+          const updatedAccounts = await Promise.all(
+            (player.accounts || []).map(async acc => {
+              const status = statusMap.get(acc.user_id);
+              if (status) {
+                console.log('✅ fetchAccountStatuses: Found status for account:', acc.user_id, status);
+                
+                // Get current Roblox status
+                const currentStatus = {
+                  userId: acc.user_id.toString(),
+                  username: status.username,
+                  isOnline: status.is_online || false,
+                  isInGame: status.is_in_game || false,
+                  inBedwars: status.in_bedwars || false,
+                  placeId: status.place_id,
+                  universeId: status.universe_id,
+                  lastUpdated: new Date(status.last_updated).getTime()
+                };
+                
+                // Get previous status from database
+                const previousStatus = await FrontendActivityTracker.getCurrentStatus(acc.user_id.toString());
+                
+                // Track the status change in database
+                await FrontendActivityTracker.trackStatusChange(
+                  acc.user_id.toString(), 
+                  currentStatus, 
+                  previousStatus
+                );
+                
+                // Get enhanced activity data
+                const activityData = await FrontendActivityTracker.getActivityData(acc.user_id.toString());
+                
+                return {
+                  ...acc,
+                  status: {
+                    isOnline: status.is_online,
+                    isInGame: status.is_in_game ?? false,
+                    inBedwars: typeof status.in_bedwars === 'boolean'
+                      ? status.in_bedwars
+                      : (status.is_in_game ?? false) && (
+                          Number(status.place_id) === BEDWARS_PLACE_ID ||
+                          Number(status.root_place_id) === BEDWARS_PLACE_ID ||
+                          Number(status.universe_id) === BEDWARS_UNIVERSE_ID
+                        ),
+                    userPresenceType: status.user_presence_type,
+                    placeId: status.place_id,
+                    rootPlaceId: status.root_place_id,
+                    universeId: status.universe_id,
+                    presenceMethod: status.presence_method,
+                    username: status.username,
+                    lastUpdated: new Date(status.last_updated).getTime(),
+                    // Activity Pulse Data from database
+                    dailyMinutesToday: activityData?.daily_minutes_today || 0,
+                    weeklyAverage: activityData?.weekly_average || 0,
+                    activityTrend: activityData?.activity_trend || 'stable',
+                    preferredTimePeriod: activityData?.preferred_time_period || 'unknown',
+                    currentSessionMinutes: activityData?.current_session_minutes || 0,
+                    isCurrentlyOnline: activityData?.is_online || false
+                  },
+                };
+              } else {
+                console.log('⚠️ fetchAccountStatuses: No status found for account:', acc.user_id);
+              }
+              return acc;
+            })
+          );
+          
+          return { ...player, accounts: updatedAccounts };
+        })
+      );
 
       console.log('✅ fetchAccountStatuses: Returning updated players:', updatedPlayers.length);
       return updatedPlayers;
@@ -256,10 +270,60 @@ function useSharedPlayerRefresh(user: any) {
 export default function PlayersPage() {
   const navigate = useNavigate();
 
-  // Clean up old session data every 30 minutes
+  // Setup cleanup and rate limiting
   useEffect(() => {
-    const cleanup = setInterval(cleanupSessionData, 30 * 60 * 1000);
-    return () => clearInterval(cleanup);
+    const setupCleanupAndLimiting = () => {
+      // Clean up frontend rate limiting every hour
+      const rateLimitCleanup = setInterval(() => {
+        FrontendActivityTracker.cleanupRateLimiting();
+      }, 60 * 60 * 1000);
+      
+      // Run database cleanup every 6 hours
+      const databaseCleanup = setInterval(async () => {
+        try {
+          const { data, error } = await supabase.rpc('comprehensive_presence_cleanup');
+          if (!error && data) {
+            console.log('Database cleanup result:', data);
+          }
+        } catch (error) {
+          console.error('Database cleanup failed:', error);
+        }
+      }, 6 * 60 * 60 * 1000);
+      
+      return () => {
+        clearInterval(rateLimitCleanup);
+        clearInterval(databaseCleanup);
+      };
+    };
+    
+    return setupCleanupAndLimiting();
+  }, []);
+
+  // Update the activity summary refresh to be less aggressive
+  useEffect(() => {
+    const refreshActivitySummaries = async () => {
+      // Only refresh if someone is actually viewing the page
+      if (document.hidden) return;
+      
+      try {
+        const { data: activeUsers } = await supabase
+          .from('roblox_user_status')
+          .select('user_id')
+          .eq('is_online', true)
+          .limit(20); // Only process top 20 online users
+        
+        if (activeUsers && activeUsers.length > 0) {
+          const userIds = activeUsers.map(u => u.user_id.toString());
+          await FrontendActivityTracker.refreshMultipleActivitySummaries(userIds);
+        }
+      } catch (error) {
+        console.error('Failed to refresh activity summaries:', error);
+      }
+    };
+    
+    // Reduced frequency: every 15 minutes instead of 10
+    const interval = setInterval(refreshActivitySummaries, 15 * 60 * 1000);
+    return () => clearInterval(interval);
   }, []);
   const { user, isAdmin } = useAuth();
   const { pinnedPlayers, togglePin, isPinned, loading: pinsLoading } = useUserPins();
@@ -551,46 +615,46 @@ export default function PlayersPage() {
               statusMap.set(status.user_id, status);
             });
 
-            // Update player's accounts with status data and calculated activity pulse
-            const updatedAccounts = (playerData.accounts || []).map((acc: any) => {
-              const status = statusMap.get(acc.user_id);
-              if (status) {
-                            // Calculate activity pulse data for this account
-            const activityPulseData = calculateActivityPulse(status);
-                
-                return {
-                  ...acc,
-                  status: {
-                    isOnline: status.is_online,
-                    isInGame: status.is_in_game ?? false,
-                    inBedwars: typeof status.in_bedwars === 'boolean'
-                      ? status.in_bedwars
-                      : (status.is_in_game ?? false) && (
-                          Number(status.place_id) === BEDWARS_PLACE_ID ||
-                          Number(status.root_place_id) === BEDWARS_PLACE_ID ||
-                          Number(status.universe_id) === BEDWARS_UNIVERSE_ID
-                        ),
-                    userPresenceType: status.user_presence_type,
-                    placeId: status.place_id,
-                    rootPlaceId: status.root_place_id,
-                    universeId: status.universe_id,
-                    presenceMethod: status.presence_method,
-                    username: status.username,
-                    lastUpdated: new Date(status.last_updated).getTime(),
-                                    // Activity Pulse Data (calculated on-demand)
-                dailyMinutesToday: activityPulseData.dailyMinutesToday,
-                weeklyAverage: activityPulseData.weeklyAverage,
-                activityTrend: activityPulseData.activityTrend,
-                preferredTimePeriod: activityPulseData.preferredTimePeriod,
-                peakHoursStart: activityPulseData.peakHoursStart,
-                peakHoursEnd: activityPulseData.peakHoursEnd,
-                lastDisconnectTime: activityPulseData.lastOnlineTimestamp,
-                sessionStartTime: status.session_start_time,
-                  },
-                };
-              }
-              return acc;
-            });
+            // Update player's accounts with status data and activity tracking
+            const updatedAccounts = await Promise.all(
+              (playerData.accounts || []).map(async (acc: any) => {
+                const status = statusMap.get(acc.user_id);
+                if (status) {
+                  // Get enhanced activity data from database
+                  const activityData = await FrontendActivityTracker.getActivityData(acc.user_id.toString());
+                  
+                  return {
+                    ...acc,
+                    status: {
+                      isOnline: status.is_online,
+                      isInGame: status.is_in_game ?? false,
+                      inBedwars: typeof status.in_bedwars === 'boolean'
+                        ? status.in_bedwars
+                        : (status.is_in_game ?? false) && (
+                            Number(status.place_id) === BEDWARS_PLACE_ID ||
+                            Number(status.root_place_id) === BEDWARS_PLACE_ID ||
+                            Number(status.universe_id) === BEDWARS_UNIVERSE_ID
+                          ),
+                      userPresenceType: status.user_presence_type,
+                      placeId: status.place_id,
+                      rootPlaceId: status.root_place_id,
+                      universeId: status.universe_id,
+                      presenceMethod: status.presence_method,
+                      username: status.username,
+                      lastUpdated: new Date(status.last_updated).getTime(),
+                      // Activity Pulse Data from database
+                      dailyMinutesToday: activityData?.daily_minutes_today || 0,
+                      weeklyAverage: activityData?.weekly_average || 0,
+                      activityTrend: activityData?.activity_trend || 'stable',
+                      preferredTimePeriod: activityData?.preferred_time_period || 'unknown',
+                      currentSessionMinutes: activityData?.current_session_minutes || 0,
+                      isCurrentlyOnline: activityData?.is_online || false
+                    },
+                  };
+                }
+                return acc;
+              })
+            );
 
             playerData.accounts = updatedAccounts;
           }
