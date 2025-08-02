@@ -156,14 +156,31 @@ function useSharedPlayerRefresh(user: any) {
                 // Get enhanced activity data
                 const activityData = await FrontendActivityTracker.getActivityData(acc.user_id.toString());
                 
-                // Determine last seen status
-                let lastSeenStatus = 'offline';
-                if (status.in_bedwars) {
-                  lastSeenStatus = 'in_bedwars';
-                } else if (status.is_in_game) {
-                  lastSeenStatus = 'in_game';
-                } else if (status.is_online) {
-                  lastSeenStatus = 'online';
+                // Get better last seen information from presence logs
+                const lastSeenInfo = await FrontendActivityTracker.getLastSeenInfo(
+                  acc.user_id.toString(),
+                  status.username // Pass the username
+                );
+                
+                // Use presence logs data if available, otherwise fall back to current status
+                let lastSeenStatus: string | undefined;
+                let lastSeenTimestamp: string | undefined;
+                let lastSeenAccount: string | undefined;
+                
+                if (lastSeenInfo?.lastSeenStatus) {
+                  // Use data from presence logs (more accurate)
+                  lastSeenStatus = lastSeenInfo.lastSeenStatus;
+                  lastSeenTimestamp = lastSeenInfo.lastSeenTimestamp;
+                  lastSeenAccount = lastSeenInfo.lastSeenAccount; // Use username from presence logs
+                } else {
+                  // Fall back to current status (less accurate) - only count meaningful activity
+                  if (status.in_bedwars) {
+                    lastSeenStatus = 'in_bedwars';
+                  } else if (status.is_in_game) {
+                    lastSeenStatus = 'in_game';
+                  }
+                  // Don't count just "online" as it could be someone leaving the website open
+                  lastSeenAccount = status.username; // Use current username as fallback
                 }
                 
                 return {
@@ -193,8 +210,9 @@ function useSharedPlayerRefresh(user: any) {
                     currentSessionMinutes: activityData?.current_session_minutes || 0,
                     isCurrentlyOnline: activityData?.is_online || false,
                     // Last seen information
-                    lastSeenAccount: status.username,
-                    lastSeenStatus: lastSeenStatus
+                    lastSeenAccount: lastSeenAccount,
+                    lastSeenStatus: lastSeenStatus,
+                    lastSeenTimestamp: lastSeenTimestamp
                   },
                 };
               } else {

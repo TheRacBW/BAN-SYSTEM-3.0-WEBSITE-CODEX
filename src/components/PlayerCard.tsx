@@ -1465,7 +1465,8 @@ function PlayerCard({ player, onDelete, isAdmin, isPinned, onPinToggle, showPinI
                                playerData.accounts.some(acc => acc.status?.activityTrend === 'stable') ? 'stable' : 'decreasing'}
                   preferredTimePeriod={playerData.accounts[0]?.status?.preferredTimePeriod || 'unknown'}
                   lastOnlineTimestamp={playerData.accounts
-                    .map(acc => acc.status?.lastDisconnectTime)
+                    .map(acc => acc.status?.lastSeenTimestamp ? acc.status.lastSeenTimestamp : 
+                         (acc.status?.lastUpdated ? new Date(acc.status.lastUpdated).toISOString() : null))
                     .filter(Boolean)
                     .sort((a, b) => new Date(b!).getTime() - new Date(a!).getTime())[0]}
                   isCurrentlyOnline={playerData.accounts.some(acc => 
@@ -1474,16 +1475,16 @@ function PlayerCard({ player, onDelete, isAdmin, isPinned, onPinToggle, showPinI
                   peakHoursStart={playerData.accounts[0]?.status?.peakHoursStart}
                   peakHoursEnd={playerData.accounts[0]?.status?.peakHoursEnd}
                   compact={false}
-                  // Last seen information - find the most recent account
+                  // Last seen information - find the most recent account with meaningful status
                   lastSeenAccount={playerData.accounts
-                    .filter(acc => acc.status?.lastSeenAccount)
+                    .filter(acc => acc.status?.lastSeenAccount && acc.status?.lastSeenStatus && acc.status.lastSeenStatus !== 'offline')
                     .sort((a, b) => {
                       const aTime = a.status?.lastUpdated || 0;
                       const bTime = b.status?.lastUpdated || 0;
                       return bTime - aTime;
-                    })[0]?.status?.lastSeenAccount}
+                    })[0]?.status?.lastSeenAccount || undefined}
                   lastSeenStatus={playerData.accounts
-                    .filter(acc => acc.status?.lastSeenStatus)
+                    .filter(acc => acc.status?.lastSeenAccount && acc.status?.lastSeenStatus && acc.status.lastSeenStatus !== 'offline')
                     .sort((a, b) => {
                       const aTime = a.status?.lastUpdated || 0;
                       const bTime = b.status?.lastUpdated || 0;

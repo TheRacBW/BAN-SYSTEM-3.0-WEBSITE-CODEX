@@ -112,6 +112,57 @@ export class FrontendActivityTracker {
       return null;
     }
   }
+
+  // Get better last seen information from presence logs
+  static async getLastSeenInfo(userId: string, username?: string): Promise<{
+    lastSeenAccount?: string;
+    lastSeenStatus?: string;
+    lastSeenTimestamp?: string;
+    lastSeenActivity?: string;
+  } | null> {
+    try {
+      // Get the most recent meaningful activity from presence logs
+      const { data, error } = await supabase
+        .from('roblox_presence_logs')
+        .select('was_online, was_in_game, in_bedwars, detected_at, status_change_type')
+        .eq('roblox_user_id', parseInt(userId))
+        .neq('status_change_type', 'status_check') // Exclude redundant status checks
+        .order('detected_at', { ascending: false })
+        .limit(1)
+        .single();
+      
+      if (error || !data) return null;
+      
+      // Determine the activity status
+      let lastSeenStatus: string | undefined;
+      let lastSeenActivity: string | undefined;
+      
+      // Only count meaningful activity (in BedWars or in game), not just "online"
+      if (data.in_bedwars) {
+        lastSeenStatus = 'in_bedwars';
+        lastSeenActivity = 'In BedWars';
+      } else if (data.was_in_game) {
+        lastSeenStatus = 'in_game';
+        lastSeenActivity = 'In Game';
+      }
+      // Don't count just "online" as it could be someone leaving the website open
+      
+      // Only return if we have meaningful status (was in BedWars or in game)
+      if (!lastSeenStatus || (!data.was_in_game && !data.in_bedwars)) {
+        return null;
+      }
+      
+      return {
+        lastSeenAccount: username, // Include the username
+        lastSeenStatus,
+        lastSeenTimestamp: data.detected_at,
+        lastSeenActivity
+      };
+    } catch (error) {
+      console.error('Failed to get last seen info:', error);
+      return null;
+    }
+  }
   
   // Update activity summary when needed
   static async refreshActivitySummary(userId: string) {

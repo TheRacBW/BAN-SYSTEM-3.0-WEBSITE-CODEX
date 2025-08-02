@@ -43,6 +43,10 @@ export interface PlayerAccount {
     activityDistribution?: Record<string, number>;
     lastDisconnectTime?: string;
     sessionStartTime?: string;
+    // Last seen information
+    lastSeenAccount?: string;
+    lastSeenStatus?: string;
+    lastSeenTimestamp?: string;
   };
 }
 

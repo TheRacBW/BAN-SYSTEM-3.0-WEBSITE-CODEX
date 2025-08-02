@@ -138,13 +138,41 @@ const ActivityPulse: React.FC<ActivityPulseProps> = ({
 
   // Format last seen status with account info
   const formatLastSeenWithAccount = (): string => {
-    if (!lastOnlineTimestamp) return '';
+    // If we have lastSeenStatus but no timestamp, we can't show time
+    if (!lastOnlineTimestamp && !lastSeenStatus) return '';
     
-    const timeAgo = formatLastSeen(lastOnlineTimestamp);
+    let timeAgo = '';
+    if (lastOnlineTimestamp) {
+      timeAgo = formatLastSeen(lastOnlineTimestamp);
+    } else {
+      timeAgo = 'recently'; // Fallback if no timestamp
+    }
+    
     const accountInfo = lastSeenAccount ? ` on ${lastSeenAccount}` : '';
-    const statusInfo = lastSeenStatus ? ` (${lastSeenStatus})` : '';
+    
+    // Only show meaningful statuses (not "offline")
+    let statusInfo = '';
+    if (lastSeenStatus && lastSeenStatus !== 'offline') {
+      statusInfo = ` (${lastSeenStatus})`;
+    }
     
     return `Last seen ${timeAgo}${accountInfo}${statusInfo}`;
+  };
+
+  // Get estimated time range based on preferred time period
+  const getEstimatedTimeRange = (timePeriod: string): string => {
+    switch (timePeriod) {
+      case 'morning':
+        return '6AM-12PM';
+      case 'afternoon':
+        return '12PM-6PM';
+      case 'evening':
+        return '6PM-12AM';
+      case 'night':
+        return '12AM-6AM';
+      default:
+        return 'various times';
+    }
   };
 
   const activityLevel = getActivityLevel(dailyMinutesToday, weeklyAverage, isCurrentlyOnline);
@@ -163,8 +191,13 @@ const ActivityPulse: React.FC<ActivityPulseProps> = ({
             {activityTrend === 'increasing' ? '↗' : '↘'}
           </span>
         )}
-        {!isCurrentlyOnline && lastOnlineTimestamp && (
+        {!isCurrentlyOnline && lastSeenStatus && lastSeenStatus !== 'offline' && (
           <span className="text-xs text-gray-500">• {formatLastSeenWithAccount()}</span>
+        )}
+        {preferredTimePeriod !== 'unknown' && (
+          <span className="text-xs text-gray-400">
+            • {getEstimatedTimeRange(preferredTimePeriod)}
+          </span>
         )}
       </div>
     );
@@ -236,6 +269,12 @@ const ActivityPulse: React.FC<ActivityPulseProps> = ({
                 • {peakHours}
               </span>
             ) : null}
+            {/* Show estimated times based on current time */}
+            {preferredTimePeriod !== 'unknown' && (
+              <span className="text-gray-400">
+                (est. {getEstimatedTimeRange(preferredTimePeriod)})
+              </span>
+            )}
             {/* Fallback for users with minimal data */}
             {(preferredTimePeriod === 'unknown' || preferredTimePeriod === 'various times') && 
              peakHours === 'Not enough data' && (
@@ -247,8 +286,8 @@ const ActivityPulse: React.FC<ActivityPulseProps> = ({
         </div>
       </div>
 
-      {/* Last Seen - ONLY FOR OFFLINE USERS */}
-      {!isCurrentlyOnline && lastOnlineTimestamp && (
+      {/* Last Seen - ONLY FOR OFFLINE USERS WITH MEANINGFUL STATUS */}
+      {!isCurrentlyOnline && lastSeenStatus && lastSeenStatus !== 'offline' && (
         <div className="text-xs text-gray-400 pt-2 border-t border-gray-700">
           {formatLastSeenWithAccount()}
         </div>
