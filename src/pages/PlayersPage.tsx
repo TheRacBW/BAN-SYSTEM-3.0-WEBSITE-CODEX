@@ -156,6 +156,16 @@ function useSharedPlayerRefresh(user: any) {
                 // Get enhanced activity data
                 const activityData = await FrontendActivityTracker.getActivityData(acc.user_id.toString());
                 
+                // Determine last seen status
+                let lastSeenStatus = 'offline';
+                if (status.in_bedwars) {
+                  lastSeenStatus = 'in_bedwars';
+                } else if (status.is_in_game) {
+                  lastSeenStatus = 'in_game';
+                } else if (status.is_online) {
+                  lastSeenStatus = 'online';
+                }
+                
                 return {
                   ...acc,
                   status: {
@@ -181,7 +191,10 @@ function useSharedPlayerRefresh(user: any) {
                     activityTrend: activityData?.activity_trend || 'stable',
                     preferredTimePeriod: activityData?.preferred_time_period || 'unknown',
                     currentSessionMinutes: activityData?.current_session_minutes || 0,
-                    isCurrentlyOnline: activityData?.is_online || false
+                    isCurrentlyOnline: activityData?.is_online || false,
+                    // Last seen information
+                    lastSeenAccount: status.username,
+                    lastSeenStatus: lastSeenStatus
                   },
                 };
               } else {

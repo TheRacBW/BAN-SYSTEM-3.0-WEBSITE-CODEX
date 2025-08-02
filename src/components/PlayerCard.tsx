@@ -1473,16 +1473,22 @@ function PlayerCard({ player, onDelete, isAdmin, isPinned, onPinToggle, showPinI
                   detectedTimezone={playerData.accounts[0]?.status?.detectedTimezone}
                   peakHoursStart={playerData.accounts[0]?.status?.peakHoursStart}
                   peakHoursEnd={playerData.accounts[0]?.status?.peakHoursEnd}
-                  activityDistribution={playerData.accounts.reduce((combined, acc) => {
-                    const dist = acc.status?.activityDistribution || {};
-                    Object.entries(dist).forEach(([hour, minutes]) => {
-                      combined[hour] = (combined[hour] || 0) + minutes;
-                    });
-                    return combined;
-                  }, {} as Record<string, number>)}
                   compact={false}
-                  showTimezoneAnalysis={true}
-                  showDetailedStats={true}
+                  // Last seen information - find the most recent account
+                  lastSeenAccount={playerData.accounts
+                    .filter(acc => acc.status?.lastSeenAccount)
+                    .sort((a, b) => {
+                      const aTime = a.status?.lastUpdated || 0;
+                      const bTime = b.status?.lastUpdated || 0;
+                      return bTime - aTime;
+                    })[0]?.status?.lastSeenAccount}
+                  lastSeenStatus={playerData.accounts
+                    .filter(acc => acc.status?.lastSeenStatus)
+                    .sort((a, b) => {
+                      const aTime = a.status?.lastUpdated || 0;
+                      const bTime = b.status?.lastUpdated || 0;
+                      return bTime - aTime;
+                    })[0]?.status?.lastSeenStatus}
                 />
               </div>
             </section>

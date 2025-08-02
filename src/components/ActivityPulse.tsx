@@ -12,6 +12,9 @@ interface ActivityPulseProps {
   detectedTimezone?: string;
   peakHoursStart?: number;
   peakHoursEnd?: number;
+  // New props for last seen with account info
+  lastSeenAccount?: string;
+  lastSeenStatus?: string; // 'online', 'in_game', 'in_bedwars', 'offline'
 }
 
 const ActivityPulse: React.FC<ActivityPulseProps> = ({
@@ -23,7 +26,9 @@ const ActivityPulse: React.FC<ActivityPulseProps> = ({
   isCurrentlyOnline,
   compact = false,
   peakHoursStart,
-  peakHoursEnd
+  peakHoursEnd,
+  lastSeenAccount,
+  lastSeenStatus
 }) => {
   // Format duration with exact times
   const formatDuration = (minutes: number): string => {
@@ -131,6 +136,17 @@ const ActivityPulse: React.FC<ActivityPulseProps> = ({
     return 'Long time ago';
   };
 
+  // Format last seen status with account info
+  const formatLastSeenWithAccount = (): string => {
+    if (!lastOnlineTimestamp) return '';
+    
+    const timeAgo = formatLastSeen(lastOnlineTimestamp);
+    const accountInfo = lastSeenAccount ? ` on ${lastSeenAccount}` : '';
+    const statusInfo = lastSeenStatus ? ` (${lastSeenStatus})` : '';
+    
+    return `Last seen ${timeAgo}${accountInfo}${statusInfo}`;
+  };
+
   const activityLevel = getActivityLevel(dailyMinutesToday, weeklyAverage, isCurrentlyOnline);
   const peakHours = formatPeakHours();
 
@@ -148,7 +164,7 @@ const ActivityPulse: React.FC<ActivityPulseProps> = ({
           </span>
         )}
         {!isCurrentlyOnline && lastOnlineTimestamp && (
-          <span className="text-xs text-gray-500">• {formatLastSeen(lastOnlineTimestamp)}</span>
+          <span className="text-xs text-gray-500">• {formatLastSeenWithAccount()}</span>
         )}
       </div>
     );
@@ -234,7 +250,7 @@ const ActivityPulse: React.FC<ActivityPulseProps> = ({
       {/* Last Seen - ONLY FOR OFFLINE USERS */}
       {!isCurrentlyOnline && lastOnlineTimestamp && (
         <div className="text-xs text-gray-400 pt-2 border-t border-gray-700">
-          Last seen {formatLastSeen(lastOnlineTimestamp)}
+          {formatLastSeenWithAccount()}
         </div>
       )}
     </div>
