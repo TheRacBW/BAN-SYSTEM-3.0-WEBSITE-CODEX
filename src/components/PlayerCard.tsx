@@ -36,6 +36,91 @@ import {
 } from 'lucide-react';
 import { useRestrictedUserIds } from '../hooks/useRestrictedUserIds';
 
+// Shared username cache to avoid duplicate queries
+const usernameCache = new Map<string, string>();
+
+// Utility function to reliably get username for display
+const useReliableUsername = (user_id: number | string | undefined, fallbackUsername?: string) => {
+  const [reliableUsername, setReliableUsername] = useState<string | undefined>(fallbackUsername);
+  const [isLoading, setIsLoading] = useState(false);
+
+  useEffect(() => {
+    if (!user_id) return;
+    
+    const userIdStr = user_id.toString();
+    
+    // Check shared cache first
+    if (usernameCache.has(userIdStr)) {
+      setReliableUsername(usernameCache.get(userIdStr));
+      return;
+    }
+    
+    // If we already have a reliable username, don't fetch again
+    if (reliableUsername && reliableUsername !== `User ${user_id}`) return;
+    
+    const fetchUsername = async () => {
+      setIsLoading(true);
+      try {
+        // First, try to get from roblox_user_cache (most efficient)
+        const { data: cachedData, error: cacheError } = await supabase
+          .from('roblox_user_cache')
+          .select('username')
+          .eq('user_id', parseInt(userIdStr))
+          .single();
+        
+        if (cachedData?.username) {
+          const username = cachedData.username;
+          usernameCache.set(userIdStr, username);
+          setReliableUsername(username);
+          setIsLoading(false);
+          return;
+        }
+        
+        // If not in cache, try roblox_user_status
+        const { data: statusData, error: statusError } = await supabase
+          .from('roblox_user_status')
+          .select('username')
+          .eq('user_id', parseInt(userIdStr))
+          .single();
+        
+        if (statusData?.username) {
+          const username = statusData.username;
+          usernameCache.set(userIdStr, username);
+          setReliableUsername(username);
+        } else {
+          // Try player_activity_summary as final fallback
+          const { data: activityData } = await supabase
+            .from('player_activity_summary')
+            .select('username')
+            .eq('user_id', parseInt(userIdStr))
+            .single();
+          
+          if (activityData?.username) {
+            const username = activityData.username;
+            usernameCache.set(userIdStr, username);
+            setReliableUsername(username);
+          } else {
+            const fallbackUsername = `User ${user_id}`;
+            usernameCache.set(userIdStr, fallbackUsername);
+            setReliableUsername(fallbackUsername);
+          }
+        }
+      } catch (error) {
+        console.error('Failed to fetch username for user_id:', user_id, error);
+        const fallbackUsername = `User ${user_id}`;
+        usernameCache.set(userIdStr, fallbackUsername);
+        setReliableUsername(fallbackUsername);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchUsername();
+  }, [user_id, reliableUsername]);
+
+  return { reliableUsername, isLoading };
+};
+
 const BEDWARS_ICON_URL =
   'https://cdn2.steamgriddb.com/icon/3ad9ecf4b4a26b7671e09283f001d626.png';
 
@@ -322,13 +407,7 @@ const AccountListWithProfiles = ({ accounts, onDeleteAccount, isAdmin, ranks, ha
   isUpdatingRank: boolean
 }) => {
   const { profiles, loading } = useRobloxProfiles(accounts);
-  if (!accounts?.length) {
-    return (
-      <div className="text-sm text-gray-500 italic">
-        No accounts added yet
-      </div>
-    );
-  }
+  
   return (
     <div className="space-y-3">
       <div className="flex items-center justify-between">
@@ -343,6 +422,12 @@ const AccountListWithProfiles = ({ accounts, onDeleteAccount, isAdmin, ranks, ha
         )}
       </div>
       {accounts.map((account) => {
+        // Use reliable username utility
+        const { reliableUsername, isLoading: usernameLoading } = useReliableUsername(
+          account.user_id, 
+          account.status?.username
+        );
+        
         // Try cache by username first, then by user_id as string
         let profile = profiles.get(account.username);
         if (!profile && account.user_id) {
@@ -357,10 +442,11 @@ const AccountListWithProfiles = ({ accounts, onDeleteAccount, isAdmin, ranks, ha
         }
         const status = account.status;
         const rank = account.rank && Array.isArray(account.rank) && account.rank.length > 0 ? account.rank[0].account_ranks : null;
-        // Display name: username or user_id or ''
-        const displayName = account.username || '';
+        // Display name: reliable username or fallback
+        const displayName = reliableUsername || account.username || '';
         // Hyperlink if user_id
         const profileLink = account.user_id ? `https://www.roblox.com/users/${account.user_id}/profile` : undefined;
+        
         return (
           <div
             key={account.id}
@@ -388,7 +474,9 @@ const AccountListWithProfiles = ({ accounts, onDeleteAccount, isAdmin, ranks, ha
                       className="flex items-center gap-x-2 font-medium text-base truncate hover:underline text-blue-700 dark:text-blue-300 -ml-2"
                       title={`View ${displayName || account.user_id ? (displayName || account.user_id) : 'Roblox'}'s Roblox profile`}
                     >
-                      <span>{displayName}</span>
+                      {usernameLoading && (
+                        <div className="w-3 h-3 border border-gray-300 border-t-blue-500 rounded-full animate-spin"></div>
+                      )}
                       <RobloxStatus 
                         username={status?.username || displayName || account.user_id}
                         isOnline={status?.isOnline || false}
@@ -399,7 +487,9 @@ const AccountListWithProfiles = ({ accounts, onDeleteAccount, isAdmin, ranks, ha
                     </a>
                   ) : (
                     <span className="flex items-center gap-x-2 font-medium text-base truncate text-gray-700 dark:text-gray-300 -ml-2">
-                      <span>{displayName}</span>
+                      {usernameLoading && (
+                        <div className="w-3 h-3 border border-gray-300 border-t-blue-500 rounded-full animate-spin"></div>
+                      )}
                       <RobloxStatus 
                         username={status?.username || displayName || account.user_id}
                         isOnline={status?.isOnline || false}
@@ -1360,28 +1450,36 @@ function PlayerCard({ player, onDelete, isAdmin, isPinned, onPinToggle, showPinI
             
             {/* Fixed height container showing max 2 accounts */}
             <div className={`space-y-2 ${showScrollbar ? 'h-16 overflow-y-auto pr-2' : ''}`}>
-              {sortedAccounts.map(account => (
-                <div key={account.id} className="flex items-center gap-2 min-h-[28px]">
-                  <RobloxStatus 
-                    username={account.status?.username || `User ${account.user_id}`}
-                    isOnline={account.status?.isOnline || false}
-                    isInGame={account.status?.isInGame || false}
-                    inBedwars={account.status?.inBedwars || false}
-                    lastUpdated={account.status?.lastUpdated}
-                  />
-                  <div className="w-8 h-8 flex items-center justify-center">
-                    <RankIcon account={account} />
-                  </div>
-                  {account.status?.inBedwars && (
-                    <img
-                      src={BEDWARS_ICON_URL}
-                      alt="BedWars"
-                      className="w-8 h-8"
-                      title="In BedWars"
+              {sortedAccounts.map(account => {
+                // Use reliable username utility for each account
+                const { reliableUsername } = useReliableUsername(
+                  account.user_id, 
+                  account.status?.username
+                );
+                
+                return (
+                  <div key={account.id} className="flex items-center gap-2 min-h-[28px]">
+                    <RobloxStatus 
+                      username={account.status?.username || reliableUsername || `User ${account.user_id}`}
+                      isOnline={account.status?.isOnline || false}
+                      isInGame={account.status?.isInGame || false}
+                      inBedwars={account.status?.inBedwars || false}
+                      lastUpdated={account.status?.lastUpdated}
                     />
-                  )}
-                </div>
-              ))}
+                    <div className="w-8 h-8 flex items-center justify-center">
+                      <RankIcon account={account} />
+                    </div>
+                    {account.status?.inBedwars && (
+                      <img
+                        src={BEDWARS_ICON_URL}
+                        alt="BedWars"
+                        className="w-8 h-8"
+                        title="In BedWars"
+                      />
+                    )}
+                  </div>
+                );
+              })}
             </div>
           </div>
         )}
