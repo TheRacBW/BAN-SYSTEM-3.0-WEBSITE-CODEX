@@ -56,9 +56,9 @@ const ReportSubmissionForm: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
-  const [canSubmit, setCanSubmit] = useState(false);
+  const [canSubmit, setCanSubmit] = useState<boolean | null>(null); // null = still checking
   const [captchaToken, setCaptchaToken] = useState<string | null>(null);
-  const [isDiscordVerified, setIsDiscordVerified] = useState(false);
+  const [isDiscordVerified, setIsDiscordVerified] = useState<boolean | null>(null); // null = still checking
   const [playerSearchInput, setPlayerSearchInput] = useState('');
   const [searchingPlayer, setSearchingPlayer] = useState(false);
   const [timestampInput, setTimestampInput] = useState({ timestamp: '', description: '' });
@@ -74,8 +74,13 @@ const ReportSubmissionForm: React.FC = () => {
 
   useEffect(() => {
     checkDiscordVerification();
-    checkSubmissionEligibility();
   }, [user]);
+
+  useEffect(() => {
+    if (user && isDiscordVerified !== undefined) {
+      checkSubmissionEligibility();
+    }
+  }, [user, isDiscordVerified]);
 
   const checkDiscordVerification = async () => {
     if (!user) return;
@@ -87,9 +92,12 @@ const ReportSubmissionForm: React.FC = () => {
         .eq('id', user.id)
         .single();
       
-      setIsDiscordVerified(!!data?.discord_verified_at);
+      const verified = !!data?.discord_verified_at;
+      console.log('Discord verification result:', verified);
+      setIsDiscordVerified(verified);
     } catch (err) {
       console.error('Error checking Discord verification:', err);
+      setIsDiscordVerified(false);
     }
   };
 
@@ -97,15 +105,32 @@ const ReportSubmissionForm: React.FC = () => {
     if (!user) return;
 
     try {
+      console.log('Checking submission eligibility for user:', user.id);
+      
       const { data, error } = await supabase.rpc('can_user_submit_reports', {
         user_uuid: user.id
       });
 
-      if (error) throw error;
+      if (error) {
+        console.error('Error from can_user_submit_reports:', error);
+        throw error;
+      }
+      
+      // Add debugging
+      console.log('can_user_submit_reports result:', data);
+      console.log('isDiscordVerified:', isDiscordVerified);
+      console.log('Setting canSubmit to:', data && isDiscordVerified);
+      
       setCanSubmit(data && isDiscordVerified);
     } catch (err) {
       console.error('Error checking submission eligibility:', err);
-      setCanSubmit(false);
+      // If the function doesn't exist, assume user can submit (fallback)
+      if (err instanceof Error && err.message.includes('function') && err.message.includes('not found')) {
+        console.log('Database function not found, allowing submission as fallback');
+        setCanSubmit(isDiscordVerified);
+      } else {
+        setCanSubmit(false);
+      }
     }
   };
 
@@ -355,6 +380,21 @@ const ReportSubmissionForm: React.FC = () => {
     );
   }
 
+  // Show loading state while checking eligibility
+  if (canSubmit === null || isDiscordVerified === null) {
+    return (
+      <div className="text-center py-8">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-600 mx-auto mb-4"></div>
+        <h3 className="text-lg font-medium text-gray-900 dark:text-gray-100 mb-2">
+          Checking Eligibility...
+        </h3>
+        <p className="text-gray-600 dark:text-gray-400">
+          Please wait while we verify your account status.
+        </p>
+      </div>
+    );
+  }
+
   if (!canSubmit) {
     return (
       <div className="text-center py-8">
@@ -555,7 +595,7 @@ const ReportSubmissionForm: React.FC = () => {
                         <div className="flex items-center gap-2">
                           <span className="font-medium">{player.username}</span>
                           {player.isVerified && (
-                            <Shield size={14} className="text-green-500" title="Verified" />
+                            <Shield size={14} className="text-green-500" />
                           )}
                         </div>
                         <span className="text-sm text-gray-500">ID: {player.userId}</span>
