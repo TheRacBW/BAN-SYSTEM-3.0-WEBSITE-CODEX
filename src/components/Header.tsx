@@ -1,6 +1,6 @@
 import React from 'react';
 import { Link, NavLink, useNavigate, useLocation } from 'react-router-dom';
-import { Moon, Sun, User, LogOut, Plus, TrendingUp, Settings, Home, Users, Trophy, Compass, Calculator } from 'lucide-react';
+import { Moon, Sun, User, LogOut, Plus, TrendingUp, Settings, Home, Users, Trophy, Compass, Calculator, Flag } from 'lucide-react';
 import { useTheme } from '../context/ThemeContext';
 import { useAuth } from '../context/AuthContext';
 import { useRef, useEffect, useState } from 'react';
@@ -137,6 +137,16 @@ const Header: React.FC = () => {
                   ref={iconRefs.players}
                 >
                   <Users size={20} />
+                </NavLink>
+                
+                <NavLink
+                  to="/report"
+                  className={({ isActive }) =>
+                    `nav-icon-link${isActive ? ' active' : ''}`
+                  }
+                  title="Submit Report"
+                >
+                  <Flag size={20} />
                 </NavLink>
               </>
             )}

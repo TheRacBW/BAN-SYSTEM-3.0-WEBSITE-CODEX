@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { Navigate } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
-import { Shield, Users, Swords, Settings, Plus, X, Edit2, Database } from 'lucide-react';
+import { Shield, Users, Swords, Settings, Plus, X, Edit2, Database, Flag } from 'lucide-react';
 import { Kit, KitType } from '../types';
 import KitCard from '../components/KitCard';
 import AdSettingsPanel from '../components/AdSettingsPanel';
@@ -11,6 +11,7 @@ import UserManagementPanel from '../components/admin/UserManagementPanel';
 import RestrictedUsersManager from '../components/admin/RestrictedUsersManager';
 import { PageAccessControlManager } from '../components/admin/PageAccessControlManager';
 import ActivityPulseManager from '../components/admin/ActivityPulseManager';
+import AdminReportPanel from '../components/AdminReportPanel';
 import { TRUST_LEVEL_CONFIGS } from "../types/trustLevels";
 
 interface AdminStats {
@@ -22,6 +23,7 @@ interface AdminStats {
 
 const AdminPage = () => {
   const { user, isAdmin } = useAuth();
+  const [activeTab, setActiveTab] = useState<'overview' | 'kits' | 'reports' | 'settings'>('overview');
   const [stats, setStats] = useState<AdminStats>({
     totalUsers: 0,
     totalStrategies: 0,
@@ -214,151 +216,229 @@ const AdminPage = () => {
   }
 
   return (
-    <div className="container mx-auto py-8">
+    <div className="max-w-7xl mx-auto px-4">
       <div className="flex items-center justify-between mb-8">
         <h1 className="text-3xl font-bold">Admin Dashboard</h1>
-        <div className="flex items-center gap-4">
-          <a
-            href="/admin/migration"
-            className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+        <div className="flex items-center gap-2">
+          <Shield className="text-primary-600" size={24} />
+          <span className="text-sm text-gray-600 dark:text-gray-400">Admin Access</span>
+        </div>
+      </div>
+
+      {/* Tab Navigation */}
+      <div className="border-b border-gray-200 dark:border-gray-700 mb-8">
+        <nav className="-mb-px flex space-x-8">
+          <button
+            onClick={() => setActiveTab('overview')}
+            className={`py-2 px-1 border-b-2 font-medium text-sm ${
+              activeTab === 'overview'
+                ? 'border-primary-500 text-primary-600 dark:text-primary-400'
+                : 'border-transparent text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300'
+            }`}
           >
-            <Database className="w-4 h-4" />
-            <span>RP Migration</span>
-          </a>
-          <div className="flex items-center gap-2">
-            <Shield className="text-primary-600" size={24} />
-            <span className="text-sm text-gray-600 dark:text-gray-400">Admin Access</span>
-          </div>
-        </div>
+            <div className="flex items-center gap-2">
+              <Users size={16} />
+              Overview
+            </div>
+          </button>
+          
+          <button
+            onClick={() => setActiveTab('reports')}
+            className={`py-2 px-1 border-b-2 font-medium text-sm ${
+              activeTab === 'reports'
+                ? 'border-primary-500 text-primary-600 dark:text-primary-400'
+                : 'border-transparent text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300'
+            }`}
+          >
+            <div className="flex items-center gap-2">
+              <Flag size={16} />
+              Report Panel
+              {/* Optional: Show unreviewed count badge */}
+              <span className="bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300 text-xs px-2 py-1 rounded-full ml-1">
+                New
+              </span>
+            </div>
+          </button>
+
+          <button
+            onClick={() => setActiveTab('kits')}
+            className={`py-2 px-1 border-b-2 font-medium text-sm ${
+              activeTab === 'kits'
+                ? 'border-primary-500 text-primary-600 dark:text-primary-400'
+                : 'border-transparent text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300'
+            }`}
+          >
+            <div className="flex items-center gap-2">
+              <Swords size={16} />
+              Kit Management
+            </div>
+          </button>
+
+          <button
+            onClick={() => setActiveTab('settings')}
+            className={`py-2 px-1 border-b-2 font-medium text-sm ${
+              activeTab === 'settings'
+                ? 'border-primary-500 text-primary-600 dark:text-primary-400'
+                : 'border-transparent text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300'
+            }`}
+          >
+            <div className="flex items-center gap-2">
+              <Settings size={16} />
+              Settings
+            </div>
+          </button>
+        </nav>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-        <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm text-gray-600 dark:text-gray-400">Total Users</p>
-              <h3 className="text-2xl font-bold">{stats.totalUsers}</h3>
-            </div>
-            <Users className="text-blue-500" size={24} />
-          </div>
-        </div>
-
-        <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm text-gray-600 dark:text-gray-400">Total Strategies</p>
-              <h3 className="text-2xl font-bold">{stats.totalStrategies}</h3>
-            </div>
-            <Swords className="text-green-500" size={24} />
-          </div>
-        </div>
-
-        <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm text-gray-600 dark:text-gray-400">Strategy Ratings</p>
-              <h3 className="text-2xl font-bold">{stats.totalRatings}</h3>
-            </div>
-            <Settings className="text-purple-500" size={24} />
-          </div>
-        </div>
-
-        <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm text-gray-600 dark:text-gray-400">Counter Strategies</p>
-              <h3 className="text-2xl font-bold">{stats.totalCounters}</h3>
-            </div>
-            <Shield className="text-orange-500" size={24} />
-          </div>
-        </div>
-      </div>
-
-      <div className="space-y-8">
-        <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
-          <UserManagementPanel />
-          <div className="my-8">
-            <div className="bg-base-200 rounded-2xl shadow-lg p-6 flex flex-col md:flex-row gap-6 items-center justify-center">
-              {TRUST_LEVEL_CONFIGS.map(config => (
-                <div key={config.level} className="flex flex-col items-center flex-1">
-                  <span className="text-3xl mb-2">{config.icon}</span>
-                  <span className="font-bold">{config.level} = {config.label}</span>
-                  <span className="text-gray-400 text-sm text-center">{config.description}</span>
-                </div>
-              ))}
-            </div>
-          </div>
-          <RestrictedUsersManager />
-        </div>
-
-        <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
-          <AdSettingsPanel />
-        </div>
-
-        <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
-          <PageAccessControlManager />
-        </div>
-
-        <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
-          <ActivityPulseManager isAdmin={isAdmin} />
-        </div>
-
-        <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
-          <div className="flex justify-between items-center mb-6">
-            <h2 className="text-xl font-semibold">Kit Management</h2>
-            <button
-              onClick={() => setShowKitModal(true)}
-              className="btn btn-primary flex items-center gap-2"
-            >
-              <Plus size={18} />
-              Add New Kit
-            </button>
-          </div>
-
-          {error && (
-            <div className="mb-4 p-3 bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-300 rounded">
-              {error}
-            </div>
-          )}
-
-          {success && (
-            <div className="mb-4 p-3 bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300 rounded">
-              {success}
-            </div>
-          )}
-
-          <div className="mb-4">
-            <input
-              type="text"
-              value={kitSearch}
-              onChange={(e) => setKitSearch(e.target.value)}
-              placeholder="Search kits..."
-              className="w-full p-2 border rounded dark:bg-gray-700 dark:border-gray-600"
-            />
-          </div>
-
-          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4">
-            {filteredKits.map(kit => (
-              <div key={kit.id} className="relative group">
-                <KitCard kit={kit} />
-                <div className="absolute top-2 right-2 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                  <button
-                    onClick={() => openEditModal(kit)}
-                    className="p-1 bg-blue-500 rounded-full text-white hover:bg-blue-600"
-                  >
-                    <Edit2 size={14} />
-                  </button>
-                  <button
-                    onClick={() => handleDeleteKit(kit.id)}
-                    className="p-1 bg-red-500 rounded-full text-white hover:bg-red-600"
-                  >
-                    <X size={14} />
-                  </button>
+      {/* Tab Content */}
+      <div>
+        {activeTab === 'overview' && (
+          <div className="space-y-8">
+            {/* Statistics Cards */}
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+              <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm text-gray-600 dark:text-gray-400">Total Users</p>
+                    <h3 className="text-2xl font-bold">{stats.totalUsers}</h3>
+                  </div>
+                  <Users className="text-blue-500" size={24} />
                 </div>
               </div>
-            ))}
+
+              <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm text-gray-600 dark:text-gray-400">Total Strategies</p>
+                    <h3 className="text-2xl font-bold">{stats.totalStrategies}</h3>
+                  </div>
+                  <Swords className="text-green-500" size={24} />
+                </div>
+              </div>
+
+              <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm text-gray-600 dark:text-gray-400">Strategy Ratings</p>
+                    <h3 className="text-2xl font-bold">{stats.totalRatings}</h3>
+                  </div>
+                  <Settings className="text-purple-500" size={24} />
+                </div>
+              </div>
+
+              <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm text-gray-600 dark:text-gray-400">Counter Strategies</p>
+                    <h3 className="text-2xl font-bold">{stats.totalCounters}</h3>
+                  </div>
+                  <Shield className="text-orange-500" size={24} />
+                </div>
+              </div>
+            </div>
+
+            {/* User Management */}
+            <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
+              <UserManagementPanel />
+              <div className="my-8">
+                <div className="bg-base-200 rounded-2xl shadow-lg p-6 flex flex-col md:flex-row gap-6 items-center justify-center">
+                  {TRUST_LEVEL_CONFIGS.map(config => (
+                    <div key={config.level} className="flex flex-col items-center flex-1">
+                      <span className="text-3xl mb-2">{config.icon}</span>
+                      <span className="font-bold">{config.level} = {config.label}</span>
+                      <span className="text-gray-400 text-sm text-center">{config.description}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+              <RestrictedUsersManager />
+            </div>
+
+            {/* Activity Pulse Manager */}
+            <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
+              <ActivityPulseManager isAdmin={isAdmin} />
+            </div>
           </div>
-        </div>
+        )}
+
+        {activeTab === 'reports' && (
+          <AdminReportPanel />
+        )}
+
+        {activeTab === 'kits' && (
+          <div className="space-y-8">
+            <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
+              <div className="flex justify-between items-center mb-6">
+                <h2 className="text-xl font-semibold">Kit Management</h2>
+                <button
+                  onClick={() => setShowKitModal(true)}
+                  className="btn btn-primary flex items-center gap-2"
+                >
+                  <Plus size={18} />
+                  Add New Kit
+                </button>
+              </div>
+
+              {error && (
+                <div className="mb-4 p-3 bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-300 rounded">
+                  {error}
+                </div>
+              )}
+
+              {success && (
+                <div className="mb-4 p-3 bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300 rounded">
+                  {success}
+                </div>
+              )}
+
+              <div className="mb-4">
+                <input
+                  type="text"
+                  value={kitSearch}
+                  onChange={(e) => setKitSearch(e.target.value)}
+                  placeholder="Search kits..."
+                  className="w-full p-2 border rounded dark:bg-gray-700 dark:border-gray-600"
+                />
+              </div>
+
+              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4">
+                {filteredKits.map(kit => (
+                  <div key={kit.id} className="relative group">
+                    <KitCard kit={kit} />
+                    <div className="absolute top-2 right-2 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                      <button
+                        onClick={() => openEditModal(kit)}
+                        className="p-1 bg-blue-500 rounded-full text-white hover:bg-blue-600"
+                      >
+                        <Edit2 size={14} />
+                      </button>
+                      <button
+                        onClick={() => handleDeleteKit(kit.id)}
+                        className="p-1 bg-red-500 rounded-full text-white hover:bg-red-600"
+                      >
+                        <X size={14} />
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {activeTab === 'settings' && (
+          <div className="space-y-8">
+            <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
+              <AdSettingsPanel />
+            </div>
+            <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
+              <PageAccessControlManager />
+            </div>
+            <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
+              <RobloxCookiePanel />
+            </div>
+          </div>
+        )}
       </div>
 
       {showKitModal && (

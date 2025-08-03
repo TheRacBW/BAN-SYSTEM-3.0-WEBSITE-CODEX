@@ -19,6 +19,7 @@ import PlayersPage from './pages/PlayersPage';
 import LeaderboardPage from './pages/LeaderboardPage';
 import StratPickerPage from './pages/StratPickerPage';
 import MMRCalculatorPage from './pages/MMRCalculatorPage';
+import ReportPage from './pages/ReportPage';
 
 function App() {
   return (
@@ -42,6 +43,7 @@ function App() {
                     <Route path="/players" element={<PlayersPage />} />
                     <Route path="/leaderboard" element={<LeaderboardPage />} />
                     <Route path="/mmr-calculator" element={<MMRCalculatorPage />} />
+                    <Route path="/report" element={<ReportPage />} />
                   </Routes>
                 </main>
                 
