@@ -114,18 +114,87 @@ export class FrontendActivityTracker {
   }
 
   // Get better last seen information from presence logs
-  static async getLastSeenInfo(userId: string, username?: string): Promise<{
+  static async getLastSeenInfo(userId: string): Promise<{
     lastSeenAccount?: string;
     lastSeenStatus?: string;
     lastSeenTimestamp?: string;
     lastSeenActivity?: string;
   } | null> {
     try {
-      // Get the most recent meaningful activity from presence logs
+      console.log(`🔍 getLastSeenInfo: Checking for userId ${userId}`);
+      console.log(`🔍 getLastSeenInfo: Parsed userId as integer: ${parseInt(userId)}`);
+      
+      // Get last seen information from player_activity_summary table
+      const { data, error } = await supabase
+        .from('player_activity_summary')
+        .select('username, user_id, last_seen_online, is_in_game, in_bedwars')
+        .eq('user_id', parseInt(userId))
+        .not('last_seen_online', 'is', null) // Only get records with last seen data
+        .single();
+      
+      console.log(`🔍 getLastSeenInfo: Query result for ${userId}:`, { data, error });
+      
+      if (error || !data || !data.last_seen_online) {
+        console.log(`❌ getLastSeenInfo: No last seen data found for ${userId}`);
+        return null;
+      }
+      
+      // Determine the activity status based on the last known state
+      let lastSeenStatus: string | undefined;
+      let lastSeenActivity: string | undefined;
+      
+      if (data.in_bedwars) {
+        lastSeenStatus = 'in_bedwars';
+        lastSeenActivity = 'In BedWars';
+      } else if (data.is_in_game) {
+        lastSeenStatus = 'in_game';
+        lastSeenActivity = 'In Game';
+      }
+      // If neither in_bedwars nor is_in_game, we still show "online" as a fallback
+      else {
+        lastSeenStatus = 'online';
+        lastSeenActivity = 'Online';
+      }
+      
+      console.log(`🔍 getLastSeenInfo: Activity status for ${userId}:`, { 
+        in_bedwars: data.in_bedwars, 
+        is_in_game: data.is_in_game, 
+        lastSeenStatus, 
+        lastSeenActivity 
+      });
+      
+      const result = {
+        lastSeenAccount: data.username || `User ${userId}`,
+        lastSeenStatus,
+        lastSeenTimestamp: data.last_seen_online,
+        lastSeenActivity
+      };
+      
+      console.log(`✅ getLastSeenInfo: Returning result for ${userId}:`, result);
+      return result;
+    } catch (error) {
+      console.error('Failed to get last seen info:', error);
+      return null;
+    }
+  }
+
+  // Get the most recent last seen activity across all accounts for a player
+  static async getPlayerLastSeenInfo(playerAccounts: Array<{ user_id: number; username?: string }>): Promise<{
+    lastSeenAccount?: string;
+    lastSeenStatus?: string;
+    lastSeenTimestamp?: string;
+    lastSeenActivity?: string;
+  } | null> {
+    try {
+      if (!playerAccounts || playerAccounts.length === 0) return null;
+
+      // Get the most recent meaningful activity across all accounts
+      const userIds = playerAccounts.map(acc => acc.user_id);
+      
       const { data, error } = await supabase
         .from('roblox_presence_logs')
-        .select('was_online, was_in_game, in_bedwars, detected_at, status_change_type')
-        .eq('roblox_user_id', parseInt(userId))
+        .select('roblox_user_id, was_online, was_in_game, in_bedwars, detected_at, status_change_type')
+        .in('roblox_user_id', userIds)
         .neq('status_change_type', 'status_check') // Exclude redundant status checks
         .order('detected_at', { ascending: false })
         .limit(1)
@@ -133,11 +202,10 @@ export class FrontendActivityTracker {
       
       if (error || !data) return null;
       
-      // Determine the activity status
+      // Determine the activity status - ONLY count meaningful activity (in BedWars or in game)
       let lastSeenStatus: string | undefined;
       let lastSeenActivity: string | undefined;
       
-      // Only count meaningful activity (in BedWars or in game), not just "online"
       if (data.in_bedwars) {
         lastSeenStatus = 'in_bedwars';
         lastSeenActivity = 'In BedWars';
@@ -145,21 +213,24 @@ export class FrontendActivityTracker {
         lastSeenStatus = 'in_game';
         lastSeenActivity = 'In Game';
       }
-      // Don't count just "online" as it could be someone leaving the website open
+      // Do NOT include was_online - only show "in game" or "in bedwars" status
       
-      // Only return if we have meaningful status (was in BedWars or in game)
-      if (!lastSeenStatus || (!data.was_in_game && !data.in_bedwars)) {
-        return null;
+      // Return information ONLY if we have meaningful activity status
+      if (lastSeenStatus) {
+        // Find the account that had this activity
+        const account = playerAccounts.find(acc => acc.user_id === data.roblox_user_id);
+        const accountName = account?.username || `User ${data.roblox_user_id}`;
+        
+        return {
+          lastSeenAccount: accountName,
+          lastSeenStatus,
+          lastSeenTimestamp: data.detected_at,
+          lastSeenActivity
+        };
       }
-      
-      return {
-        lastSeenAccount: username, // Include the username
-        lastSeenStatus,
-        lastSeenTimestamp: data.detected_at,
-        lastSeenActivity
-      };
+      return null;
     } catch (error) {
-      console.error('Failed to get last seen info:', error);
+      console.error('Failed to get player last seen info:', error);
       return null;
     }
   }

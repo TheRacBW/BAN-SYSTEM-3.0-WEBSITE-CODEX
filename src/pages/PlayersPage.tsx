@@ -157,31 +157,31 @@ function useSharedPlayerRefresh(user: any) {
                 const activityData = await FrontendActivityTracker.getActivityData(acc.user_id.toString());
                 
                 // Get better last seen information from presence logs
+                console.log(`🔍 PlayersPage: Calling getLastSeenInfo for account ${acc.user_id} (${typeof acc.user_id})`);
                 const lastSeenInfo = await FrontendActivityTracker.getLastSeenInfo(
-                  acc.user_id.toString(),
-                  status.username // Pass the username
+                  acc.user_id.toString()
                 );
                 
-                // Use presence logs data if available, otherwise fall back to current status
+                console.log(`🔍 PlayersPage: lastSeenInfo for account ${acc.user_id}:`, lastSeenInfo);
+                
+                // Use presence logs data if available
                 let lastSeenStatus: string | undefined;
                 let lastSeenTimestamp: string | undefined;
                 let lastSeenAccount: string | undefined;
                 
                 if (lastSeenInfo?.lastSeenStatus) {
-                  // Use data from presence logs (more accurate)
+                  // Use data from presence logs (only "in game" or "in bedwars" status)
                   lastSeenStatus = lastSeenInfo.lastSeenStatus;
                   lastSeenTimestamp = lastSeenInfo.lastSeenTimestamp;
                   lastSeenAccount = lastSeenInfo.lastSeenAccount; // Use username from presence logs
-                } else {
-                  // Fall back to current status (less accurate) - only count meaningful activity
-                  if (status.in_bedwars) {
-                    lastSeenStatus = 'in_bedwars';
-                  } else if (status.is_in_game) {
-                    lastSeenStatus = 'in_game';
-                  }
-                  // Don't count just "online" as it could be someone leaving the website open
-                  lastSeenAccount = status.username; // Use current username as fallback
                 }
+                // Only show last seen if we have meaningful activity status from presence logs
+                
+                console.log(`🔍 PlayersPage: Final last seen data for account ${acc.user_id}:`, {
+                  lastSeenStatus,
+                  lastSeenTimestamp,
+                  lastSeenAccount
+                });
                 
                 return {
                   ...acc,
@@ -205,8 +205,8 @@ function useSharedPlayerRefresh(user: any) {
                     // Activity Pulse Data from database
                     dailyMinutesToday: activityData?.daily_minutes_today || 0,
                     weeklyAverage: activityData?.weekly_average || 0,
-                    activityTrend: activityData?.activity_trend || 'stable',
-                    preferredTimePeriod: activityData?.preferred_time_period || 'unknown',
+                    activityTrend: (activityData?.activity_trend as 'increasing' | 'decreasing' | 'stable') || 'stable',
+                    preferredTimePeriod: (activityData?.preferred_time_period as 'unknown' | 'morning' | 'afternoon' | 'evening' | 'night') || 'unknown',
                     currentSessionMinutes: activityData?.current_session_minutes || 0,
                     isCurrentlyOnline: activityData?.is_online || false,
                     // Last seen information
@@ -676,8 +676,8 @@ export default function PlayersPage() {
                       // Activity Pulse Data from database
                       dailyMinutesToday: activityData?.daily_minutes_today || 0,
                       weeklyAverage: activityData?.weekly_average || 0,
-                      activityTrend: activityData?.activity_trend || 'stable',
-                      preferredTimePeriod: activityData?.preferred_time_period || 'unknown',
+                      activityTrend: (activityData?.activity_trend as 'increasing' | 'decreasing' | 'stable') || 'stable',
+                      preferredTimePeriod: (activityData?.preferred_time_period as 'unknown' | 'morning' | 'afternoon' | 'evening' | 'night') || 'unknown',
                       currentSessionMinutes: activityData?.current_session_minutes || 0,
                       isCurrentlyOnline: activityData?.is_online || false
                     },
@@ -877,7 +877,16 @@ export default function PlayersPage() {
 
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {sortedPlayers.map(player => (
-            <div key={player.id} onClick={() => setModalPlayer(player)}>
+            <div key={player.id} onClick={() => {
+              // Find the updated player data with last seen information
+              const updatedPlayer = players.find(p => p.id === player.id);
+              console.log('🔍 PlayersPage: Modal player data:', {
+                playerId: player.id,
+                updatedPlayer,
+                accountsWithLastSeen: updatedPlayer?.accounts?.filter(acc => acc.status?.lastSeenStatus)
+              });
+              setModalPlayer(updatedPlayer || player);
+            }}>
               <PlayerCard
                 player={player}
                 isAdmin={isAdmin}

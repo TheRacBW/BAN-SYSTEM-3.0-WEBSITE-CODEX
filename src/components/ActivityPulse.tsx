@@ -14,7 +14,8 @@ interface ActivityPulseProps {
   peakHoursEnd?: number;
   // New props for last seen with account info
   lastSeenAccount?: string;
-  lastSeenStatus?: string; // 'online', 'in_game', 'in_bedwars', 'offline'
+  lastSeenStatus?: string; // 'in_game', 'in_bedwars'
+  lastSeenTimestamp?: string; // Timestamp from presence logs
 }
 
 const ActivityPulse: React.FC<ActivityPulseProps> = ({
@@ -28,8 +29,18 @@ const ActivityPulse: React.FC<ActivityPulseProps> = ({
   peakHoursStart,
   peakHoursEnd,
   lastSeenAccount,
-  lastSeenStatus
+  lastSeenStatus,
+  lastSeenTimestamp
 }) => {
+  // Debug logging
+  console.log('🔍 ActivityPulse props:', {
+    isCurrentlyOnline,
+    lastSeenAccount,
+    lastSeenStatus,
+    lastSeenTimestamp,
+    lastOnlineTimestamp
+  });
+  
   // Format duration with exact times
   const formatDuration = (minutes: number): string => {
     if (isNaN(minutes) || minutes < 0) return '0m';
@@ -138,21 +149,17 @@ const ActivityPulse: React.FC<ActivityPulseProps> = ({
 
   // Format last seen status with account info
   const formatLastSeenWithAccount = (): string => {
-    // If we have lastSeenStatus but no timestamp, we can't show time
-    if (!lastOnlineTimestamp && !lastSeenStatus) return '';
+    // Use lastSeenTimestamp from presence logs if available, otherwise fallback to lastOnlineTimestamp
+    const timestampToUse = lastSeenTimestamp || lastOnlineTimestamp;
     
-    let timeAgo = '';
-    if (lastOnlineTimestamp) {
-      timeAgo = formatLastSeen(lastOnlineTimestamp);
-    } else {
-      timeAgo = 'recently'; // Fallback if no timestamp
-    }
+    if (!timestampToUse || !lastSeenStatus) return '';
     
+    const timeAgo = formatLastSeen(timestampToUse);
     const accountInfo = lastSeenAccount ? ` on ${lastSeenAccount}` : '';
     
-    // Only show meaningful statuses (not "offline")
+    // Only show meaningful statuses (in_bedwars, in_game, online)
     let statusInfo = '';
-    if (lastSeenStatus && lastSeenStatus !== 'offline') {
+    if (lastSeenStatus && (lastSeenStatus === 'in_bedwars' || lastSeenStatus === 'in_game' || lastSeenStatus === 'online')) {
       statusInfo = ` (${lastSeenStatus})`;
     }
     
@@ -191,7 +198,7 @@ const ActivityPulse: React.FC<ActivityPulseProps> = ({
             {activityTrend === 'increasing' ? '↗' : '↘'}
           </span>
         )}
-        {!isCurrentlyOnline && lastSeenStatus && lastSeenStatus !== 'offline' && (
+        {!isCurrentlyOnline && lastSeenStatus && (lastSeenStatus === 'in_bedwars' || lastSeenStatus === 'in_game' || lastSeenStatus === 'online') && (
           <span className="text-xs text-gray-500">• {formatLastSeenWithAccount()}</span>
         )}
         {preferredTimePeriod !== 'unknown' && (
@@ -287,9 +294,16 @@ const ActivityPulse: React.FC<ActivityPulseProps> = ({
       </div>
 
       {/* Last Seen - ONLY FOR OFFLINE USERS WITH MEANINGFUL STATUS */}
-      {!isCurrentlyOnline && lastSeenStatus && lastSeenStatus !== 'offline' && (
+      {!isCurrentlyOnline && lastSeenStatus && (lastSeenStatus === 'in_bedwars' || lastSeenStatus === 'in_game' || lastSeenStatus === 'online') && (
         <div className="text-xs text-gray-400 pt-2 border-t border-gray-700">
           {formatLastSeenWithAccount()}
+        </div>
+      )}
+      
+      {/* Debug info for offline users with no last seen data */}
+      {!isCurrentlyOnline && !lastSeenStatus && (
+        <div className="text-xs text-gray-500 pt-2 border-t border-gray-700">
+          No recent activity data available
         </div>
       )}
     </div>

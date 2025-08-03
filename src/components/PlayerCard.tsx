@@ -1476,20 +1476,58 @@ function PlayerCard({ player, onDelete, isAdmin, isPinned, onPinToggle, showPinI
                   peakHoursEnd={playerData.accounts[0]?.status?.peakHoursEnd}
                   compact={false}
                   // Last seen information - find the most recent account with meaningful status
-                  lastSeenAccount={playerData.accounts
-                    .filter(acc => acc.status?.lastSeenAccount && acc.status?.lastSeenStatus && acc.status.lastSeenStatus !== 'offline')
-                    .sort((a, b) => {
-                      const aTime = a.status?.lastUpdated || 0;
-                      const bTime = b.status?.lastUpdated || 0;
-                      return bTime - aTime;
-                    })[0]?.status?.lastSeenAccount || undefined}
-                  lastSeenStatus={playerData.accounts
-                    .filter(acc => acc.status?.lastSeenAccount && acc.status?.lastSeenStatus && acc.status.lastSeenStatus !== 'offline')
-                    .sort((a, b) => {
-                      const aTime = a.status?.lastUpdated || 0;
-                      const bTime = b.status?.lastUpdated || 0;
-                      return bTime - aTime;
-                    })[0]?.status?.lastSeenStatus}
+                  lastSeenAccount={(() => {
+                    const account = playerData.accounts
+                      .filter(acc => acc.status?.lastSeenAccount && acc.status?.lastSeenStatus && (acc.status.lastSeenStatus === 'in_bedwars' || acc.status.lastSeenStatus === 'in_game' || acc.status.lastSeenStatus === 'online'))
+                      .sort((a, b) => {
+                        const aTime = a.status?.lastSeenTimestamp ? new Date(a.status.lastSeenTimestamp).getTime() : 0;
+                        const bTime = b.status?.lastSeenTimestamp ? new Date(b.status.lastSeenTimestamp).getTime() : 0;
+                        return bTime - aTime;
+                      })[0];
+                    
+                    const result = account?.status?.lastSeenAccount || undefined;
+                    console.log('🔍 PlayerCard lastSeenAccount calculation:', {
+                      playerId: playerData.id,
+                      accountsWithLastSeen: playerData.accounts.filter(acc => acc.status?.lastSeenAccount && acc.status?.lastSeenStatus),
+                      selectedAccount: account?.status?.lastSeenAccount,
+                      result
+                    });
+                    return result;
+                  })()}
+                  lastSeenStatus={(() => {
+                    const account = playerData.accounts
+                      .filter(acc => acc.status?.lastSeenAccount && acc.status?.lastSeenStatus && (acc.status.lastSeenStatus === 'in_bedwars' || acc.status.lastSeenStatus === 'in_game' || acc.status.lastSeenStatus === 'online'))
+                      .sort((a, b) => {
+                        const aTime = a.status?.lastSeenTimestamp ? new Date(a.status.lastSeenTimestamp).getTime() : 0;
+                        const bTime = b.status?.lastSeenTimestamp ? new Date(b.status.lastSeenTimestamp).getTime() : 0;
+                        return bTime - aTime;
+                      })[0];
+                    
+                    const status = account?.status?.lastSeenStatus;
+                    const result = status === null ? undefined : status;
+                    console.log('🔍 PlayerCard lastSeenStatus calculation:', {
+                      playerId: playerData.id,
+                      result
+                    });
+                    return result;
+                  })()}
+                  lastSeenTimestamp={(() => {
+                    const account = playerData.accounts
+                      .filter(acc => acc.status?.lastSeenAccount && acc.status?.lastSeenStatus && (acc.status.lastSeenStatus === 'in_bedwars' || acc.status.lastSeenStatus === 'in_game' || acc.status.lastSeenStatus === 'online'))
+                      .sort((a, b) => {
+                        const aTime = a.status?.lastSeenTimestamp ? new Date(a.status.lastSeenTimestamp).getTime() : 0;
+                        const bTime = b.status?.lastSeenTimestamp ? new Date(b.status.lastSeenTimestamp).getTime() : 0;
+                        return bTime - aTime;
+                      })[0];
+                    
+                    const timestamp = account?.status?.lastSeenTimestamp;
+                    const result = timestamp || undefined;
+                    console.log('🔍 PlayerCard lastSeenTimestamp calculation:', {
+                      playerId: playerData.id,
+                      result
+                    });
+                    return result;
+                  })()}
                 />
               </div>
             </section>
