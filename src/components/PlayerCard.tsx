@@ -30,7 +30,9 @@ import {
   Crown,
   Check,
   Hash,
-  User
+  User,
+  TrendingUp,
+  TrendingDown
 } from 'lucide-react';
 import { useRestrictedUserIds } from '../hooks/useRestrictedUserIds';
 
@@ -99,7 +101,6 @@ const CompactActivityPulse: React.FC<{ accounts: PlayerAccount[] }> = ({ account
   // Get trend indicator
   const hasIncreasing = accounts.some(acc => acc.status?.activityTrend === 'increasing');
   const hasStable = accounts.some(acc => acc.status?.activityTrend === 'stable');
-  const trendIcon = hasIncreasing ? '↗' : hasStable ? '➖' : '↘';
   
   // Format last seen
   const lastSeen = formatLastSeen(lastOnlineTimestamp);
@@ -113,8 +114,16 @@ const CompactActivityPulse: React.FC<{ accounts: PlayerAccount[] }> = ({ account
         </span>
       </div>
       
-      {trendIcon !== '➖' && (
-        <span className="text-xs text-gray-500">{trendIcon}</span>
+      {hasIncreasing && (
+        <div className="flex items-center gap-1">
+          <TrendingUp size={12} className="text-green-400" />
+        </div>
+      )}
+      
+      {!hasIncreasing && !hasStable && (
+        <div className="flex items-center gap-1">
+          <TrendingDown size={12} className="text-red-400" />
+        </div>
       )}
       
       {!isCurrentlyOnline && lastSeen && (
