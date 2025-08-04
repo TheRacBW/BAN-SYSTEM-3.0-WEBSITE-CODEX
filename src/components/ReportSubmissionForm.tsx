@@ -14,7 +14,8 @@ import {
   Flag,
   User,
   Search,
-  Loader
+  Loader,
+  ExternalLink as ExternalLinkIcon
 } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../context/AuthContext';
@@ -64,6 +65,7 @@ const ReportSubmissionForm: React.FC = () => {
   const [playerSearchInput, setPlayerSearchInput] = useState('');
   const [searchingPlayer, setSearchingPlayer] = useState(false);
   const [timestampInput, setTimestampInput] = useState({ timestamp: '', description: '' });
+  const [matchHistoryImageError, setMatchHistoryImageError] = useState(false);
 
   const reasonOptions = [
     { value: 'hacking/exploiting', label: 'Hacking/Exploiting' },
@@ -76,8 +78,14 @@ const ReportSubmissionForm: React.FC = () => {
 
   useEffect(() => {
     checkDiscordVerification();
-    checkSubmissionEligibility();
   }, [user]);
+
+  useEffect(() => {
+    // Only check eligibility after Discord verification is determined
+    if (isDiscordVerified !== null) {
+      checkSubmissionEligibility();
+    }
+  }, [user, isDiscordVerified]);
 
   useEffect(() => {
     // Clear error messages after 5 seconds
@@ -86,6 +94,11 @@ const ReportSubmissionForm: React.FC = () => {
       return () => clearTimeout(timer);
     }
   }, [error]);
+
+  // Reset image error when URL changes
+  useEffect(() => {
+    setMatchHistoryImageError(false);
+  }, [formData.matchHistoryUrl]);
 
   const checkDiscordVerification = async () => {
     if (!user) return;
@@ -97,9 +110,11 @@ const ReportSubmissionForm: React.FC = () => {
         .eq('id', user.id)
         .single();
       
-      setIsDiscordVerified(!!data?.discord_verified_at);
+      const verified = !!data?.discord_verified_at;
+      setIsDiscordVerified(verified);
     } catch (err) {
       console.error('Error checking Discord verification:', err);
+      setIsDiscordVerified(false);
     }
   };
 
@@ -334,6 +349,7 @@ const ReportSubmissionForm: React.FC = () => {
         additionalNotes: ''
       });
       setTimestampInput({ timestamp: '', description: '' });
+      setMatchHistoryImageError(false);
       
     } catch (err) {
       console.error('Error submitting report:', err);
@@ -470,14 +486,22 @@ const ReportSubmissionForm: React.FC = () => {
             {/* Image Preview */}
             {formData.matchHistoryUrl && (
               <div className="mt-3">
-                <img 
-                  src={formData.matchHistoryUrl} 
-                  alt="Match History Preview"
-                  className="max-w-full h-auto rounded-lg border border-gray-200 dark:border-gray-600"
-                  onError={(e) => {
-                    e.currentTarget.style.display = 'none';
-                  }}
-                />
+                {!matchHistoryImageError ? (
+                  <img 
+                    src={formData.matchHistoryUrl} 
+                    alt="Match History Preview"
+                    className="max-w-full h-auto max-h-96 rounded-lg border border-gray-200 dark:border-gray-600 object-contain"
+                    onError={() => setMatchHistoryImageError(true)}
+                    onLoad={() => setMatchHistoryImageError(false)}
+                  />
+                ) : (
+                  <div className="flex items-center gap-2 p-4 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg">
+                    <AlertTriangle size={16} className="text-red-500" />
+                    <span className="text-red-700 dark:text-red-300 text-sm">
+                      Unable to load image. Please check the URL and try again.
+                    </span>
+                  </div>
+                )}
               </div>
             )}
           </div>
@@ -527,16 +551,26 @@ const ReportSubmissionForm: React.FC = () => {
               <div className="space-y-3">
                 {formData.reportedPlayers.map((player) => (
                   <div key={player.userId} className="flex items-center gap-3 p-4 bg-gray-50 dark:bg-gray-700 rounded-lg border">
-                    {player.avatarUrl && (
-                      <img 
-                        src={player.avatarUrl} 
-                        alt={player.username}
-                        className="w-10 h-10 rounded-full"
-                        onError={(e) => {
-                          e.currentTarget.style.display = 'none';
-                        }}
-                      />
-                    )}
+                    {/* Profile Picture */}
+                    <div className="flex-shrink-0">
+                      {player.avatarUrl ? (
+                        <img 
+                          src={player.avatarUrl} 
+                          alt={player.username}
+                          className="w-12 h-12 rounded-full border-2 border-gray-200 dark:border-gray-600"
+                          onError={(e) => {
+                            e.currentTarget.style.display = 'none';
+                            e.currentTarget.nextElementSibling?.classList.remove('hidden');
+                          }}
+                        />
+                      ) : null}
+                      {(!player.avatarUrl || player.avatarUrl === '') && (
+                        <div className="w-12 h-12 rounded-full bg-gray-300 dark:bg-gray-600 flex items-center justify-center">
+                          <User size={20} className="text-gray-500 dark:text-gray-400" />
+                        </div>
+                      )}
+                    </div>
+                    
                     <div className="flex-1">
                       <div className="flex items-center gap-2">
                         <span className="font-medium text-gray-900 dark:text-gray-100">
@@ -556,7 +590,19 @@ const ReportSubmissionForm: React.FC = () => {
                         )}
                       </div>
                     </div>
+                    
                     <div className="flex items-center gap-2">
+                      {/* Roblox Profile Link */}
+                      <a
+                        href={`https://www.roblox.com/users/${player.userId}/profile`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-blue-500 hover:text-blue-700 p-1"
+                        title="View Roblox Profile"
+                      >
+                        <ExternalLinkIcon size={16} />
+                      </a>
+                      
                       <button
                         type="button"
                         onClick={() => setPrimarySuspect(player.userId)}
