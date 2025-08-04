@@ -15,6 +15,7 @@ import ActivityPulseManager from '../components/admin/ActivityPulseManager';
 import AdminReportPanel from '../components/AdminReportPanel';
 import AdminCallsDashboard from '../components/AdminCallsDashboard';
 import { TRUST_LEVEL_CONFIGS } from "../types/trustLevels";
+import { useAudioAlerts } from '../hooks/useAudioAlerts';
 
 interface AdminStats {
   totalUsers: number;
@@ -47,6 +48,22 @@ const AdminPage = () => {
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
 
+  // Audio preferences state
+  const [audioEnabled, setAudioEnabled] = useState(true);
+  const [soundType, setSoundType] = useState<'default' | 'siren' | 'chime' | 'bell' | 'youtube'>('default');
+  const [audioVolume, setAudioVolume] = useState(0.7);
+  const [audioPreferencesLoading, setAudioPreferencesLoading] = useState(false);
+  const [audioPreferencesError, setAudioPreferencesError] = useState<string | null>(null);
+  const [audioPreferencesSuccess, setAudioPreferencesSuccess] = useState<string | null>(null);
+
+  // Audio alerts hook
+  const audioAlerts = useAudioAlerts({
+    enabled: audioEnabled,
+    soundType: soundType,
+    volume: audioVolume,
+    adminId: user?.id
+  });
+
   const kitTypes: KitType[] = [
     'Fighter', 'Movement', 'Economy', 'Ranged',
     'Support', 'Destroyer', 'Tank', 'Defender'
@@ -56,8 +73,9 @@ const AdminPage = () => {
     if (isAdmin) {
       fetchAdminStats();
       fetchKits();
+      loadAudioPreferences();
     }
-  }, [isAdmin]);
+  }, [isAdmin, user]);
 
   const fetchKits = async () => {
     try {
@@ -97,6 +115,27 @@ const AdminPage = () => {
       console.error('Error fetching admin stats:', error);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const loadAudioPreferences = async () => {
+    if (!user?.id) return;
+    
+    try {
+      const { data, error } = await supabase.rpc('get_admin_preferences', {
+        admin_user_id: user.id
+      });
+
+      if (error) throw error;
+
+      if (data) {
+        setAudioEnabled(data.sound_enabled ?? true);
+        setSoundType(data.sound_type ?? 'default');
+        setAudioVolume(data.sound_volume ?? 0.7);
+      }
+    } catch (err) {
+      console.error('Error loading audio preferences:', err);
+      setAudioPreferencesError('Failed to load audio preferences');
     }
   };
 
@@ -199,6 +238,38 @@ const AdminPage = () => {
   const openEditModal = (kit: Kit) => {
     setEditingKit(kit);
     setShowEditModal(true);
+  };
+
+  // Test sound function
+  const handleTestSound = () => {
+    audioAlerts.testSound(soundType);
+  };
+
+  // Save audio preferences function
+  const handleSaveAudioPreferences = async () => {
+    if (!user?.id) return;
+    
+    setAudioPreferencesLoading(true);
+    setAudioPreferencesError(null);
+    setAudioPreferencesSuccess(null);
+
+    try {
+      const { error } = await supabase.rpc('update_audio_preferences', {
+        p_user_id: user.id,
+        p_sound_enabled: audioEnabled,
+        p_sound_type: soundType,
+        p_sound_volume: audioVolume
+      });
+
+      if (error) throw error;
+
+      setAudioPreferencesSuccess('Audio preferences saved successfully!');
+    } catch (err: any) {
+      console.error('Error saving audio preferences:', err);
+      setAudioPreferencesError(err.message || 'Failed to save audio preferences');
+    } finally {
+      setAudioPreferencesLoading(false);
+    }
   };
 
   const filteredKits = kits.filter(k =>
@@ -414,13 +485,18 @@ const AdminPage = () => {
                       <input
                         type="checkbox"
                         className="form-checkbox"
-                        defaultChecked
+                        checked={audioEnabled}
+                        onChange={(e) => setAudioEnabled(e.target.checked)}
                       />
                     </div>
                     
                     <div>
                       <label className="block text-sm font-medium mb-2">Sound Type</label>
-                      <select className="w-full p-2 border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-700">
+                      <select 
+                        className="w-full p-2 border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-700"
+                        value={soundType}
+                        onChange={(e) => setSoundType(e.target.value as any)}
+                      >
                         <option value="default">Default</option>
                         <option value="chime">Chime</option>
                         <option value="bell">Bell</option>
@@ -436,14 +512,30 @@ const AdminPage = () => {
                         min="0"
                         max="1"
                         step="0.1"
-                        defaultValue="0.7"
+                        value={audioVolume}
+                        onChange={(e) => setAudioVolume(parseFloat(e.target.value))}
                         className="w-full"
                       />
+                      <div className="flex justify-between text-xs text-gray-500 mt-1">
+                        <span>0%</span>
+                        <span>{Math.round(audioVolume * 100)}%</span>
+                        <span>100%</span>
+                      </div>
                     </div>
                     
-                    <button className="btn btn-primary text-sm">
-                      Test Sound
+                    <button 
+                      onClick={handleTestSound}
+                      disabled={audioAlerts.isPlaying}
+                      className="btn btn-primary text-sm disabled:opacity-50"
+                    >
+                      {audioAlerts.isPlaying ? 'Playing...' : 'Test Sound'}
                     </button>
+                    
+                    {audioAlerts.error && (
+                      <div className="text-red-500 text-sm mt-2">
+                        {audioAlerts.error}
+                      </div>
+                    )}
                   </div>
                 </div>
                 
@@ -497,9 +589,27 @@ False alarm, no violation found"
               </div>
               
               <div className="mt-6 pt-6 border-t border-gray-200 dark:border-gray-700">
-                <button className="btn btn-primary">
-                  Save Preferences
-                </button>
+                <div className="flex items-center justify-between">
+                  <button 
+                    onClick={handleSaveAudioPreferences}
+                    disabled={audioPreferencesLoading}
+                    className="btn btn-primary disabled:opacity-50"
+                  >
+                    {audioPreferencesLoading ? 'Saving...' : 'Save Preferences'}
+                  </button>
+                  
+                  {audioPreferencesSuccess && (
+                    <div className="text-green-600 dark:text-green-400 text-sm">
+                      {audioPreferencesSuccess}
+                    </div>
+                  )}
+                </div>
+                
+                {audioPreferencesError && (
+                  <div className="mt-2 text-red-500 text-sm">
+                    {audioPreferencesError}
+                  </div>
+                )}
               </div>
             </div>
           </div>
