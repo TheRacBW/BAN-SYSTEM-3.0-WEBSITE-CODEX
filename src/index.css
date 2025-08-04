@@ -915,6 +915,15 @@
   box-shadow: 0 0 5px 1px #6ee7b788, 0 0 10px 2px #05966988;
 }
 
+.nav-slider-bar.report {
+  background: linear-gradient(90deg, #a78bfa 0%, #8b5cf6 100%);
+  box-shadow: 0 0 4px 1px #a78bfa88, 0 0 8px 2px #8b5cf688;
+}
+.dark .nav-slider-bar.report {
+  background: linear-gradient(90deg, #c4b5fd 0%, #a78bfa 100%);
+  box-shadow: 0 0 5px 1px #c4b5fd88, 0 0 10px 2px #a78bfa88;
+}
+
 /* Remove ::after underline for nav-icon-link.active */
 .nav-icon-link.active::after {
   display: none !important;
@@ -1016,4 +1025,21 @@
 }
 .nav-icon-link[data-page="players"]:hover svg {
   color: #34d399 !important; /* Emerald-400 */
+}
+
+/* Report: Light violet gradient underline, solid light violet icon */
+.nav-icon-link.active[data-page="report"]::after {
+  background: linear-gradient(90deg, #a78bfa 0%, #8b5cf6 100%);
+  box-shadow: 0 0 4px 1px #a78bfa88, 0 0 8px 2px #8b5cf688;
+}
+.dark .nav-icon-link.active[data-page="report"]::after {
+  background: linear-gradient(90deg, #c4b5fd 0%, #a78bfa 100%);
+  box-shadow: 0 0 5px 1px #c4b5fd88, 0 0 10px 2px #a78bfa88;
+}
+.nav-icon-link.active[data-page="report"] svg {
+  color: #a78bfa !important; /* Violet-400 */
+}
+
+.nav-icon-link[data-page="report"]:hover svg {
+  color: #a78bfa !important; /* Violet-400 */
 }

@@ -22,6 +22,7 @@ const Header: React.FC = () => {
     leaderboard: useRef<HTMLAnchorElement>(null),
     calculator: useRef<HTMLAnchorElement>(null),
     players: useRef<HTMLAnchorElement>(null),
+    report: useRef<HTMLAnchorElement>(null),
   };
   const [sliderStyle, setSliderStyle] = useState<React.CSSProperties>({ opacity: 0 });
   const [sliderClass, setSliderClass] = useState('');
@@ -33,6 +34,7 @@ const Header: React.FC = () => {
     '/leaderboard': 'leaderboard',
     '/mmr-calculator': 'calculator',
     '/players': 'players',
+    '/report': 'report',
   };
 
   useEffect(() => {
@@ -128,6 +130,18 @@ const Header: React.FC = () => {
             {user && (
               <>
                 <NavLink
+                  to="/report"
+                  className={({ isActive }) =>
+                    `nav-icon-link${isActive ? ' active' : ''}`
+                  }
+                  title="Submit Report"
+                  data-page="report"
+                  ref={iconRefs.report}
+                >
+                  <Flag size={20} />
+                </NavLink>
+                
+                <NavLink
                   to="/players"
                   className={({ isActive }) =>
                     `nav-icon-link${isActive ? ' active' : ''}`
@@ -137,16 +151,6 @@ const Header: React.FC = () => {
                   ref={iconRefs.players}
                 >
                   <Users size={20} />
-                </NavLink>
-                
-                <NavLink
-                  to="/report"
-                  className={({ isActive }) =>
-                    `nav-icon-link${isActive ? ' active' : ''}`
-                  }
-                  title="Submit Report"
-                >
-                  <Flag size={20} />
                 </NavLink>
               </>
             )}
