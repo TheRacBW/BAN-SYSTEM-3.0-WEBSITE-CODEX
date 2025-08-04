@@ -354,10 +354,7 @@ const AdminPage = () => {
               <RestrictedUsersManager />
             </div>
 
-            {/* Activity Pulse Manager */}
-            <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
-              <ActivityPulseManager isAdmin={isAdmin} />
-            </div>
+
           </div>
         )}
 
@@ -436,6 +433,9 @@ const AdminPage = () => {
             </div>
             <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
               <RobloxCookiePanel />
+            </div>
+            <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
+              <ActivityPulseManager isAdmin={isAdmin} />
             </div>
           </div>
         )}
