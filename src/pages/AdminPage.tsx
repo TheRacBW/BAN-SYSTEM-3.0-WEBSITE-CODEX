@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { Navigate } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
-import { Shield, Users, Swords, Settings, Plus, X, Edit2, Database, Flag, Phone } from 'lucide-react';
+import { Shield, Users, Swords, Settings, Plus, X, Edit2, Database, Flag, Phone, Bell } from 'lucide-react';
 import { Kit, KitType } from '../types';
 import KitCard from '../components/KitCard';
 import AdSettingsPanel from '../components/AdSettingsPanel';
@@ -24,7 +24,7 @@ interface AdminStats {
 
 const AdminPage = () => {
   const { user, isAdmin } = useAuth();
-  const [activeTab, setActiveTab] = useState<'overview' | 'kits' | 'reports' | 'admin-calls' | 'settings'>('overview');
+  const [activeTab, setActiveTab] = useState<'overview' | 'kits' | 'reports' | 'admin-calls' | 'preferences' | 'settings'>('overview');
   const [stats, setStats] = useState<AdminStats>({
     totalUsers: 0,
     totalStrategies: 0,
@@ -290,6 +290,20 @@ const AdminPage = () => {
           </button>
 
           <button
+            onClick={() => setActiveTab('preferences')}
+            className={`py-2 px-1 border-b-2 font-medium text-sm ${
+              activeTab === 'preferences'
+                ? 'border-primary-500 text-primary-600 dark:text-primary-400'
+                : 'border-transparent text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300'
+            }`}
+          >
+            <div className="flex items-center gap-2">
+              <Bell size={16} />
+              Preferences
+            </div>
+          </button>
+
+          <button
             onClick={() => setActiveTab('settings')}
             className={`py-2 px-1 border-b-2 font-medium text-sm ${
               activeTab === 'settings'
@@ -379,6 +393,104 @@ const AdminPage = () => {
 
         {activeTab === 'admin-calls' && (
           <AdminCallsDashboard />
+        )}
+
+        {activeTab === 'preferences' && (
+          <div className="space-y-8">
+            <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
+              <h2 className="text-xl font-semibold mb-6 flex items-center gap-2">
+                <Bell className="text-blue-500" size={24} />
+                Admin Call Preferences
+              </h2>
+              
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                {/* Sound Settings */}
+                <div className="space-y-4">
+                  <h3 className="text-lg font-medium">Audio Alerts</h3>
+                  <div className="space-y-3">
+                    <div className="flex items-center justify-between">
+                      <label className="text-sm font-medium">Enable Sound Alerts</label>
+                      <input
+                        type="checkbox"
+                        className="form-checkbox"
+                        defaultChecked
+                      />
+                    </div>
+                    
+                    <div>
+                      <label className="block text-sm font-medium mb-2">Sound Type</label>
+                      <select className="w-full p-2 border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-700">
+                        <option value="default">Default</option>
+                        <option value="chime">Chime</option>
+                        <option value="bell">Bell</option>
+                        <option value="siren">Siren</option>
+                      </select>
+                    </div>
+                    
+                    <div>
+                      <label className="block text-sm font-medium mb-2">Volume</label>
+                      <input
+                        type="range"
+                        min="0"
+                        max="1"
+                        step="0.1"
+                        defaultValue="0.7"
+                        className="w-full"
+                      />
+                    </div>
+                    
+                    <button className="btn btn-primary text-sm">
+                      Test Sound
+                    </button>
+                  </div>
+                </div>
+                
+                {/* Panel Settings */}
+                <div className="space-y-4">
+                  <h3 className="text-lg font-medium">Floating Panel</h3>
+                  <div className="space-y-3">
+                    <div className="flex items-center justify-between">
+                      <label className="text-sm font-medium">Show Portable Panel</label>
+                      <input
+                        type="checkbox"
+                        className="form-checkbox"
+                        defaultChecked
+                      />
+                    </div>
+                    
+                    <div>
+                      <label className="block text-sm font-medium mb-2">Panel Position</label>
+                      <select className="w-full p-2 border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-700">
+                        <option value="bottom-right">Bottom Right</option>
+                        <option value="bottom-left">Bottom Left</option>
+                        <option value="top-right">Top Right</option>
+                        <option value="top-left">Top Left</option>
+                      </select>
+                    </div>
+                    
+                    <div>
+                      <label className="block text-sm font-medium mb-2">Quick Responses</label>
+                      <textarea
+                        rows={4}
+                        className="w-full p-2 border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-700"
+                        placeholder="Enter quick response templates..."
+                        defaultValue="On my way to investigate
+Joined game, observing suspect
+Issue resolved, suspect handled
+False alarm, no violation found"
+                      />
+                    </div>
+                  </div>
+                </div>
+              </div>
+              
+              <div className="mt-6 pt-6 border-t border-gray-200 dark:border-gray-700">
+                <button className="btn btn-primary">
+                  Save Preferences
+                </button>
+              </div>
+            </div>
+          </div>
         )}
 
         {activeTab === 'kits' && (
