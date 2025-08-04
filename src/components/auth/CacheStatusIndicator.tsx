@@ -37,7 +37,7 @@ export const CacheStatusIndicator: React.FC = () => {
     return (
       <button
         onClick={() => setIsVisible(true)}
-        className="fixed bottom-4 right-4 bg-gray-800 text-white p-2 rounded-full shadow-lg z-50"
+        className="fixed bottom-4 left-4 bg-gray-800 text-white p-2 rounded-full shadow-lg z-50"
         title="Show Cache Status"
       >
         📊
@@ -46,7 +46,7 @@ export const CacheStatusIndicator: React.FC = () => {
   }
 
   return (
-    <div className="fixed bottom-4 right-4 bg-gray-800 text-white p-4 rounded-lg shadow-lg z-50 max-w-sm">
+    <div className="fixed bottom-4 left-4 bg-gray-800 text-white p-4 rounded-lg shadow-lg z-50 max-w-sm">
       <div className="flex justify-between items-center mb-2">
         <h3 className="text-sm font-bold">Cache Status</h3>
         <button
