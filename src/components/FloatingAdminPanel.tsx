@@ -18,6 +18,7 @@ import {
 } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../context/AuthContext';
+import { useAdminAvailability } from '../context/AdminAvailabilityContext';
 
 interface AdminCall {
   id: string;
@@ -43,9 +44,9 @@ interface AdminPreferences {
 
 const FloatingAdminPanel: React.FC = () => {
   const { user, isAdmin } = useAuth();
+  const { isActive } = useAdminAvailability();
   const [isExpanded, setIsExpanded] = useState(false);
   const [calls, setCalls] = useState<AdminCall[]>([]);
-  const [isActive, setIsActive] = useState(false);
   const [preferences, setPreferences] = useState<AdminPreferences | null>(null);
   const [loading, setLoading] = useState(false);
   const [soundEnabled, setSoundEnabled] = useState(true);
@@ -73,7 +74,10 @@ const FloatingAdminPanel: React.FC = () => {
       )
       .on('postgres_changes',
         { event: '*', schema: 'public', table: 'admin_availability' },
-        checkAdminStatus
+        (payload) => {
+          // Availability changes are now handled by the context
+          // This is just for call updates
+        }
       )
       .subscribe();
 
@@ -85,6 +89,8 @@ const FloatingAdminPanel: React.FC = () => {
       clearInterval(refreshInterval);
     };
   }, [isAdminUser, user]);
+
+  // Admin status is now handled by the context
 
   useEffect(() => {
     // Handle sound alerts for new calls
@@ -103,7 +109,6 @@ const FloatingAdminPanel: React.FC = () => {
   const initializePanel = async () => {
     await Promise.all([
       loadPreferences(),
-      checkAdminStatus(),
       fetchActiveCalls()
     ]);
     
@@ -162,21 +167,7 @@ const FloatingAdminPanel: React.FC = () => {
     }
   };
 
-  const checkAdminStatus = async () => {
-    if (!user) return;
-
-    try {
-      const { data } = await supabase
-        .from('admin_availability')
-        .select('is_active')
-        .eq('user_id', user.id)
-        .single();
-
-      setIsActive(data?.is_active || false);
-    } catch (err) {
-      console.error('Error checking admin status:', err);
-    }
-  };
+  // Admin status is now handled by the context
 
   const fetchActiveCalls = async () => {
     try {

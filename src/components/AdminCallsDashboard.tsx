@@ -26,6 +26,7 @@ import {
 } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../context/AuthContext';
+import { useAdminAvailability } from '../context/AdminAvailabilityContext';
 
 interface AdminCall {
   id: string;
@@ -66,9 +67,9 @@ interface SuspicionLogEntry {
 
 const AdminCallsDashboard: React.FC = () => {
   const { user, isAdmin } = useAuth();
+  const { isActive, setIsActive, toggleAvailability } = useAdminAvailability();
   const [calls, setCalls] = useState<AdminCall[]>([]);
   const [loading, setLoading] = useState(true);
-  const [isActive, setIsActive] = useState(false);
   const [selectedCall, setSelectedCall] = useState<AdminCall | null>(null);
   const [showSuspicionLog, setShowSuspicionLog] = useState(false);
   const [suspicionLog, setSuspicionLog] = useState<SuspicionLogEntry[]>([]);
@@ -115,8 +116,7 @@ const AdminCallsDashboard: React.FC = () => {
 
   useEffect(() => {
     if (user && (isAdmin || (user as any).trust_level >= 2)) {
-      fetchCalls();
-      checkAdminStatus();
+          fetchCalls();
       
       // Set up real-time subscription for new calls
       const callsSubscription = supabase
@@ -172,45 +172,10 @@ const AdminCallsDashboard: React.FC = () => {
     }
   };
 
-  const checkAdminStatus = async () => {
-    if (!user) return;
-
-    try {
-      const { data } = await supabase
-        .from('admin_availability')
-        .select('is_active')
-        .eq('user_id', user.id)
-        .single();
-
-      setIsActive(data?.is_active || false);
-    } catch (err) {
-      console.error('Error checking admin status:', err);
-    }
-  };
-
+  // Admin status is now handled by the context
   const toggleActiveStatus = async () => {
-    if (!user) return;
-
-    try {
-      const newStatus = !isActive;
-      
-      const { error } = await supabase
-        .from('admin_availability')
-        .upsert({
-          user_id: user.id,
-          is_active: newStatus,
-          last_activity: new Date().toISOString(),
-          updated_at: new Date().toISOString()
-        }, { onConflict: 'user_id' });
-
-      if (error) throw error;
-
-      setIsActive(newStatus);
-      setSuccess(`You are now ${newStatus ? 'active' : 'inactive'} for admin calls`);
-    } catch (err) {
-      console.error('Error updating admin status:', err);
-      setError('Failed to update status');
-    }
+    toggleAvailability();
+    setSuccess(`You are now ${!isActive ? 'active' : 'inactive'} for admin calls`);
   };
 
   const handleCall = async (callId: string, action: 'handled' | 'ignored', reason?: string) => {
