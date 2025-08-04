@@ -335,20 +335,6 @@ const AdminPage = () => {
           </button>
 
           <button
-            onClick={() => setActiveTab('report-restrictions')}
-            className={`py-2 px-1 border-b-2 font-medium text-sm ${
-              activeTab === 'report-restrictions'
-                ? 'border-primary-500 text-primary-600 dark:text-primary-400'
-                : 'border-transparent text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300'
-            }`}
-          >
-            <div className="flex items-center gap-2">
-              <Shield size={16} />
-              Report Restrictions
-            </div>
-          </button>
-
-          <button
             onClick={() => setActiveTab('admin-calls')}
             className={`py-2 px-1 border-b-2 font-medium text-sm ${
               activeTab === 'admin-calls'
@@ -359,6 +345,20 @@ const AdminPage = () => {
             <div className="flex items-center gap-2">
               <Phone size={16} />
               Admin Calls
+            </div>
+          </button>
+
+          <button
+            onClick={() => setActiveTab('report-restrictions')}
+            className={`py-2 px-1 border-b-2 font-medium text-sm ${
+              activeTab === 'report-restrictions'
+                ? 'border-primary-500 text-primary-600 dark:text-primary-400'
+                : 'border-transparent text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300'
+            }`}
+          >
+            <div className="flex items-center gap-2">
+              <Shield size={16} />
+              Report Restrictions
             </div>
           </button>
 
