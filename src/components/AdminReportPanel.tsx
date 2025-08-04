@@ -157,9 +157,8 @@ const AdminReportPanel: React.FC = () => {
         query = query.eq('reason', filters.reason);
       }
 
-      if (filters.search) {
-        query = query.or(`discord_username.ilike.%${filters.search}%,review_notes.ilike.%${filters.search}%`);
-      }
+      // Don't apply search filter at database level - we'll do all filtering client-side
+      // This ensures we can search through reported_players properly
 
       // Apply date filtering
       if (filters.dateRange !== 'all') {
@@ -188,7 +187,45 @@ const AdminReportPanel: React.FC = () => {
       const { data, error } = await query;
       
       if (error) throw error;
-      setCases(data || []);
+      
+      // Do all filtering client-side to ensure reported_players search works
+      let filteredData = data || [];
+      if (filters.search) {
+        const searchTerm = filters.search.toLowerCase();
+        console.log('🔍 Searching for:', searchTerm);
+        console.log('📊 Total cases before filtering:', filteredData.length);
+        
+        filteredData = filteredData.filter(caseItem => {
+          // Check discord_username
+          const matchesDiscord = caseItem.discord_username?.toLowerCase().includes(searchTerm);
+          
+          // Check review_notes
+          const matchesNotes = caseItem.review_notes?.toLowerCase().includes(searchTerm);
+          
+          // Check all reported player usernames
+          let matchesReportedPlayer = false;
+          if (caseItem.reported_players && Array.isArray(caseItem.reported_players)) {
+            matchesReportedPlayer = caseItem.reported_players.some((player: { username?: string }) => {
+              const matches = player.username && player.username.toLowerCase().includes(searchTerm);
+              if (matches) {
+                console.log('✅ Found match in reported player:', player.username, 'for case:', caseItem.id);
+              }
+              return matches;
+            });
+          }
+          
+          const shouldInclude = matchesDiscord || matchesNotes || matchesReportedPlayer;
+          if (!shouldInclude) {
+            console.log('❌ Excluding case:', caseItem.id, 'Reported players:', caseItem.reported_players?.map((p: { username?: string }) => p.username));
+          }
+          
+          return shouldInclude;
+        });
+        
+        console.log('📊 Total cases after filtering:', filteredData.length);
+      }
+      
+      setCases(filteredData);
     } catch (err) {
       console.error('Error fetching cases:', err);
       setError('Failed to fetch report cases');
@@ -299,7 +336,7 @@ const AdminReportPanel: React.FC = () => {
                     <span className="font-medium">Submitted by:</span>
                     <span>{reportCase.discord_username}</span>
                     {reportCase.submitter?.discord_verified_at && (
-                      <Shield size={14} className="text-green-500" title="Discord Verified" />
+                      <Shield size={14} className="text-green-500" />
                     )}
                   </div>
                 </div>
@@ -321,7 +358,7 @@ const AdminReportPanel: React.FC = () => {
                         {player.username}
                       </span>
                       {player.is_primary_suspect && (
-                        <AlertTriangle size={14} className="text-red-500" title="Primary Suspect" />
+                        <AlertTriangle size={14} className="text-red-500" />
                       )}
                     </div>
                   ))}
@@ -655,7 +692,7 @@ const AdminReportPanel: React.FC = () => {
                 type="text"
                 value={filters.search}
                 onChange={(e) => setFilters({ ...filters, search: e.target.value })}
-                placeholder="Username or notes..."
+                placeholder="Discord username, Roblox username, or notes..."
                 className="w-full pl-9 pr-3 py-2 border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-700 text-sm"
               />
             </div>

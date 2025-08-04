@@ -130,7 +130,7 @@ const ReportSubmissionForm: React.FC = () => {
       setCanSubmit(data && isDiscordVerified);
     } catch (err) {
       console.error('Error checking submission eligibility:', err);
-      setCanSubmit(false);
+        setCanSubmit(false);
     }
   };
 
@@ -152,29 +152,29 @@ const ReportSubmissionForm: React.FC = () => {
 
       if (data?.success && data?.player) {
         const player = data.player;
-        
+
         // Check if player already added
         if (formData.reportedPlayers.find(p => p.userId === player.userId)) {
           setError('Player already added to report');
           return;
         }
         
-        if (formData.reportedPlayers.length >= 5) {
-          setError('Maximum of 5 players can be reported per case');
-          return;
-        }
+          if (formData.reportedPlayers.length >= 5) {
+            setError('Maximum of 5 players can be reported per case');
+            return;
+          }
         
         const newPlayer = {
           ...player,
           isPrimarySuspect: formData.reportedPlayers.length === 0 // First player is primary by default
         };
+          
+          setFormData(prev => ({
+            ...prev,
+            reportedPlayers: [...prev.reportedPlayers, newPlayer]
+          }));
         
-        setFormData(prev => ({
-          ...prev,
-          reportedPlayers: [...prev.reportedPlayers, newPlayer]
-        }));
-        
-        setPlayerSearchInput('');
+          setPlayerSearchInput('');
       } else {
         setError(data?.error || 'Player not found. Please check the username or user ID.');
       }
@@ -396,8 +396,8 @@ const ReportSubmissionForm: React.FC = () => {
         <h2 className="text-3xl font-bold text-gray-900 dark:text-gray-100">Submit Report</h2>
         <p className="text-gray-600 dark:text-gray-400 mt-2">
           Report cheaters, exploiters, and rule violators to our anti-cheat team
-        </p>
-      </div>
+          </p>
+        </div>
 
       {/* Important Guidelines */}
       <div className="bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-lg p-4">
@@ -413,8 +413,8 @@ const ReportSubmissionForm: React.FC = () => {
               <li>If your ticket isn't responded to, please don't ping anyone - we'll handle it when we have time</li>
             </ul>
           </div>
+          </div>
         </div>
-      </div>
 
       {/* Form */}
       <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700">
@@ -440,16 +440,16 @@ const ReportSubmissionForm: React.FC = () => {
           </div>
 
           {/* YouTube Video URL */}
-          <div>
+              <div>
             <label className="block text-sm font-medium mb-2">
               <Video className="inline mr-2" size={16} />
               YouTube Video Evidence *
             </label>
-            <input
-              type="url"
-              value={formData.youtubeUrl}
+                <input
+                  type="url"
+                  value={formData.youtubeUrl}
               onChange={(e) => setFormData(prev => ({ ...prev, youtubeUrl: e.target.value }))}
-              placeholder="https://www.youtube.com/watch?v=..."
+                  placeholder="https://www.youtube.com/watch?v=..."
               className="w-full p-3 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
             />
             
@@ -544,7 +544,7 @@ const ReportSubmissionForm: React.FC = () => {
 
           {/* Added Players */}
           {formData.reportedPlayers.length > 0 && (
-            <div>
+              <div>
               <label className="block text-sm font-medium mb-2">
                 Reported Players ({formData.reportedPlayers.length}/5)
               </label>
@@ -586,7 +586,7 @@ const ReportSubmissionForm: React.FC = () => {
                         {player.accountCreated && (
                           <span className="ml-2">
                             • Created: {new Date(player.accountCreated).toLocaleDateString()}
-                          </span>
+                      </span>
                         )}
                       </div>
                     </div>
@@ -655,32 +655,32 @@ const ReportSubmissionForm: React.FC = () => {
                     className="text-red-500 hover:text-red-700 p-1"
                   >
                     <X size={14} />
-                  </button>
-                </div>
-              ))}
-              
-              <div className="flex gap-2">
-                <input
-                  type="text"
-                  value={timestampInput.timestamp}
-                  onChange={(e) => setTimestampInput({ ...timestampInput, timestamp: e.target.value })}
-                  placeholder="1:23"
-                  className="flex-1 p-2 border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-700 text-sm"
-                />
-                <input
-                  type="text"
-                  value={timestampInput.description}
-                  onChange={(e) => setTimestampInput({ ...timestampInput, description: e.target.value })}
-                  placeholder="Description of violation"
-                  className="flex-1 p-2 border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-700 text-sm"
-                />
-                <button
-                  type="button"
-                  onClick={addTimestamp}
+                      </button>
+                    </div>
+                  ))}
+                  
+                  <div className="flex gap-2">
+                    <input
+                      type="text"
+                      value={timestampInput.timestamp}
+                      onChange={(e) => setTimestampInput({ ...timestampInput, timestamp: e.target.value })}
+                      placeholder="1:23"
+                      className="flex-1 p-2 border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-700 text-sm"
+                    />
+                    <input
+                      type="text"
+                      value={timestampInput.description}
+                      onChange={(e) => setTimestampInput({ ...timestampInput, description: e.target.value })}
+                      placeholder="Description of violation"
+                      className="flex-1 p-2 border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-700 text-sm"
+                    />
+                    <button
+                      type="button"
+                      onClick={addTimestamp}
                   className="btn btn-primary px-3 py-2"
-                >
+                    >
                   <Plus size={14} />
-                </button>
+                    </button>
               </div>
             </div>
           </div>
@@ -723,24 +723,24 @@ const ReportSubmissionForm: React.FC = () => {
         </div>
       </div>
 
-      {/* Alerts */}
-      {error && (
+        {/* Alerts */}
+        {error && (
         <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 text-red-700 dark:text-red-300 px-4 py-3 rounded-lg">
-          <div className="flex items-center gap-2">
-            <AlertTriangle size={18} />
-            {error}
+            <div className="flex items-center gap-2">
+              <AlertTriangle size={18} />
+              {error}
+            </div>
           </div>
-        </div>
-      )}
+        )}
 
-      {success && (
+        {success && (
         <div className="bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 text-green-700 dark:text-green-300 px-4 py-3 rounded-lg">
-          <div className="flex items-center gap-2">
-            <CheckCircle size={18} />
-            {success}
+            <div className="flex items-center gap-2">
+              <CheckCircle size={18} />
+              {success}
+            </div>
           </div>
-        </div>
-      )}
+        )}
     </div>
   );
 };
