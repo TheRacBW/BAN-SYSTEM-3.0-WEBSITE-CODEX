@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { Navigate } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
-import { Shield, Users, Swords, Settings, Plus, X, Edit2, Database, Flag } from 'lucide-react';
+import { Shield, Users, Swords, Settings, Plus, X, Edit2, Database, Flag, Phone } from 'lucide-react';
 import { Kit, KitType } from '../types';
 import KitCard from '../components/KitCard';
 import AdSettingsPanel from '../components/AdSettingsPanel';
@@ -12,6 +12,7 @@ import RestrictedUsersManager from '../components/admin/RestrictedUsersManager';
 import { PageAccessControlManager } from '../components/admin/PageAccessControlManager';
 import ActivityPulseManager from '../components/admin/ActivityPulseManager';
 import AdminReportPanel from '../components/AdminReportPanel';
+import AdminCallsDashboard from '../components/AdminCallsDashboard';
 import { TRUST_LEVEL_CONFIGS } from "../types/trustLevels";
 
 interface AdminStats {
@@ -23,7 +24,7 @@ interface AdminStats {
 
 const AdminPage = () => {
   const { user, isAdmin } = useAuth();
-  const [activeTab, setActiveTab] = useState<'overview' | 'kits' | 'reports' | 'settings'>('overview');
+  const [activeTab, setActiveTab] = useState<'overview' | 'kits' | 'reports' | 'admin-calls' | 'settings'>('overview');
   const [stats, setStats] = useState<AdminStats>({
     totalUsers: 0,
     totalStrategies: 0,
@@ -261,6 +262,20 @@ const AdminPage = () => {
           </button>
 
           <button
+            onClick={() => setActiveTab('admin-calls')}
+            className={`py-2 px-1 border-b-2 font-medium text-sm ${
+              activeTab === 'admin-calls'
+                ? 'border-primary-500 text-primary-600 dark:text-primary-400'
+                : 'border-transparent text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300'
+            }`}
+          >
+            <div className="flex items-center gap-2">
+              <Phone size={16} />
+              Admin Calls
+            </div>
+          </button>
+
+          <button
             onClick={() => setActiveTab('kits')}
             className={`py-2 px-1 border-b-2 font-medium text-sm ${
               activeTab === 'kits'
@@ -360,6 +375,10 @@ const AdminPage = () => {
 
         {activeTab === 'reports' && (
           <AdminReportPanel />
+        )}
+
+        {activeTab === 'admin-calls' && (
+          <AdminCallsDashboard />
         )}
 
         {activeTab === 'kits' && (
