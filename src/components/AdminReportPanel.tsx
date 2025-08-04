@@ -553,10 +553,7 @@ const AdminReportPanel: React.FC = () => {
             Manage and review user-submitted reports for anti-cheat violations
           </p>
         </div>
-        <div className="flex items-center gap-2 text-sm text-gray-500">
-          <AlertTriangle size={16} />
-          <span>If reports aren't being responded to, please don't ping anyone - we'll handle them when we have time</span>
-        </div>
+
       </div>
 
       {/* Statistics Cards */}
