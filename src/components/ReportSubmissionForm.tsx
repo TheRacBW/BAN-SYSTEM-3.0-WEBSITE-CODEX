@@ -12,8 +12,9 @@ import {
   Video,
   Users,
   Flag,
-  MessageSquare,
-  User
+  User,
+  Search,
+  Loader
 } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../context/AuthContext';
@@ -21,8 +22,10 @@ import { useAuth } from '../context/AuthContext';
 interface RobloxPlayer {
   userId: number;
   username: string;
+  displayName?: string;
   avatarUrl?: string;
   isVerified?: boolean;
+  accountCreated?: string;
 }
 
 interface VideoTimestamp {
@@ -35,10 +38,10 @@ interface ReportFormData {
   reason: string;
   youtubeUrl: string;
   matchHistoryUrl: string;
-  reportedPlayers: RobloxPlayer[];
-  primarySuspectUserId: number | null;
+  reportedPlayers: (RobloxPlayer & { isPrimarySuspect: boolean })[];
   videoTimestamps: VideoTimestamp[];
   multipleViolators: boolean;
+  additionalNotes: string;
 }
 
 const ReportSubmissionForm: React.FC = () => {
@@ -48,17 +51,16 @@ const ReportSubmissionForm: React.FC = () => {
     youtubeUrl: '',
     matchHistoryUrl: '',
     reportedPlayers: [],
-    primarySuspectUserId: null,
     videoTimestamps: [],
-    multipleViolators: false
+    multipleViolators: false,
+    additionalNotes: ''
   });
 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
-  const [canSubmit, setCanSubmit] = useState<boolean | null>(null); // null = still checking
-  const [captchaToken, setCaptchaToken] = useState<string | null>(null);
-  const [isDiscordVerified, setIsDiscordVerified] = useState<boolean | null>(null); // null = still checking
+  const [canSubmit, setCanSubmit] = useState(false);
+  const [isDiscordVerified, setIsDiscordVerified] = useState(false);
   const [playerSearchInput, setPlayerSearchInput] = useState('');
   const [searchingPlayer, setSearchingPlayer] = useState(false);
   const [timestampInput, setTimestampInput] = useState({ timestamp: '', description: '' });
@@ -74,13 +76,16 @@ const ReportSubmissionForm: React.FC = () => {
 
   useEffect(() => {
     checkDiscordVerification();
+    checkSubmissionEligibility();
   }, [user]);
 
   useEffect(() => {
-    if (user && isDiscordVerified !== undefined) {
-      checkSubmissionEligibility();
+    // Clear error messages after 5 seconds
+    if (error) {
+      const timer = setTimeout(() => setError(null), 5000);
+      return () => clearTimeout(timer);
     }
-  }, [user, isDiscordVerified]);
+  }, [error]);
 
   const checkDiscordVerification = async () => {
     if (!user) return;
@@ -92,12 +97,9 @@ const ReportSubmissionForm: React.FC = () => {
         .eq('id', user.id)
         .single();
       
-      const verified = !!data?.discord_verified_at;
-      console.log('Discord verification result:', verified);
-      setIsDiscordVerified(verified);
+      setIsDiscordVerified(!!data?.discord_verified_at);
     } catch (err) {
       console.error('Error checking Discord verification:', err);
-      setIsDiscordVerified(false);
     }
   };
 
@@ -105,97 +107,91 @@ const ReportSubmissionForm: React.FC = () => {
     if (!user) return;
 
     try {
-      console.log('Checking submission eligibility for user:', user.id);
-      
       const { data, error } = await supabase.rpc('can_user_submit_reports', {
         user_uuid: user.id
       });
 
-      if (error) {
-        console.error('Error from can_user_submit_reports:', error);
-        throw error;
-      }
-      
-      // Add debugging
-      console.log('can_user_submit_reports result:', data);
-      console.log('isDiscordVerified:', isDiscordVerified);
-      console.log('Setting canSubmit to:', data && isDiscordVerified);
-      
+      if (error) throw error;
       setCanSubmit(data && isDiscordVerified);
     } catch (err) {
       console.error('Error checking submission eligibility:', err);
-      // If the function doesn't exist, assume user can submit (fallback)
-      if (err instanceof Error && err.message.includes('function') && err.message.includes('not found')) {
-        console.log('Database function not found, allowing submission as fallback');
-        setCanSubmit(isDiscordVerified);
-      } else {
-        setCanSubmit(false);
-      }
+      setCanSubmit(false);
     }
   };
 
   const searchRobloxPlayer = async (input: string) => {
-    if (!input.trim()) return;
+    if (!input.trim()) {
+      setError('Please enter a username or user ID');
+      return;
+    }
     
     setSearchingPlayer(true);
+    setError(null);
+    
     try {
-      // First check if it's a user ID (numeric)
-      const isUserId = /^\d+$/.test(input.trim());
-      
-      const { data, error } = await supabase.functions.invoke('find-user-id', {
-        body: { 
-          [isUserId ? 'userId' : 'username']: input.trim() 
-        }
+      const { data, error } = await supabase.functions.invoke('find-reported-player', {
+        body: { input: input.trim() }
       });
 
       if (error) throw error;
 
-      if (data?.userId && data?.username) {
-        const newPlayer: RobloxPlayer = {
-          userId: data.userId,
-          username: data.username,
-          avatarUrl: data.avatarUrl,
-          isVerified: data.isVerified
-        };
-
+      if (data?.success && data?.player) {
+        const player = data.player;
+        
         // Check if player already added
-        if (!formData.reportedPlayers.find(p => p.userId === newPlayer.userId)) {
-          if (formData.reportedPlayers.length >= 5) {
-            setError('Maximum of 5 players can be reported per case');
-            return;
-          }
-          
-          setFormData(prev => ({
-            ...prev,
-            reportedPlayers: [...prev.reportedPlayers, newPlayer]
-          }));
-          setPlayerSearchInput('');
-        } else {
+        if (formData.reportedPlayers.find(p => p.userId === player.userId)) {
           setError('Player already added to report');
+          return;
         }
+        
+        if (formData.reportedPlayers.length >= 5) {
+          setError('Maximum of 5 players can be reported per case');
+          return;
+        }
+        
+        const newPlayer = {
+          ...player,
+          isPrimarySuspect: formData.reportedPlayers.length === 0 // First player is primary by default
+        };
+        
+        setFormData(prev => ({
+          ...prev,
+          reportedPlayers: [...prev.reportedPlayers, newPlayer]
+        }));
+        
+        setPlayerSearchInput('');
       } else {
-        setError('Player not found. Please check the username or user ID.');
+        setError(data?.error || 'Player not found. Please check the username or user ID.');
       }
     } catch (err) {
       console.error('Error searching player:', err);
-      setError('Failed to search for player');
+      setError('Failed to search for player. Please try again.');
     } finally {
       setSearchingPlayer(false);
     }
   };
 
   const removePlayer = (userId: number) => {
+    const updatedPlayers = formData.reportedPlayers.filter(p => p.userId !== userId);
+    
+    // If we removed the primary suspect, make the first remaining player primary
+    if (updatedPlayers.length > 0 && !updatedPlayers.find(p => p.isPrimarySuspect)) {
+      updatedPlayers[0].isPrimarySuspect = true;
+    }
+    
     setFormData(prev => ({
       ...prev,
-      reportedPlayers: prev.reportedPlayers.filter(p => p.userId !== userId),
-      primarySuspectUserId: prev.primarySuspectUserId === userId ? null : prev.primarySuspectUserId
+      reportedPlayers: updatedPlayers
     }));
   };
 
   const setPrimarySuspect = (userId: number) => {
     setFormData(prev => ({
       ...prev,
-      primarySuspectUserId: prev.primarySuspectUserId === userId ? null : userId
+      reportedPlayers: prev.reportedPlayers.map(player => ({
+        ...player,
+        isPrimarySuspect: player.userId === userId
+      }))
     }));
   };
 
@@ -246,6 +242,7 @@ const ReportSubmissionForm: React.FC = () => {
     }));
 
     setTimestampInput({ timestamp: '', description: '' });
+    setError(null);
   };
 
   const removeTimestamp = (index: number) => {
@@ -254,16 +251,6 @@ const ReportSubmissionForm: React.FC = () => {
       videoTimestamps: prev.videoTimestamps.filter((_, i) => i !== index)
     }));
   };
-
-  const generateSimpleCaptcha = () => {
-    const num1 = Math.floor(Math.random() * 10) + 1;
-    const num2 = Math.floor(Math.random() * 10) + 1;
-    const answer = num1 + num2;
-    return { question: `${num1} + ${num2} = ?`, answer: answer.toString() };
-  };
-
-  const [captcha] = useState(generateSimpleCaptcha());
-  const [captchaAnswer, setCaptchaAnswer] = useState('');
 
   const validateForm = () => {
     if (!formData.reason) {
@@ -291,21 +278,6 @@ const ReportSubmissionForm: React.FC = () => {
       return false;
     }
 
-    if (formData.reportedPlayers.length > 1 && !formData.primarySuspectUserId) {
-      setError('Please select a primary suspect when reporting multiple players');
-      return false;
-    }
-
-    if (formData.videoTimestamps.length === 0) {
-      setError('At least one video timestamp is required');
-      return false;
-    }
-
-    if (captchaAnswer !== captcha.answer) {
-      setError('Incorrect captcha answer');
-      return false;
-    }
-
     if (!isDiscordVerified) {
       setError('Discord verification is required to submit reports');
       return false;
@@ -325,26 +297,31 @@ const ReportSubmissionForm: React.FC = () => {
       const reportedPlayersData = formData.reportedPlayers.map(player => ({
         user_id: player.userId,
         username: player.username,
-        is_primary_suspect: player.userId === formData.primarySuspectUserId,
-        roblox_avatar_url: player.avatarUrl
+        is_primary_suspect: player.isPrimarySuspect,
+        roblox_avatar_url: player.avatarUrl,
+        display_name: player.displayName,
+        is_verified: player.isVerified
       }));
+
+      const primarySuspect = formData.reportedPlayers.find(p => p.isPrimarySuspect);
 
       const { error } = await supabase
         .from('admin_report_cases')
         .insert({
           submitted_by: user?.id,
-          discord_username: user?.email?.split('@')[0] || 'Unknown', // This should be the actual Discord username
+          discord_username: user?.email?.split('@')[0] || 'Unknown',
           reason: formData.reason,
           youtube_video_url: formData.youtubeUrl,
           match_history_image_url: formData.matchHistoryUrl,
           reported_players: reportedPlayersData,
-          primary_suspect_user_id: formData.primarySuspectUserId,
-          video_timestamps: formData.videoTimestamps
+          primary_suspect_user_id: primarySuspect?.userId || null,
+          video_timestamps: formData.videoTimestamps,
+          review_notes: formData.additionalNotes
         });
 
       if (error) throw error;
 
-      setSuccess('Report submitted successfully! Our anti-cheat moderators will review it soon.');
+      setSuccess('Report submitted successfully! Our anti-cheat moderators will review it soon. You can check the status in your account dashboard.');
       
       // Reset form
       setFormData({
@@ -352,11 +329,11 @@ const ReportSubmissionForm: React.FC = () => {
         youtubeUrl: '',
         matchHistoryUrl: '',
         reportedPlayers: [],
-        primarySuspectUserId: null,
         videoTimestamps: [],
-        multipleViolators: false
+        multipleViolators: false,
+        additionalNotes: ''
       });
-      setCaptchaAnswer('');
+      setTimestampInput({ timestamp: '', description: '' });
       
     } catch (err) {
       console.error('Error submitting report:', err);
@@ -380,21 +357,6 @@ const ReportSubmissionForm: React.FC = () => {
     );
   }
 
-  // Show loading state while checking eligibility
-  if (canSubmit === null || isDiscordVerified === null) {
-    return (
-      <div className="text-center py-8">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-600 mx-auto mb-4"></div>
-        <h3 className="text-lg font-medium text-gray-900 dark:text-gray-100 mb-2">
-          Checking Eligibility...
-        </h3>
-        <p className="text-gray-600 dark:text-gray-400">
-          Please wait while we verify your account status.
-        </p>
-      </div>
-    );
-  }
-
   if (!canSubmit) {
     return (
       <div className="text-center py-8">
@@ -405,49 +367,54 @@ const ReportSubmissionForm: React.FC = () => {
         <p className="text-gray-600 dark:text-gray-400">
           {!isDiscordVerified 
             ? 'You must verify your Discord account to submit reports.'
-            : 'You are temporarily restricted from submitting reports due to previous false reports.'}
+            : 'You are temporarily restricted from submitting reports due to previous violations.'}
         </p>
       </div>
     );
   }
 
   return (
-    <div className="max-w-4xl mx-auto">
-      <div className="bg-white dark:bg-gray-800 rounded-lg shadow-lg p-6">
-        <div className="text-center mb-8">
-          <Flag className="mx-auto h-12 w-12 text-primary-600 mb-4" />
-          <h1 className="text-3xl font-bold text-gray-900 dark:text-gray-100 mb-2">
-            Submit Anti-Cheat Report
-          </h1>
-          <p className="text-gray-600 dark:text-gray-400">
-            Help us maintain a fair gaming environment by reporting violations
-          </p>
-        </div>
+    <div className="max-w-4xl mx-auto space-y-6">
+      {/* Header */}
+      <div className="text-center">
+        <h2 className="text-3xl font-bold text-gray-900 dark:text-gray-100">Submit Report</h2>
+        <p className="text-gray-600 dark:text-gray-400 mt-2">
+          Report cheaters, exploiters, and rule violators to our anti-cheat team
+        </p>
+      </div>
 
-        {/* Discord Verification Status */}
-        <div className="mb-6 p-4 bg-green-50 dark:bg-green-900/30 border border-green-200 dark:border-green-700 rounded-lg">
-          <div className="flex items-center gap-2">
-            <Shield className="text-green-600" size={20} />
-            <span className="text-green-800 dark:text-green-200 font-medium">
-              Discord Verified ✓
-            </span>
+      {/* Important Guidelines */}
+      <div className="bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-lg p-4">
+        <div className="flex items-start gap-3">
+          <AlertTriangle className="text-amber-600 dark:text-amber-400 mt-0.5" size={20} />
+          <div className="text-sm text-amber-800 dark:text-amber-200">
+            <h3 className="font-semibold mb-2">Important Guidelines:</h3>
+            <ul className="space-y-1 list-disc list-inside">
+              <li>Show the exploiter's username clearly in the video</li>
+              <li>Match history screenshot is REQUIRED - tickets without it are invalid</li>
+              <li>Submit only ONE cheater per ticket</li>
+              <li>Videos longer than 1 minute MUST include timestamps</li>
+              <li>If your ticket isn't responded to, please don't ping anyone - we'll handle it when we have time</li>
+            </ul>
           </div>
         </div>
+      </div>
 
-        <form onSubmit={(e) => { e.preventDefault(); submitReport(); }} className="space-y-6">
-          {/* Report Reason */}
-          <div className="panel">
-            <h3 className="panel-title flex items-center gap-2">
-              <Flag size={18} />
-              Violation Type
-            </h3>
+      {/* Form */}
+      <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700">
+        <div className="p-6 space-y-6">
+          {/* Reason Selection */}
+          <div>
+            <label className="block text-sm font-medium mb-2">
+              <Flag className="inline mr-2" size={16} />
+              Report Reason *
+            </label>
             <select
               value={formData.reason}
-              onChange={(e) => setFormData({ ...formData, reason: e.target.value })}
-              className="w-full p-3 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700"
-              required
+              onChange={(e) => setFormData(prev => ({ ...prev, reason: e.target.value }))}
+              className="w-full p-3 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
             >
-              <option value="">Select violation type...</option>
+              <option value="">Select a reason...</option>
               {reasonOptions.map(option => (
                 <option key={option.value} value={option.value}>
                   {option.label}
@@ -456,244 +423,278 @@ const ReportSubmissionForm: React.FC = () => {
             </select>
           </div>
 
-          {/* Video Evidence */}
-          <div className="panel">
-            <h3 className="panel-title flex items-center gap-2">
-              <Video size={18} />
-              Video Evidence (Required)
-            </h3>
-            <div className="space-y-4">
-              <div>
-                <label className="block text-sm font-medium mb-2">YouTube Video URL</label>
-                <input
-                  type="url"
-                  value={formData.youtubeUrl}
-                  onChange={(e) => setFormData({ ...formData, youtubeUrl: e.target.value })}
-                  placeholder="https://www.youtube.com/watch?v=..."
-                  className="w-full p-3 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700"
-                  required
+          {/* YouTube Video URL */}
+          <div>
+            <label className="block text-sm font-medium mb-2">
+              <Video className="inline mr-2" size={16} />
+              YouTube Video Evidence *
+            </label>
+            <input
+              type="url"
+              value={formData.youtubeUrl}
+              onChange={(e) => setFormData(prev => ({ ...prev, youtubeUrl: e.target.value }))}
+              placeholder="https://www.youtube.com/watch?v=..."
+              className="w-full p-3 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+            />
+            
+            {/* YouTube Preview */}
+            {formData.youtubeUrl && getYouTubeVideoId(formData.youtubeUrl) && (
+              <div className="mt-3">
+                <iframe
+                  width="100%"
+                  height="250"
+                  src={`https://www.youtube.com/embed/${getYouTubeVideoId(formData.youtubeUrl)}`}
+                  title="Evidence Video Preview"
+                  frameBorder="0"
+                  allowFullScreen
+                  className="rounded-lg"
                 />
-                <p className="text-sm text-gray-500 mt-1">
-                  Provide a link to YouTube or Medal video showing the violation
-                </p>
               </div>
+            )}
+          </div>
 
-              {/* Video Timestamps */}
-              <div>
-                <label className="block text-sm font-medium mb-2">Video Timestamps</label>
-                <div className="space-y-2">
-                  {formData.videoTimestamps.map((timestamp, index) => (
-                    <div key={index} className="flex items-center gap-2 p-2 bg-gray-50 dark:bg-gray-700 rounded">
-                      <span className="font-mono text-sm bg-gray-200 dark:bg-gray-600 px-2 py-1 rounded">
-                        {timestamp.timestamp}
-                      </span>
-                      <span className="text-sm flex-1">{timestamp.description}</span>
+          {/* Match History Image */}
+          <div>
+            <label className="block text-sm font-medium mb-2">
+              <Image className="inline mr-2" size={16} />
+              Match History Evidence *
+            </label>
+            <input
+              type="url"
+              value={formData.matchHistoryUrl}
+              onChange={(e) => setFormData(prev => ({ ...prev, matchHistoryUrl: e.target.value }))}
+              placeholder="https://example.com/image.png or imgur.com/..."
+              className="w-full p-3 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+            />
+            
+            {/* Image Preview */}
+            {formData.matchHistoryUrl && (
+              <div className="mt-3">
+                <img 
+                  src={formData.matchHistoryUrl} 
+                  alt="Match History Preview"
+                  className="max-w-full h-auto rounded-lg border border-gray-200 dark:border-gray-600"
+                  onError={(e) => {
+                    e.currentTarget.style.display = 'none';
+                  }}
+                />
+              </div>
+            )}
+          </div>
+
+          {/* Player Search */}
+          <div>
+            <label className="block text-sm font-medium mb-2">
+              <Users className="inline mr-2" size={16} />
+              Search & Add Players *
+            </label>
+            <div className="flex gap-2">
+              <input
+                type="text"
+                value={playerSearchInput}
+                onChange={(e) => setPlayerSearchInput(e.target.value)}
+                placeholder="Enter Roblox username or user ID"
+                className="flex-1 p-3 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+                onKeyPress={(e) => {
+                  if (e.key === 'Enter') {
+                    e.preventDefault();
+                    searchRobloxPlayer(playerSearchInput);
+                  }
+                }}
+              />
+              <button
+                type="button"
+                onClick={() => searchRobloxPlayer(playerSearchInput)}
+                disabled={searchingPlayer || !playerSearchInput.trim()}
+                className="btn btn-primary px-4 py-3 flex items-center gap-2"
+              >
+                {searchingPlayer ? (
+                  <Loader className="animate-spin" size={16} />
+                ) : (
+                  <Search size={16} />
+                )}
+                Search
+              </button>
+            </div>
+          </div>
+
+          {/* Added Players */}
+          {formData.reportedPlayers.length > 0 && (
+            <div>
+              <label className="block text-sm font-medium mb-2">
+                Reported Players ({formData.reportedPlayers.length}/5)
+              </label>
+              <div className="space-y-3">
+                {formData.reportedPlayers.map((player) => (
+                  <div key={player.userId} className="flex items-center gap-3 p-4 bg-gray-50 dark:bg-gray-700 rounded-lg border">
+                    {player.avatarUrl && (
+                      <img 
+                        src={player.avatarUrl} 
+                        alt={player.username}
+                        className="w-10 h-10 rounded-full"
+                        onError={(e) => {
+                          e.currentTarget.style.display = 'none';
+                        }}
+                      />
+                    )}
+                    <div className="flex-1">
+                      <div className="flex items-center gap-2">
+                        <span className="font-medium text-gray-900 dark:text-gray-100">
+                          {player.displayName || player.username}
+                        </span>
+                        <span className="text-sm text-gray-500">@{player.username}</span>
+                        {player.isVerified && (
+                          <Shield size={14} className="text-green-500" />
+                        )}
+                      </div>
+                      <div className="text-sm text-gray-500">
+                        ID: {player.userId}
+                        {player.accountCreated && (
+                          <span className="ml-2">
+                            • Created: {new Date(player.accountCreated).toLocaleDateString()}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2">
                       <button
                         type="button"
-                        onClick={() => removeTimestamp(index)}
-                        className="text-red-500 hover:text-red-700"
+                        onClick={() => setPrimarySuspect(player.userId)}
+                        className={`px-3 py-1 rounded text-sm font-medium ${
+                          player.isPrimarySuspect
+                            ? 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300 border border-red-200 dark:border-red-700'
+                            : 'bg-gray-100 text-gray-700 dark:bg-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-500'
+                        }`}
+                      >
+                        {player.isPrimarySuspect ? 'Primary Suspect' : 'Set as Primary'}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => removePlayer(player.userId)}
+                        className="text-red-500 hover:text-red-700 p-1"
                       >
                         <X size={16} />
                       </button>
                     </div>
-                  ))}
-                  
-                  <div className="flex gap-2">
-                    <input
-                      type="text"
-                      value={timestampInput.timestamp}
-                      onChange={(e) => setTimestampInput({ ...timestampInput, timestamp: e.target.value })}
-                      placeholder="1:23"
-                      className="flex-1 p-2 border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-700 text-sm"
-                    />
-                    <input
-                      type="text"
-                      value={timestampInput.description}
-                      onChange={(e) => setTimestampInput({ ...timestampInput, description: e.target.value })}
-                      placeholder="Description of violation"
-                      className="flex-1 p-2 border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-700 text-sm"
-                    />
-                    <button
-                      type="button"
-                      onClick={addTimestamp}
-                      className="btn btn-primary px-4 py-2"
-                    >
-                      <Plus size={16} />
-                    </button>
                   </div>
-                </div>
+                ))}
               </div>
             </div>
-          </div>
+          )}
 
-          {/* Match History Image */}
-          <div className="panel">
-            <h3 className="panel-title flex items-center gap-2">
-              <Image size={18} />
-              Match History Evidence (Required)
-            </h3>
-            <input
-              type="url"
-              value={formData.matchHistoryUrl}
-              onChange={(e) => setFormData({ ...formData, matchHistoryUrl: e.target.value })}
-              placeholder="https://example.com/match-history-image.png"
-              className="w-full p-3 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700"
-              required
-            />
-            <p className="text-sm text-gray-500 mt-1">
-              Provide a link to an image showing the match history or relevant evidence
-            </p>
-          </div>
-
-          {/* Reported Players */}
-          <div className="panel">
-            <h3 className="panel-title flex items-center gap-2">
-              <Users size={18} />
-              Reported Players
-            </h3>
-            <div className="space-y-4">
-              {/* Player Search */}
-              <div>
-                <label className="block text-sm font-medium mb-2">Search Player</label>
-                <div className="flex gap-2">
-                  <input
-                    type="text"
-                    value={playerSearchInput}
-                    onChange={(e) => setPlayerSearchInput(e.target.value)}
-                    placeholder="Enter Roblox username or user ID"
-                    className="flex-1 p-3 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700"
-                  />
+          {/* Video Timestamps */}
+          <div>
+            <label className="block text-sm font-medium mb-2">
+              <Clock className="inline mr-2" size={16} />
+              Video Timestamps
+            </label>
+            <div className="space-y-3">
+              {formData.videoTimestamps.map((timestamp, index) => (
+                <div key={index} className="flex items-center gap-3 p-3 bg-gray-50 dark:bg-gray-700 rounded-lg">
+                  <span className="font-mono text-sm bg-gray-200 dark:bg-gray-600 px-2 py-1 rounded">
+                    {timestamp.timestamp}
+                  </span>
+                  <span className="text-sm flex-1">{timestamp.description}</span>
+                  <a
+                    href={timestamp.url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-blue-500 hover:text-blue-700 p-1"
+                  >
+                    <ExternalLink size={14} />
+                  </a>
                   <button
                     type="button"
-                    onClick={() => searchRobloxPlayer(playerSearchInput)}
-                    disabled={searchingPlayer || !playerSearchInput.trim()}
-                    className="btn btn-primary px-4 py-3"
+                    onClick={() => removeTimestamp(index)}
+                    className="text-red-500 hover:text-red-700 p-1"
                   >
-                    {searchingPlayer ? (
-                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
-                    ) : (
-                      'Search'
-                    )}
+                    <X size={14} />
                   </button>
                 </div>
-              </div>
-
-              {/* Added Players */}
-              <div>
-                <label className="block text-sm font-medium mb-2">Reported Players ({formData.reportedPlayers.length}/5)</label>
-                <div className="space-y-2">
-                  {formData.reportedPlayers.map((player, index) => (
-                    <div key={player.userId} className="flex items-center gap-3 p-3 bg-gray-50 dark:bg-gray-700 rounded-lg">
-                      {player.avatarUrl && (
-                        <img 
-                          src={player.avatarUrl} 
-                          alt={player.username}
-                          className="w-8 h-8 rounded-full"
-                        />
-                      )}
-                      <div className="flex-1">
-                        <div className="flex items-center gap-2">
-                          <span className="font-medium">{player.username}</span>
-                          {player.isVerified && (
-                            <Shield size={14} className="text-green-500" />
-                          )}
-                        </div>
-                        <span className="text-sm text-gray-500">ID: {player.userId}</span>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <button
-                          type="button"
-                          onClick={() => setPrimarySuspect(player.userId)}
-                          className={`px-3 py-1 rounded text-sm ${
-                            formData.primarySuspectUserId === player.userId
-                              ? 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300'
-                              : 'bg-gray-100 text-gray-700 dark:bg-gray-600 dark:text-gray-300'
-                          }`}
-                        >
-                          {formData.primarySuspectUserId === player.userId ? 'Primary' : 'Set Primary'}
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => removePlayer(player.userId)}
-                          className="text-red-500 hover:text-red-700"
-                        >
-                          <X size={16} />
-                        </button>
-                      </div>
-                    </div>
-                  ))}
-                </div>
+              ))}
+              
+              <div className="flex gap-2">
+                <input
+                  type="text"
+                  value={timestampInput.timestamp}
+                  onChange={(e) => setTimestampInput({ ...timestampInput, timestamp: e.target.value })}
+                  placeholder="1:23"
+                  className="flex-1 p-2 border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-700 text-sm"
+                />
+                <input
+                  type="text"
+                  value={timestampInput.description}
+                  onChange={(e) => setTimestampInput({ ...timestampInput, description: e.target.value })}
+                  placeholder="Description of violation"
+                  className="flex-1 p-2 border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-700 text-sm"
+                />
+                <button
+                  type="button"
+                  onClick={addTimestamp}
+                  className="btn btn-primary px-3 py-2"
+                >
+                  <Plus size={14} />
+                </button>
               </div>
             </div>
           </div>
 
-          {/* Captcha */}
-          <div className="panel">
-            <h3 className="panel-title flex items-center gap-2">
-              <Shield size={18} />
-              Verification
-            </h3>
-            <div className="space-y-4">
-              <div>
-                <label className="block text-sm font-medium mb-2">Security Check</label>
-                <div className="flex items-center gap-3">
-                  <span className="text-lg font-mono bg-gray-100 dark:bg-gray-700 px-3 py-2 rounded">
-                    {captcha.question}
-                  </span>
-                  <input
-                    type="number"
-                    value={captchaAnswer}
-                    onChange={(e) => setCaptchaAnswer(e.target.value)}
-                    placeholder="Answer"
-                    className="flex-1 p-3 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700"
-                    required
-                  />
-                </div>
-              </div>
-            </div>
+          {/* Additional Notes */}
+          <div>
+            <label className="block text-sm font-medium mb-2">
+              Additional Notes (Optional)
+            </label>
+            <textarea
+              value={formData.additionalNotes}
+              onChange={(e) => setFormData(prev => ({ ...prev, additionalNotes: e.target.value }))}
+              placeholder="Any additional context or information..."
+              rows={3}
+              className="w-full p-3 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+            />
           </div>
 
           {/* Submit Button */}
-          <div className="flex justify-end">
+          <div className="flex justify-end pt-4">
             <button
-              type="submit"
+              type="button"
+              onClick={submitReport}
               disabled={loading}
-              className="btn btn-primary px-8 py-3 text-lg"
+              className="btn btn-primary px-8 py-3 text-lg flex items-center gap-2"
             >
               {loading ? (
-                <div className="flex items-center gap-2">
-                  <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
+                <>
+                  <Loader className="animate-spin" size={20} />
                   Submitting...
-                </div>
+                </>
               ) : (
-                <div className="flex items-center gap-2">
+                <>
                   <Flag size={20} />
                   Submit Report
-                </div>
+                </>
               )}
             </button>
           </div>
-        </form>
-
-        {/* Alerts */}
-        {error && (
-          <div className="mt-6 bg-red-100 dark:bg-red-900/30 border border-red-400 text-red-700 dark:text-red-300 px-4 py-3 rounded">
-            <div className="flex items-center gap-2">
-              <AlertTriangle size={18} />
-              {error}
-            </div>
-          </div>
-        )}
-
-        {success && (
-          <div className="mt-6 bg-green-100 dark:bg-green-900/30 border border-green-400 text-green-700 dark:text-green-300 px-4 py-3 rounded">
-            <div className="flex items-center gap-2">
-              <CheckCircle size={18} />
-              {success}
-            </div>
-          </div>
-        )}
+        </div>
       </div>
+
+      {/* Alerts */}
+      {error && (
+        <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 text-red-700 dark:text-red-300 px-4 py-3 rounded-lg">
+          <div className="flex items-center gap-2">
+            <AlertTriangle size={18} />
+            {error}
+          </div>
+        </div>
+      )}
+
+      {success && (
+        <div className="bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 text-green-700 dark:text-green-300 px-4 py-3 rounded-lg">
+          <div className="flex items-center gap-2">
+            <CheckCircle size={18} />
+            {success}
+          </div>
+        </div>
+      )}
     </div>
   );
 };
