@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useAudioAlerts } from '../hooks/useAudioAlerts';
 import { supabase } from '../lib/supabase';
+import YouTubeAudioService from '../services/youtubeAudioService';
 
 interface AdminCall {
   id: string;
@@ -13,6 +14,9 @@ interface AdminPreferences {
   sound_enabled: boolean;
   sound_type: string;
   sound_volume: number;
+  youtube_audio_enabled?: boolean;
+  youtube_video_url?: string;
+  youtube_audio_duration?: number;
 }
 
 const AdminAudioManager: React.FC = () => {
@@ -26,7 +30,11 @@ const AdminAudioManager: React.FC = () => {
     enabled: preferences?.sound_enabled ?? false,
     soundType: (preferences?.sound_type as any) ?? 'default',
     volume: preferences?.sound_volume ?? 0.7,
-    adminId: user?.id
+    adminId: user?.id,
+    youtubeSettings: preferences?.youtube_audio_enabled ? {
+      videoUrl: preferences.youtube_video_url,
+      duration: preferences.youtube_audio_duration
+    } : undefined
   });
 
   useEffect(() => {

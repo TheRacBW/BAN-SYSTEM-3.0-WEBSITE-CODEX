@@ -3,6 +3,7 @@ import { useAuth } from '../context/AuthContext';
 import { Navigate } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import { Shield, Users, Swords, Settings, Plus, X, Edit2, Database, Flag, Phone, Bell } from 'lucide-react';
+import YouTubeAudioPreferences from '../components/YouTubeAudioPreferences';
 import { Kit, KitType } from '../types';
 import KitCard from '../components/KitCard';
 import AdSettingsPanel from '../components/AdSettingsPanel';
@@ -424,6 +425,7 @@ const AdminPage = () => {
                         <option value="chime">Chime</option>
                         <option value="bell">Bell</option>
                         <option value="siren">Siren</option>
+                        <option value="youtube">YouTube Audio</option>
                       </select>
                     </div>
                     
@@ -482,6 +484,16 @@ False alarm, no violation found"
                     </div>
                   </div>
                 </div>
+              </div>
+              
+              {/* YouTube Audio Preferences */}
+              <div className="mt-6 pt-6 border-t border-gray-200 dark:border-gray-700">
+                <YouTubeAudioPreferences 
+                  userId={user?.id || ''}
+                  onSettingsChange={(settings) => {
+                    console.log('YouTube settings updated:', settings);
+                  }}
+                />
               </div>
               
               <div className="mt-6 pt-6 border-t border-gray-200 dark:border-gray-700">
