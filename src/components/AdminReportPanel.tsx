@@ -18,7 +18,8 @@ import {
   ChevronDown,
   ChevronUp,
   ExternalLink,
-  Shield
+  Shield,
+  Ban
 } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../context/AuthContext';
@@ -277,6 +278,14 @@ const AdminReportPanel: React.FC = () => {
     const [newStatus, setNewStatus] = useState(reportCase.status);
     const [reviewNotes, setReviewNotes] = useState(reportCase.review_notes || '');
     const [selectedFlags, setSelectedFlags] = useState<string[]>(reportCase.case_flags || []);
+    const [submitterInfo, setSubmitterInfo] = useState<any>(null);
+    const [submitterRestrictions, setSubmitterRestrictions] = useState<any[]>([]);
+    const [showRestrictionModal, setShowRestrictionModal] = useState(false);
+    const [restrictionForm, setRestrictionForm] = useState({
+      restrictionType: 'temp_ban' as 'warning' | 'temp_ban' | 'permanent_ban',
+      reason: '',
+      duration: 24
+    });
 
     const availableFlags = [
       'needs_replay',
@@ -290,6 +299,101 @@ const AdminReportPanel: React.FC = () => {
 
     const videoId = getYouTubeVideoId(reportCase.youtube_video_url);
     const primarySuspect = reportCase.reported_players.find(p => p.is_primary_suspect);
+
+    // Fetch submitter information and restrictions
+    useEffect(() => {
+      const fetchSubmitterInfo = async () => {
+        try {
+          // Get submitter user info
+          const { data: userData } = await supabase
+            .from('users')
+            .select('username, email, discord_username, discord_verified_at')
+            .eq('id', reportCase.submitted_by)
+            .single();
+
+          // Get submitter's report restrictions
+          const { data: restrictionsData } = await supabase
+            .from('user_report_restrictions')
+            .select('*')
+            .eq('user_id', reportCase.submitted_by)
+            .order('created_at', { ascending: false });
+
+          // Get submitter's report statistics
+          const { data: statsData } = await supabase
+            .from('user_report_stats')
+            .select('*')
+            .eq('user_id', reportCase.submitted_by)
+            .single();
+
+          setSubmitterInfo({ ...userData, stats: statsData });
+          setSubmitterRestrictions(restrictionsData || []);
+        } catch (error) {
+          console.error('Error fetching submitter info:', error);
+        }
+      };
+
+      fetchSubmitterInfo();
+    }, [reportCase.submitted_by]);
+
+    const addRestriction = async () => {
+      if (!restrictionForm.reason) return;
+
+      try {
+        const expiresAt = restrictionForm.restrictionType === 'permanent_ban' 
+          ? null 
+          : new Date(Date.now() + (restrictionForm.duration * 60 * 60 * 1000)).toISOString();
+
+        const { error } = await supabase.rpc('add_user_restriction', {
+          user_uuid: reportCase.submitted_by,
+          restriction_type: restrictionForm.restrictionType,
+          reason: restrictionForm.reason,
+          expires_at: expiresAt
+        });
+
+        if (error) throw error;
+
+        setShowRestrictionModal(false);
+        setRestrictionForm({
+          restrictionType: 'temp_ban',
+          reason: '',
+          duration: 24
+        });
+        
+        // Refresh restrictions
+        const { data: restrictionsData } = await supabase
+          .from('user_report_restrictions')
+          .select('*')
+          .eq('user_id', reportCase.submitted_by)
+          .order('created_at', { ascending: false });
+        
+        setSubmitterRestrictions(restrictionsData || []);
+      } catch (error) {
+        console.error('Error adding restriction:', error);
+      }
+    };
+
+    const removeRestriction = async (restrictionId: string) => {
+      if (!window.confirm('Remove this restriction?')) return;
+
+      try {
+        const { error } = await supabase.rpc('remove_user_restriction', {
+          restriction_id: restrictionId
+        });
+
+        if (error) throw error;
+        
+        // Refresh restrictions
+        const { data: restrictionsData } = await supabase
+          .from('user_report_restrictions')
+          .select('*')
+          .eq('user_id', reportCase.submitted_by)
+          .order('created_at', { ascending: false });
+        
+        setSubmitterRestrictions(restrictionsData || []);
+      } catch (error) {
+        console.error('Error removing restriction:', error);
+      }
+    };
 
     return (
       <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
@@ -313,7 +417,7 @@ const AdminReportPanel: React.FC = () => {
 
           <div className="p-6 space-y-6">
             {/* Case Status and Info */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="panel">
                 <h3 className="panel-title">Case Information</h3>
                 <div className="space-y-2">
@@ -334,13 +438,22 @@ const AdminReportPanel: React.FC = () => {
                   <div className="flex items-center gap-2">
                     <User size={16} />
                     <span className="font-medium">Submitted by:</span>
-                    <span>{reportCase.discord_username}</span>
+                    <button
+                      onClick={() => setShowRestrictionModal(true)}
+                      className="text-primary-600 hover:text-primary-900 dark:text-primary-400 dark:hover:text-primary-300 font-medium hover:underline cursor-pointer flex items-center gap-1"
+                      title="Click to view user details and manage restrictions"
+                    >
+                      {reportCase.discord_username}
+                      <User size={12} className="opacity-60" />
+                    </button>
                     {reportCase.submitter?.discord_verified_at && (
                       <Shield size={14} className="text-green-500" />
                     )}
                   </div>
                 </div>
               </div>
+
+
 
               <div className="panel">
                 <h3 className="panel-title">Reported Players</h3>
@@ -524,6 +637,159 @@ const AdminReportPanel: React.FC = () => {
               )}
             </div>
           </div>
+
+          {/* Submitter Info & Restriction Modal */}
+          {showRestrictionModal && (
+            <div 
+              className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4"
+              onClick={() => setShowRestrictionModal(false)}
+            >
+              <div 
+                className="bg-white dark:bg-gray-800 rounded-lg max-w-lg w-full"
+                onClick={(e) => e.stopPropagation()}
+              >
+                <div className="p-6 border-b border-gray-200 dark:border-gray-700">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <h3 className="text-lg font-bold">Submitter Information</h3>
+                      <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
+                        User details and restriction management
+                      </p>
+                    </div>
+                    <button
+                      onClick={() => setShowRestrictionModal(false)}
+                      className="text-gray-500 hover:text-gray-700 dark:hover:text-gray-300"
+                    >
+                      <XCircle size={20} />
+                    </button>
+                  </div>
+                </div>
+                
+                <div className="p-6 space-y-6">
+                  {/* Submitter Info Section */}
+                  {submitterInfo && (
+                    <div className="space-y-4">
+                      <h4 className="font-medium text-gray-900 dark:text-gray-100">User Details</h4>
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div className="space-y-2">
+                          <div className="flex items-center gap-2">
+                            <User size={16} />
+                            <span className="font-medium">Username:</span>
+                            <span>{submitterInfo.username}</span>
+                          </div>
+                          {submitterInfo.discord_username && (
+                            <div className="flex items-center gap-2">
+                              <MessageSquare size={16} />
+                              <span className="font-medium">Discord:</span>
+                              <span>{submitterInfo.discord_username}</span>
+                            </div>
+                          )}
+                        </div>
+                        
+                        {submitterInfo.stats && (
+                          <div className="space-y-2">
+                            <div className="flex items-center gap-2">
+                              <Flag size={16} />
+                              <span className="font-medium">Reports:</span>
+                              <span>{submitterInfo.stats.total_reports_submitted}</span>
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <AlertTriangle size={16} />
+                              <span className="font-medium">False Rate:</span>
+                              <span className={`${
+                                submitterInfo.stats.false_report_rate > 0.5 ? 'text-red-600 dark:text-red-400' :
+                                submitterInfo.stats.false_report_rate > 0.2 ? 'text-orange-600 dark:text-orange-400' :
+                                'text-green-600 dark:text-green-400'
+                              }`}>
+                                {(submitterInfo.stats.false_report_rate * 100).toFixed(1)}%
+                              </span>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                      
+                      {submitterRestrictions.length > 0 && (
+                        <div className="p-3 bg-red-50 dark:bg-red-900/20 rounded border border-red-200 dark:border-red-800">
+                          <div className="text-sm font-medium text-red-800 dark:text-red-200">
+                            Active Restrictions: {submitterRestrictions.filter(r => !r.expires_at || new Date(r.expires_at) > new Date()).length}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {/* Restriction Form Section */}
+                  <div className="border-t border-gray-200 dark:border-gray-700 pt-4">
+                    <h4 className="font-medium text-gray-900 dark:text-gray-100 mb-4">Add Restriction</h4>
+                    <div className="space-y-4">
+                      <div>
+                        <label className="block text-sm font-medium mb-2">Restriction Type</label>
+                        <select
+                          value={restrictionForm.restrictionType}
+                          onChange={(e) => setRestrictionForm({
+                            ...restrictionForm,
+                            restrictionType: e.target.value as 'warning' | 'temp_ban' | 'permanent_ban'
+                          })}
+                          className="w-full p-2 border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-700"
+                        >
+                          <option value="warning">Warning</option>
+                          <option value="temp_ban">Temporary Ban</option>
+                          <option value="permanent_ban">Permanent Ban</option>
+                        </select>
+                      </div>
+
+                      {restrictionForm.restrictionType === 'temp_ban' && (
+                        <div>
+                          <label className="block text-sm font-medium mb-2">Duration (hours)</label>
+                          <input
+                            type="number"
+                            value={restrictionForm.duration}
+                            onChange={(e) => setRestrictionForm({
+                              ...restrictionForm,
+                              duration: parseInt(e.target.value) || 24
+                            })}
+                            className="w-full p-2 border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-700"
+                            min="1"
+                            max="8760" // 1 year
+                          />
+                        </div>
+                      )}
+
+                      <div>
+                        <label className="block text-sm font-medium mb-2">Reason</label>
+                        <textarea
+                          value={restrictionForm.reason}
+                          onChange={(e) => setRestrictionForm({
+                            ...restrictionForm,
+                            reason: e.target.value
+                          })}
+                          rows={3}
+                          className="w-full p-2 border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-700"
+                          placeholder="Reason for restriction..."
+                        />
+                      </div>
+
+                      <div className="flex gap-2">
+                        <button
+                          onClick={addRestriction}
+                          className="btn btn-primary"
+                          disabled={!restrictionForm.reason}
+                        >
+                          Add Restriction
+                        </button>
+                        <button
+                          onClick={() => setShowRestrictionModal(false)}
+                          className="btn btn-outline"
+                        >
+                          Cancel
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
         </div>
       </div>
     );

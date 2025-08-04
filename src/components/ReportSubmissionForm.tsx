@@ -19,6 +19,7 @@ import {
 } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../context/AuthContext';
+import { useReportRestrictions } from '../hooks/useReportRestrictions';
 
 interface RobloxPlayer {
   userId: number;
@@ -67,6 +68,9 @@ const ReportSubmissionForm: React.FC = () => {
   const [timestampInput, setTimestampInput] = useState({ timestamp: '', description: '' });
   const [matchHistoryImageError, setMatchHistoryImageError] = useState(false);
 
+  // Report restrictions hook
+  const { canSubmit: canSubmitReports, restrictionMessage, loading: restrictionsLoading } = useReportRestrictions();
+
   const reasonOptions = [
     { value: 'hacking/exploiting', label: 'Hacking/Exploiting' },
     { value: 'queue_dodging', label: 'Queue Dodging' },
@@ -81,11 +85,11 @@ const ReportSubmissionForm: React.FC = () => {
   }, [user]);
 
   useEffect(() => {
-    // Only check eligibility after Discord verification is determined
-    if (isDiscordVerified !== null) {
+    // Only check eligibility after Discord verification is determined and restrictions are loaded
+    if (isDiscordVerified !== null && !restrictionsLoading) {
       checkSubmissionEligibility();
     }
-  }, [user, isDiscordVerified]);
+  }, [user, isDiscordVerified, canSubmitReports, restrictionsLoading]);
 
   useEffect(() => {
     // Clear error messages after 5 seconds
@@ -122,15 +126,10 @@ const ReportSubmissionForm: React.FC = () => {
     if (!user) return;
 
     try {
-      const { data, error } = await supabase.rpc('can_user_submit_reports', {
-        user_uuid: user.id
-      });
-
-      if (error) throw error;
-      setCanSubmit(data && isDiscordVerified);
+      setCanSubmit((canSubmitReports ?? false) && isDiscordVerified);
     } catch (err) {
       console.error('Error checking submission eligibility:', err);
-        setCanSubmit(false);
+      setCanSubmit(false);
     }
   };
 
@@ -378,13 +377,20 @@ const ReportSubmissionForm: React.FC = () => {
       <div className="text-center py-8">
         <Shield className="mx-auto h-12 w-12 text-gray-400 mb-4" />
         <h3 className="text-lg font-medium text-gray-900 dark:text-gray-100 mb-2">
-          {!isDiscordVerified ? 'Discord Verification Required' : 'Temporarily Restricted'}
+          {!isDiscordVerified ? 'Discord Verification Required' : 'Report Submission Restricted'}
         </h3>
         <p className="text-gray-600 dark:text-gray-400">
           {!isDiscordVerified 
             ? 'You must verify your Discord account to submit reports.'
-            : 'You are temporarily restricted from submitting reports due to previous violations.'}
+            : restrictionMessage || 'You are currently restricted from submitting reports.'}
         </p>
+        {restrictionMessage && (
+          <div className="mt-4 p-4 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg">
+            <p className="text-sm text-red-800 dark:text-red-200">
+              {restrictionMessage}
+            </p>
+          </div>
+        )}
       </div>
     );
   }

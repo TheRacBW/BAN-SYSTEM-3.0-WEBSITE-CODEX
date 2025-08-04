@@ -2,6 +2,7 @@ import React, { useEffect, useState } from "react";
 import { supabase } from "../../lib/supabase";
 import { TrustLevel, TRUST_LEVEL_CONFIGS } from "../../types/trustLevels";
 import { FaDiscord, FaCheck, FaTimes } from "react-icons/fa";
+import { Shield } from "lucide-react";
 import { useAuth } from "../../context/AuthContext";
 
 interface User {
@@ -29,6 +30,14 @@ const UserPrivilegeEditor: React.FC<Props> = ({ userId, onClose, onUpdated }) =>
   const [trustLevel, setTrustLevel] = useState<TrustLevel>(0);
   const [isAdmin, setIsAdmin] = useState(false);
   const [currentUserProfile, setCurrentUserProfile] = useState<{ username: string } | null>(null);
+  const [userRestrictions, setUserRestrictions] = useState<any[]>([]);
+  const [userReportStats, setUserReportStats] = useState<any>(null);
+  const [showRestrictionModal, setShowRestrictionModal] = useState(false);
+  const [restrictionForm, setRestrictionForm] = useState({
+    restrictionType: 'temp_ban' as 'warning' | 'temp_ban' | 'permanent_ban',
+    reason: '',
+    duration: 24
+  });
   
   // Check if current user is therac (only admin who can see Discord data)
   const canViewDiscordData = currentUserProfile?.username === "therac";
@@ -52,20 +61,23 @@ const UserPrivilegeEditor: React.FC<Props> = ({ userId, onClose, onUpdated }) =>
   useEffect(() => {
     if (!userId) return;
     setLoading(true);
-    supabase
-      .from("users")
-      .select(`
-        *,
-        discord_verifications(
-          discord_id,
-          discord_username,
-          is_verified,
-          created_at
-        )
-      `)
-      .eq("id", userId)
-      .single()
-      .then(({ data, error }) => {
+    
+    const fetchUserData = async () => {
+      try {
+        const { data, error } = await supabase
+          .from("users")
+          .select(`
+            *,
+            discord_verifications(
+              discord_id,
+              discord_username,
+              is_verified,
+              created_at
+            )
+          `)
+          .eq("id", userId)
+          .single();
+
         if (error) {
           console.error("Error fetching user:", error);
           setLoading(false);
@@ -88,8 +100,31 @@ const UserPrivilegeEditor: React.FC<Props> = ({ userId, onClose, onUpdated }) =>
         setUserData(transformedUser);
         setTrustLevel(transformedUser.trust_level);
         setIsAdmin(transformedUser.is_admin);
+        
+        // Fetch user's report restrictions and stats
+        const [restrictionsResult, statsResult] = await Promise.all([
+          supabase
+            .from('user_report_restrictions')
+            .select('*')
+            .eq('user_id', userId)
+            .order('created_at', { ascending: false }),
+          supabase
+            .from('user_report_stats')
+            .select('*')
+            .eq('user_id', userId)
+            .single()
+        ]);
+        
+        setUserRestrictions(restrictionsResult.data || []);
+        setUserReportStats(statsResult.data);
+      } catch (error) {
+        console.error("Error fetching user data:", error);
+      } finally {
         setLoading(false);
-      });
+      }
+    };
+
+    fetchUserData();
   }, [userId]);
 
   const handleSave = async () => {
@@ -111,6 +146,68 @@ const UserPrivilegeEditor: React.FC<Props> = ({ userId, onClose, onUpdated }) =>
   const formatDiscordDate = (dateString: string | null) => {
     if (!dateString) return "Never";
     return new Date(dateString).toLocaleDateString();
+  };
+
+  const addRestriction = async () => {
+    if (!restrictionForm.reason || !userId) return;
+
+    try {
+      const expiresAt = restrictionForm.restrictionType === 'permanent_ban' 
+        ? null 
+        : new Date(Date.now() + (restrictionForm.duration * 60 * 60 * 1000)).toISOString();
+
+      const { error } = await supabase.rpc('add_user_restriction', {
+        user_uuid: userId,
+        restriction_type: restrictionForm.restrictionType,
+        reason: restrictionForm.reason,
+        expires_at: expiresAt
+      });
+
+      if (error) throw error;
+
+      setShowRestrictionModal(false);
+      setRestrictionForm({
+        restrictionType: 'temp_ban',
+        reason: '',
+        duration: 24
+      });
+      
+      // Refresh restrictions
+      const { data: restrictionsData } = await supabase
+        .from('user_report_restrictions')
+        .select('*')
+        .eq('user_id', userId)
+        .order('created_at', { ascending: false });
+      
+      setUserRestrictions(restrictionsData || []);
+    } catch (error) {
+      console.error('Error adding restriction:', error);
+      alert('Failed to add restriction. Please try again.');
+    }
+  };
+
+  const removeRestriction = async (restrictionId: string) => {
+    if (!window.confirm('Remove this restriction?')) return;
+
+    try {
+      const { error } = await supabase.rpc('remove_user_restriction', {
+        restriction_id: restrictionId
+      });
+
+      if (error) throw error;
+      
+      // Refresh restrictions
+      const { data: restrictionsData } = await supabase
+        .from('user_report_restrictions')
+        .select('*')
+        .eq('user_id', userId)
+        .order('created_at', { ascending: false });
+      
+      setUserRestrictions(restrictionsData || []);
+    } catch (error) {
+      console.error('Error removing restriction:', error);
+      alert('Failed to remove restriction. Please try again.');
+    }
   };
 
   if (!userId) return null;
@@ -184,6 +281,85 @@ const UserPrivilegeEditor: React.FC<Props> = ({ userId, onClose, onUpdated }) =>
               </div>
             </div>
 
+            {/* Report Restrictions Section */}
+            <div className="mb-6 p-4 bg-[#2a323c] rounded-lg border border-[#3a4250]">
+              <div className="flex items-center justify-between mb-3">
+                <h4 className="text-lg font-semibold text-gray-200 flex items-center gap-2">
+                  <Shield />
+                  Report Restrictions
+                </h4>
+                <button
+                  onClick={() => setShowRestrictionModal(true)}
+                  className="btn btn-sm btn-outline"
+                >
+                  Add Restriction
+                </button>
+              </div>
+              
+              {userReportStats && (
+                <div className="mb-4 p-3 bg-[#323a45] rounded">
+                  <h5 className="text-sm font-medium text-gray-200 mb-2">Report Statistics</h5>
+                  <div className="grid grid-cols-2 gap-4 text-sm">
+                    <div>
+                      <span className="text-gray-400">Total Reports:</span>
+                      <span className="text-white ml-2">{userReportStats.total_reports_submitted || 0}</span>
+                    </div>
+                    <div>
+                      <span className="text-gray-400">False Reports:</span>
+                      <span className="text-white ml-2">{userReportStats.false_reports_count || 0}</span>
+                    </div>
+                    <div>
+                      <span className="text-gray-400">False Rate:</span>
+                      <span className={`ml-2 ${
+                        (userReportStats.false_report_rate || 0) > 0.5 ? 'text-red-400' :
+                        (userReportStats.false_report_rate || 0) > 0.2 ? 'text-orange-400' :
+                        'text-green-400'
+                      }`}>
+                        {((userReportStats.false_report_rate || 0) * 100).toFixed(1)}%
+                      </span>
+                    </div>
+                    <div>
+                      <span className="text-gray-400">Last Report:</span>
+                      <span className="text-white ml-2">
+                        {userReportStats.last_report_at ? new Date(userReportStats.last_report_at).toLocaleDateString() : 'Never'}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {userRestrictions.length > 0 && (
+                <div className="space-y-2">
+                  <h5 className="text-sm font-medium text-gray-200">Active Restrictions</h5>
+                  {userRestrictions.filter(r => !r.expires_at || new Date(r.expires_at) > new Date()).map((restriction) => (
+                    <div key={restriction.id} className="p-2 bg-red-900/20 border border-red-700 rounded">
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <div className="text-sm font-medium text-red-200">
+                            {restriction.restriction_type === 'warning' ? 'Warning' :
+                             restriction.restriction_type === 'temp_ban' ? 'Temporary Ban' :
+                             'Permanent Ban'}
+                          </div>
+                          <div className="text-xs text-red-300">{restriction.reason}</div>
+                          {restriction.expires_at && (
+                            <div className="text-xs text-red-400">
+                              Expires: {new Date(restriction.expires_at).toLocaleString()}
+                            </div>
+                          )}
+                        </div>
+                                                 <button
+                           onClick={() => removeRestriction(restriction.id)}
+                           className="btn btn-xs btn-error"
+                         >
+                           Remove
+                         </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
             <div className="mb-4">
               <label className="flex items-center gap-2 text-gray-200">
                 <input 
@@ -218,6 +394,84 @@ const UserPrivilegeEditor: React.FC<Props> = ({ userId, onClose, onUpdated }) =>
           <div className="text-gray-200">User not found.</div>
         )}
       </div>
+
+      {/* Add Restriction Modal */}
+      {showRestrictionModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-[#232b36] dark:bg-gray-800 rounded-lg max-w-md w-full border border-[#3a4250]">
+            <div className="p-6 border-b border-[#3a4250]">
+              <h3 className="text-lg font-bold text-gray-200">Add Report Restriction</h3>
+              <p className="text-sm text-gray-400 mt-1">
+                Restrict {userData?.username || 'this user'} from submitting reports
+              </p>
+            </div>
+            <div className="p-6 space-y-4">
+              <div>
+                <label className="block text-sm font-medium mb-2 text-gray-200">Restriction Type</label>
+                <select
+                  value={restrictionForm.restrictionType}
+                  onChange={(e) => setRestrictionForm({
+                    ...restrictionForm,
+                    restrictionType: e.target.value as 'warning' | 'temp_ban' | 'permanent_ban'
+                  })}
+                  className="w-full p-2 border border-[#3a4250] rounded bg-[#323a45] text-gray-200"
+                >
+                  <option value="warning">Warning</option>
+                  <option value="temp_ban">Temporary Ban</option>
+                  <option value="permanent_ban">Permanent Ban</option>
+                </select>
+              </div>
+
+              {restrictionForm.restrictionType === 'temp_ban' && (
+                <div>
+                  <label className="block text-sm font-medium mb-2 text-gray-200">Duration (hours)</label>
+                  <input
+                    type="number"
+                    value={restrictionForm.duration}
+                    onChange={(e) => setRestrictionForm({
+                      ...restrictionForm,
+                      duration: parseInt(e.target.value) || 24
+                    })}
+                    className="w-full p-2 border border-[#3a4250] rounded bg-[#323a45] text-gray-200"
+                    min="1"
+                    max="8760" // 1 year
+                  />
+                </div>
+              )}
+
+              <div>
+                <label className="block text-sm font-medium mb-2 text-gray-200">Reason</label>
+                <textarea
+                  value={restrictionForm.reason}
+                  onChange={(e) => setRestrictionForm({
+                    ...restrictionForm,
+                    reason: e.target.value
+                  })}
+                  rows={3}
+                  className="w-full p-2 border border-[#3a4250] rounded bg-[#323a45] text-gray-200"
+                  placeholder="Reason for restriction..."
+                />
+              </div>
+
+              <div className="flex gap-2">
+                <button
+                  onClick={addRestriction}
+                  className="btn btn-primary"
+                  disabled={!restrictionForm.reason}
+                >
+                  Add Restriction
+                </button>
+                <button
+                  onClick={() => setShowRestrictionModal(false)}
+                  className="btn btn-ghost text-gray-200"
+                >
+                  Cancel
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
