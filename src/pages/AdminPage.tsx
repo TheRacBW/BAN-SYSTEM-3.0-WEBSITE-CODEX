@@ -437,6 +437,23 @@ const AdminPage = () => {
             <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
               <ActivityPulseManager isAdmin={isAdmin} />
             </div>
+            <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
+              <div className="flex justify-between items-center">
+                <div>
+                  <h3 className="text-lg font-semibold mb-2">Rp Migration Settings</h3>
+                  <p className="text-gray-600 dark:text-gray-400 text-sm">
+                    Manage and configure Rp migration settings and data transfer operations.
+                  </p>
+                </div>
+                <a
+                  href="/admin/migration"
+                  className="btn btn-primary flex items-center gap-2"
+                >
+                  <Database size={16} />
+                  Open Migration Panel
+                </a>
+              </div>
+            </div>
           </div>
         )}
       </div>
