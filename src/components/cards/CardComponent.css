@@ -1,0 +1,400 @@
+.card-container {
+  display: inline-block;
+  margin: 1rem;
+}
+
+.pokemon-card {
+  position: relative;
+  width: 320px;
+  height: 448px;
+  transform-style: preserve-3d;
+  border-radius: 12px;
+  cursor: pointer;
+  transition: all 0.3s ease-out;
+}
+
+.pokemon-card.active {
+  z-index: 100;
+}
+
+.card-front {
+  position: absolute;
+  width: 100%;
+  height: 100%;
+  backface-visibility: hidden;
+  border-radius: 12px;
+  overflow: hidden;
+}
+
+.card-content {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  border-radius: 12px;
+  overflow: hidden;
+}
+
+.card-shine {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  border-radius: 12px;
+  z-index: 5;
+  opacity: 0;
+  transition: opacity 0.3s ease;
+  pointer-events: none;
+}
+
+.card-holo-mask {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  border-radius: 12px;
+  z-index: 6;
+  opacity: 0;
+  transition: opacity 0.3s ease;
+  pointer-events: none;
+  mix-blend-mode: color-dodge;
+}
+
+.pokemon-card.active .card-shine {
+  opacity: 1;
+}
+
+.pokemon-card.active .card-shine[data-holo-type="rare_holo"] {
+  opacity: 0.3;
+}
+
+.pokemon-card.active .card-shine[data-holo-type="amazing"] {
+  opacity: 0.3;
+}
+
+.pokemon-card.active .card-shine[data-holo-type="radiant"] {
+  opacity: 0.3;
+}
+
+.pokemon-card.active .card-shine[data-holo-type="galaxy"] {
+  opacity: 0.5;
+}
+
+.pokemon-card.active .card-holo-mask {
+  opacity: 1;
+}
+
+.pokemon-card.active .card-holo-mask[data-holo-type="rare_holo"] {
+  opacity: 0.3;
+}
+
+.pokemon-card.active .card-holo-mask[data-holo-type="amazing"] {
+  opacity: 0.3;
+}
+
+.pokemon-card.active .card-holo-mask[data-holo-type="radiant"] {
+  opacity: 0.3;
+}
+
+.pokemon-card.active .card-holo-mask[data-holo-type="galaxy"] {
+  opacity: 0.5;
+}
+
+/* Copy all holo effects for the mask layer */
+.card-holo-mask[data-holo-type="basic"] {
+  background: radial-gradient(
+    farthest-corner circle at var(--mx) var(--my),
+    rgba(255, 255, 255, 0.8) 0%,
+    rgba(255, 255, 255, 0.65) 27.5%,
+    rgba(255, 255, 255, 0.35) 40%,
+    rgba(255, 255, 255, 0.1) 70%,
+    transparent 100%
+  );
+  mix-blend-mode: overlay;
+}
+
+.card-holo-mask[data-holo-type="reverse"] {
+  background-image: 
+    radial-gradient(
+      farthest-corner circle at var(--mx) var(--my),
+      rgba(255, 255, 255, 0.8) 0%,
+      rgba(255, 255, 255, 0.3) 50%,
+      transparent 100%
+    ),
+    repeating-linear-gradient(
+      0deg,
+      #ff6b9d 0%,
+      #c44569 25%,
+      #f8b500 50%,
+      #78e08f 75%,
+      #4a69bd 100%
+    );
+  background-size: 100% 100%, 150% 150%;
+  background-position: center, var(--posx) var(--posy);
+  mix-blend-mode: color-dodge;
+  clip-path: inset(22% 8% 33% 8%);
+}
+
+.card-holo-mask[data-holo-type="rare_holo"] {
+  background-image: 
+    repeating-linear-gradient(
+      90deg,
+      #f80e7b,
+      #eedf10,
+      #21e985,
+      #0dbde9,
+      #c929f1,
+      #f80e7b
+    ),
+    radial-gradient(
+      farthest-corner circle at var(--mx) var(--my),
+      rgba(255, 255, 255, 0.48) 0%,
+      rgba(200, 200, 200, 0.18) 50%,
+      transparent 100%
+    );
+  background-size: 200% 200%, 100% 100%;
+  background-position: var(--posx) var(--posy), center;
+  mix-blend-mode: screen;
+  filter: brightness(0.8) contrast(2) saturate(1.2);
+}
+
+.card-holo-mask[data-holo-type="galaxy"] {
+  background-image: 
+    repeating-linear-gradient(
+      82deg,
+      rgb(218, 56, 50) 80px,
+      rgb(219, 204, 86) 160px,
+      rgb(121, 199, 58) 240px,
+      rgb(58, 192, 183) 320px,
+      rgb(71, 98, 207) 400px,
+      rgb(170, 69, 209) 480px,
+      rgb(218, 56, 50) 800px
+    ),
+    radial-gradient(
+      farthest-corner circle at var(--mx) var(--my),
+      rgba(255, 255, 255, 0.6) 5%,
+      rgba(150, 150, 150, 0.3) 40%,
+      rgb(0, 0, 0) 100%
+    );
+  background-size: 600% 1200%, cover;
+  background-position: var(--posx) var(--posy), center;
+  mix-blend-mode: color-dodge;
+  filter: brightness(0.75) contrast(1.2) saturate(1.5);
+}
+
+.card-holo-mask[data-holo-type="amazing"] {
+  background-image: 
+    repeating-linear-gradient(
+      45deg,
+      #ff6b9d 0%,
+      #ffa726 25%,
+      #66bb6a 50%,
+      #42a5f5 75%,
+      #ab47bc 100%
+    ),
+    radial-gradient(
+      farthest-corner circle at var(--mx) var(--my),
+      rgba(255, 255, 255, 0.6) 0%,
+      rgba(255, 255, 255, 0.48) 20%,
+      rgba(255, 255, 255, 0.18) 50%,
+      transparent 100%
+    );
+  background-size: 400% 400%, 100% 100%;
+  background-position: var(--posx) var(--posy), center;
+  mix-blend-mode: lighten;
+  filter: brightness(1.5) contrast(2) saturate(2);
+}
+
+.card-holo-mask[data-holo-type="radiant"] {
+  background-image: 
+    repeating-linear-gradient(
+      55deg,
+      rgb(255, 161, 158) 200px,
+      rgb(85, 178, 255) 400px,
+      rgb(255, 199, 146) 600px,
+      rgb(130, 255, 213) 800px,
+      rgb(253, 170, 240) 1000px,
+      rgb(148, 241, 255) 1200px,
+      rgb(255, 161, 158) 1400px
+    );
+  background-size: 400% 400%;
+  background-position: var(--posx) var(--posy);
+  mix-blend-mode: color-dodge;
+  filter: brightness(0.95) contrast(4) saturate(0.75);
+}
+
+.card-holo-mask[data-holo-type="trainer_gallery"] {
+  background-image: 
+    repeating-linear-gradient(
+      -22deg,
+      rgba(174, 102, 202, 0.75) 5%,
+      rgba(228, 77, 72, 0.75) 10%,
+      rgba(216, 197, 55, 0.75) 15%,
+      rgba(124, 201, 62, 0.75) 20%,
+      rgba(80, 177, 170, 0.75) 25%,
+      rgba(136, 160, 255, 0.75) 30%,
+      rgba(176, 105, 204, 0.75) 35%
+    ),
+    radial-gradient(
+      farthest-corner ellipse at var(--mx) var(--my),
+      rgb(255, 255, 255) 5%,
+      rgba(55, 0, 55, 0.6) 25%,
+      rgb(55, 55, 55) 90%
+    );
+  background-size: 200% 400%, 200% 200%;
+  background-position: 0% var(--posy), center;
+  mix-blend-mode: color-dodge;
+  filter: brightness(0.6) contrast(2.3) saturate(1.1);
+}
+
+/* Hide base holo when mask is enabled */
+.pokemon-card.active .card-shine[data-mask-enabled="true"] {
+  opacity: 0;
+}
+
+.card-shine[data-holo-type="basic"] {
+  background: radial-gradient(
+    farthest-corner circle at var(--mx) var(--my),
+    rgba(255, 255, 255, 0.8) 0%,
+    rgba(255, 255, 255, 0.65) 27.5%,
+    rgba(255, 255, 255, 0.35) 40%,
+    rgba(255, 255, 255, 0.1) 70%,
+    transparent 100%
+  );
+  mix-blend-mode: overlay;
+}
+
+.card-shine[data-holo-type="reverse"] {
+  background-image: 
+    radial-gradient(
+      farthest-corner circle at var(--mx) var(--my),
+      rgba(255, 255, 255, 0.8) 0%,
+      rgba(255, 255, 255, 0.3) 50%,
+      transparent 100%
+    ),
+    repeating-linear-gradient(
+      0deg,
+      #ff6b9d 0%,
+      #c44569 25%,
+      #f8b500 50%,
+      #78e08f 75%,
+      #4a69bd 100%
+    );
+  background-size: 100% 100%, 150% 150%;
+  background-position: center, var(--posx) var(--posy);
+  mix-blend-mode: color-dodge;
+  clip-path: inset(22% 8% 33% 8%);
+}
+
+.card-shine[data-holo-type="rare_holo"] {
+  background-image: 
+    repeating-linear-gradient(
+      90deg,
+      #f80e7b,
+      #eedf10,
+      #21e985,
+      #0dbde9,
+      #c929f1,
+      #f80e7b
+    ),
+    radial-gradient(
+      farthest-corner circle at var(--mx) var(--my),
+      rgba(255, 255, 255, 0.48) 0%,
+      rgba(200, 200, 200, 0.18) 50%,
+      transparent 100%
+    );
+  background-size: 200% 200%, 100% 100%;
+  background-position: var(--posx) var(--posy), center;
+  mix-blend-mode: screen;
+  filter: brightness(0.8) contrast(2) saturate(1.2);
+}
+
+.card-shine[data-holo-type="galaxy"] {
+  background-image: 
+    repeating-linear-gradient(
+      82deg,
+      rgb(218, 56, 50) 80px,
+      rgb(219, 204, 86) 160px,
+      rgb(121, 199, 58) 240px,
+      rgb(58, 192, 183) 320px,
+      rgb(71, 98, 207) 400px,
+      rgb(170, 69, 209) 480px,
+      rgb(218, 56, 50) 800px
+    ),
+    radial-gradient(
+      farthest-corner circle at var(--mx) var(--my),
+      rgba(255, 255, 255, 0.6) 5%,
+      rgba(150, 150, 150, 0.3) 40%,
+      rgb(0, 0, 0) 100%
+    );
+  background-size: 600% 1200%, cover;
+  background-position: var(--posx) var(--posy), center;
+  mix-blend-mode: color-dodge;
+  filter: brightness(0.75) contrast(1.2) saturate(1.5);
+}
+
+.card-shine[data-holo-type="amazing"] {
+  background-image: 
+    repeating-linear-gradient(
+      45deg,
+      #ff6b9d 0%,
+      #ffa726 25%,
+      #66bb6a 50%,
+      #42a5f5 75%,
+      #ab47bc 100%
+    ),
+    radial-gradient(
+      farthest-corner circle at var(--mx) var(--my),
+      rgba(255, 255, 255, 0.6) 0%,
+      rgba(255, 255, 255, 0.48) 20%,
+      rgba(255, 255, 255, 0.18) 50%,
+      transparent 100%
+    );
+  background-size: 400% 400%, 100% 100%;
+  background-position: var(--posx) var(--posy), center;
+  mix-blend-mode: lighten;
+  filter: brightness(1.5) contrast(2) saturate(2);
+}
+
+.card-shine[data-holo-type="radiant"] {
+  background-image: 
+    repeating-linear-gradient(
+      55deg,
+      rgb(255, 161, 158) 200px,
+      rgb(85, 178, 255) 400px,
+      rgb(255, 199, 146) 600px,
+      rgb(130, 255, 213) 800px,
+      rgb(253, 170, 240) 1000px,
+      rgb(148, 241, 255) 1200px,
+      rgb(255, 161, 158) 1400px
+    );
+  background-size: 400% 400%;
+  background-position: var(--posx) var(--posy);
+  mix-blend-mode: color-dodge;
+  filter: brightness(0.95) contrast(4) saturate(0.75);
+}
+
+.card-shine[data-holo-type="trainer_gallery"] {
+  background-image: 
+    repeating-linear-gradient(
+      -22deg,
+      rgba(174, 102, 202, 0.75) 5%,
+      rgba(228, 77, 72, 0.75) 10%,
+      rgba(216, 197, 55, 0.75) 15%,
+      rgba(124, 201, 62, 0.75) 20%,
+      rgba(80, 177, 170, 0.75) 25%,
+      rgba(136, 160, 255, 0.75) 30%,
+      rgba(176, 105, 204, 0.75) 35%
+    ),
+    radial-gradient(
+      farthest-corner ellipse at var(--mx) var(--my),
+      rgb(255, 255, 255) 5%,
+      rgba(55, 0, 55, 0.6) 25%,
+      rgb(55, 55, 55) 90%
+    );
+  background-size: 200% 400%, 200% 200%;
+  background-position: 0% var(--posy), center;
+  mix-blend-mode: color-dodge;
+  filter: brightness(0.6) contrast(2.3) saturate(1.1);
+} 

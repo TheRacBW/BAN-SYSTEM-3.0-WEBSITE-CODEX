@@ -1,6 +1,6 @@
 import React from 'react';
 import { Link, NavLink, useNavigate, useLocation } from 'react-router-dom';
-import { Moon, Sun, User, LogOut, Plus, TrendingUp, Settings, Home, Users, Trophy, Compass, Calculator, Flag } from 'lucide-react';
+import { Moon, Sun, User, LogOut, Plus, TrendingUp, Settings, Home, Users, Trophy, Compass, Calculator, Flag, Package } from 'lucide-react';
 import { useTheme } from '../context/ThemeContext';
 import { useAuth } from '../context/AuthContext';
 import { useRef, useEffect, useState } from 'react';
@@ -23,6 +23,7 @@ const Header: React.FC = () => {
     calculator: useRef<HTMLAnchorElement>(null),
     players: useRef<HTMLAnchorElement>(null),
     report: useRef<HTMLAnchorElement>(null),
+    cards: useRef<HTMLAnchorElement>(null),
   };
   const [sliderStyle, setSliderStyle] = useState<React.CSSProperties>({ opacity: 0 });
   const [sliderClass, setSliderClass] = useState('');
@@ -35,6 +36,7 @@ const Header: React.FC = () => {
     '/mmr-calculator': 'calculator',
     '/players': 'players',
     '/report': 'report',
+    '/cards': 'cards',
   };
 
   useEffect(() => {
@@ -129,6 +131,18 @@ const Header: React.FC = () => {
             
             {user && (
               <>
+                <NavLink
+                  to="/cards"
+                  className={({ isActive }) =>
+                    `nav-icon-link${isActive ? ' active' : ''}`
+                  }
+                  title="Card Collection"
+                  data-page="cards"
+                  ref={iconRefs.cards}
+                >
+                  <Package size={20} />
+                </NavLink>
+                
                 <NavLink
                   to="/report"
                   className={({ isActive }) =>

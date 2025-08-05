@@ -1,0 +1,344 @@
+/* Pack Opening Page Styles */
+
+@keyframes cardReveal {
+  0% {
+    opacity: 0;
+    transform: scale(0.8) rotateY(180deg);
+  }
+  50% {
+    opacity: 0.5;
+    transform: scale(0.9) rotateY(90deg);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1) rotateY(0deg);
+  }
+}
+
+@keyframes coinBounce {
+  0%, 100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-10px);
+  }
+}
+
+@keyframes packShake {
+  0%, 100% {
+    transform: translateX(0);
+  }
+  25% {
+    transform: translateX(-5px);
+  }
+  75% {
+    transform: translateX(5px);
+  }
+}
+
+@keyframes progressPulse {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.7;
+  }
+}
+
+/* Pack card hover effects */
+.pack-card {
+  transition: all 0.3s ease;
+}
+
+.pack-card:hover {
+  transform: translateY(-5px);
+  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.3);
+}
+
+.pack-card:hover .pack-glow {
+  opacity: 1;
+}
+
+.pack-glow {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: linear-gradient(45deg, rgba(255, 255, 255, 0.1), transparent);
+  border-radius: inherit;
+  opacity: 0;
+  transition: opacity 0.3s ease;
+  pointer-events: none;
+}
+
+/* Coin animation */
+.coin-animation {
+  animation: coinBounce 2s ease-in-out infinite;
+}
+
+/* Pack opening animation */
+.pack-opening {
+  animation: packShake 0.5s ease-in-out;
+}
+
+/* Progress bar animation */
+.progress-bar {
+  animation: progressPulse 2s ease-in-out infinite;
+}
+
+/* Card reveal animation */
+.card-reveal {
+  animation: cardReveal 1s ease-out forwards;
+}
+
+/* Session timer pulse */
+.session-active {
+  animation: progressPulse 2s ease-in-out infinite;
+}
+
+/* Goal completion celebration */
+.goal-completed {
+  animation: coinBounce 0.6s ease-in-out 3;
+}
+
+/* Inventory card hover */
+.inventory-card {
+  transition: all 0.3s ease;
+}
+
+.inventory-card:hover {
+  transform: scale(1.05);
+  z-index: 10;
+}
+
+/* Stats card hover */
+.stats-card {
+  transition: all 0.3s ease;
+}
+
+.stats-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.2);
+}
+
+/* Modal animations */
+.modal-enter {
+  opacity: 0;
+  transform: scale(0.9);
+}
+
+.modal-enter-active {
+  opacity: 1;
+  transform: scale(1);
+  transition: all 0.3s ease;
+}
+
+.modal-exit {
+  opacity: 1;
+  transform: scale(1);
+}
+
+.modal-exit-active {
+  opacity: 0;
+  transform: scale(0.9);
+  transition: all 0.3s ease;
+}
+
+/* Tab transitions */
+.tab-content {
+  transition: opacity 0.3s ease;
+}
+
+.tab-content-enter {
+  opacity: 0;
+}
+
+.tab-content-enter-active {
+  opacity: 1;
+  transition: opacity 0.3s ease;
+}
+
+.tab-content-exit {
+  opacity: 1;
+}
+
+.tab-content-exit-active {
+  opacity: 0;
+  transition: opacity 0.3s ease;
+}
+
+/* Loading spinner */
+.loading-spinner {
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* Rarity glow effects */
+.rarity-common {
+  box-shadow: 0 0 10px rgba(156, 163, 175, 0.5);
+}
+
+.rarity-uncommon {
+  box-shadow: 0 0 10px rgba(34, 197, 94, 0.5);
+}
+
+.rarity-rare {
+  box-shadow: 0 0 10px rgba(59, 130, 246, 0.5);
+}
+
+.rarity-epic {
+  box-shadow: 0 0 10px rgba(147, 51, 234, 0.5);
+}
+
+.rarity-legendary {
+  box-shadow: 0 0 15px rgba(249, 115, 22, 0.7);
+  animation: legendaryGlow 2s ease-in-out infinite alternate;
+}
+
+@keyframes legendaryGlow {
+  from {
+    box-shadow: 0 0 15px rgba(249, 115, 22, 0.7);
+  }
+  to {
+    box-shadow: 0 0 25px rgba(249, 115, 22, 0.9), 0 0 35px rgba(249, 115, 22, 0.5);
+  }
+}
+
+/* Backdrop blur for modals */
+.backdrop-blur {
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+}
+
+/* Gradient text effects */
+.gradient-text {
+  background: linear-gradient(45deg, #ff6b6b, #4ecdc4, #45b7d1, #96ceb4);
+  background-size: 300% 300%;
+  animation: gradientShift 3s ease infinite;
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+@keyframes gradientShift {
+  0%, 100% {
+    background-position: 0% 50%;
+  }
+  50% {
+    background-position: 100% 50%;
+  }
+}
+
+/* Floating animation for cards */
+.floating {
+  animation: float 3s ease-in-out infinite;
+}
+
+@keyframes float {
+  0%, 100% {
+    transform: translateY(0px);
+  }
+  50% {
+    transform: translateY(-10px);
+  }
+}
+
+/* Pulse animation for notifications */
+.pulse {
+  animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}
+
+@keyframes pulse {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.5;
+  }
+}
+
+/* Shimmer effect for loading states */
+.shimmer {
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.2), transparent);
+  background-size: 200% 100%;
+  animation: shimmer 1.5s infinite;
+}
+
+@keyframes shimmer {
+  0% {
+    background-position: -200% 0;
+  }
+  100% {
+    background-position: 200% 0;
+  }
+}
+
+/* Responsive grid adjustments */
+@media (max-width: 768px) {
+  .card-grid {
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  }
+  
+  .stats-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (max-width: 480px) {
+  .stats-grid {
+    grid-template-columns: 1fr;
+  }
+  
+  .tab-navigation {
+    flex-wrap: wrap;
+  }
+  
+  .tab-button {
+    flex: 1;
+    min-width: 120px;
+  }
+}
+
+/* Dark mode adjustments */
+@media (prefers-color-scheme: dark) {
+  .backdrop-blur {
+    background-color: rgba(0, 0, 0, 0.8);
+  }
+}
+
+/* High contrast mode support */
+@media (prefers-contrast: high) {
+  .card-border {
+    border-width: 2px;
+  }
+  
+  .text-shadow {
+    text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.8);
+  }
+}
+
+/* Reduced motion support */
+@media (prefers-reduced-motion: reduce) {
+  * {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+  
+  .floating,
+  .pulse,
+  .shimmer,
+  .gradient-text,
+  .legendary-glow {
+    animation: none;
+  }
+} 
