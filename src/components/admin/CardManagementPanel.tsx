@@ -81,13 +81,13 @@ const CardManagementPanel: React.FC = () => {
     retreat_cost: 2,
     unlock_requirement: '',
     show_season_overlay: true,
-    has_border: false,
+    has_border: true,
     border_color: '#FFD700',
     border_behind_holo: true,
     has_holo_mask: false,
     holo_mask_url: '',
-    card_frame_color: '#ffffff',
-    text_theme: 'dark'
+    card_frame_color: '#1f2937',
+    text_theme: 'light'
   });
 
   useEffect(() => {
@@ -149,13 +149,13 @@ const CardManagementPanel: React.FC = () => {
       retreat_cost: 2,
       unlock_requirement: '',
       show_season_overlay: true,
-      has_border: false,
+      has_border: true,
       border_color: '#FFD700',
       border_behind_holo: true,
       has_holo_mask: false,
       holo_mask_url: '',
-      card_frame_color: '#ffffff',
-      text_theme: 'dark'
+      card_frame_color: '#1f2937',
+      text_theme: 'light'
     });
     setEditingCard(null);
     setShowBuilder(false);
@@ -551,6 +551,70 @@ const CardManagementPanel: React.FC = () => {
                           placeholder="The decaying shadow who always finds her mark."
                           className="w-full p-2 border border-gray-600 rounded bg-gray-700 text-white placeholder-gray-400"
                         />
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-4">
+                        <div>
+                          <label className="block text-sm font-medium mb-1 text-gray-300">Card Frame Color</label>
+                          <div className="flex gap-2">
+                            <input
+                              type="color"
+                              value={formData.card_frame_color}
+                              onChange={(e) => handleInputChange('card_frame_color', e.target.value)}
+                              className="w-12 h-10 border border-gray-600 rounded bg-gray-700"
+                            />
+                            <input
+                              type="text"
+                              value={formData.card_frame_color}
+                              onChange={(e) => handleInputChange('card_frame_color', e.target.value)}
+                              className="flex-1 p-2 border border-gray-600 rounded bg-gray-700 text-white"
+                            />
+                          </div>
+                        </div>
+
+                        <div>
+                          <label className="block text-sm font-medium mb-1 text-gray-300">Text Theme</label>
+                          <select
+                            value={formData.text_theme}
+                            onChange={(e) => handleInputChange('text_theme', e.target.value)}
+                            className="w-full p-2 border border-gray-600 rounded bg-gray-700 text-white"
+                          >
+                            <option value="light">Light Text</option>
+                            <option value="dark">Dark Text</option>
+                          </select>
+                        </div>
+                      </div>
+
+                      <div className="flex items-center space-x-4">
+                        <label className="flex items-center text-gray-300">
+                          <input
+                            type="checkbox"
+                            checked={formData.has_border}
+                            onChange={(e) => handleInputChange('has_border', e.target.checked)}
+                            className="mr-2 bg-gray-700 border-gray-600"
+                          />
+                          <span>Show Card Border</span>
+                        </label>
+
+                        {formData.has_border && (
+                          <div>
+                            <label className="block text-sm font-medium mb-1 text-gray-300">Border Color</label>
+                            <div className="flex gap-2">
+                              <input
+                                type="color"
+                                value={formData.border_color}
+                                onChange={(e) => handleInputChange('border_color', e.target.value)}
+                                className="w-12 h-10 border border-gray-600 rounded bg-gray-700"
+                              />
+                              <input
+                                type="text"
+                                value={formData.border_color}
+                                onChange={(e) => handleInputChange('border_color', e.target.value)}
+                                className="flex-1 p-2 border border-gray-600 rounded bg-gray-700 text-white"
+                              />
+                            </div>
+                          </div>
+                        )}
                       </div>
                     </div>
                   </div>
