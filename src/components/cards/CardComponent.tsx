@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Sparkles, Image } from 'lucide-react';
-import { Card, RARITY_COLORS, CLASS_ICONS, SEASON_IMAGES } from '../../types/cards';
+import { Card, RARITY_COLORS, CLASS_ICONS, SeasonConfig } from '../../types/cards';
+import { CardService } from '../../services/cardService';
 import './CardComponent.css';
 
 // Text color helpers
@@ -57,9 +58,29 @@ const CardComponent: React.FC<CardComponentProps> = ({
   const [mousePos, setMousePos] = useState({ x: 50, y: 50 });
   const [isActive, setIsActive] = useState(false);
   const [transform, setTransform] = useState({ rx: 0, ry: 0, scale: 1 });
+  const [seasons, setSeasons] = useState<SeasonConfig[]>([]);
   
   const canHaveHolo = ['Epic', 'Legendary'].includes(card.rarity) && card.is_holo;
   const textColors = getTextColors(card.text_theme);
+
+  // Load seasons from database
+  useEffect(() => {
+    const loadSeasons = async () => {
+      try {
+        const seasonsData = await CardService.getAllSeasons();
+        setSeasons(seasonsData);
+      } catch (error) {
+        console.error('Error loading seasons:', error);
+      }
+    };
+    loadSeasons();
+  }, []);
+
+  // Get season image URL dynamically
+  const getSeasonImageUrl = (seasonName: string) => {
+    const season = seasons.find(s => s.name === seasonName && s.is_active);
+    return season?.image_url || 'https://via.placeholder.com/40x40/666/fff?text=?';
+  };
 
   useEffect(() => {
     if (!interactive || !cardRef.current) return;
@@ -248,10 +269,10 @@ const CardComponent: React.FC<CardComponentProps> = ({
                 )}
               </div>
 
-              {card.show_season_overlay && card.season && SEASON_IMAGES[card.season] && (
+              {card.show_season_overlay && card.season && getSeasonImageUrl(card.season) && (
                 <div className="absolute bottom-2 right-2 flex flex-col items-center z-30 pointer-events-none">
                   <img 
-                    src={SEASON_IMAGES[card.season]} 
+                    src={getSeasonImageUrl(card.season)} 
                     alt={card.season}
                     className="w-12 h-12 opacity-90 drop-shadow-lg mb-1"
                     style={{ 

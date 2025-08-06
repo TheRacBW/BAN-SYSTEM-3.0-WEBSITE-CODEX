@@ -8,7 +8,9 @@ import {
   UserSessionTime, 
   PackOpeningHistory,
   CardRarity,
-  GoalType
+  GoalType,
+  SeasonConfig,
+  PackTypeConfig
 } from '../types/cards';
 
 export class CardService {
@@ -506,23 +508,23 @@ export class CardService {
     const goals: Omit<UserGoal, 'id' | 'user_id' | 'created_at'>[] = [
       {
         goal_type: 'daily_time',
-        target_value: 3600, // 1 hour
+        target_value: 60, // 1 hour
         current_value: 0,
         reward_coins: 50,
         is_completed: false,
-        expires_at: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString() // 24 hours from now
+        expires_at: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString()
       },
       {
-        goal_type: 'packs_opened',
-        target_value: 3,
+        goal_type: 'cards_collected',
+        target_value: 5,
         current_value: 0,
         reward_coins: 25,
         is_completed: false,
         expires_at: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString()
       },
       {
-        goal_type: 'cards_collected',
-        target_value: 10,
+        goal_type: 'packs_opened',
+        target_value: 2,
         current_value: 0,
         reward_coins: 30,
         is_completed: false,
@@ -532,10 +534,100 @@ export class CardService {
 
     const createdGoals: UserGoal[] = [];
     for (const goal of goals) {
-      const created = await this.createGoal(userId, goal);
-      createdGoals.push(created);
+      try {
+        const createdGoal = await this.createGoal(userId, goal);
+        createdGoals.push(createdGoal);
+      } catch (error) {
+        console.error('Failed to create goal:', error);
+      }
     }
 
     return createdGoals;
+  }
+
+  // Season Management
+  static async getAllSeasons(): Promise<SeasonConfig[]> {
+    const { data, error } = await supabase
+      .from('seasons')
+      .select('*')
+      .order('name', { ascending: true });
+
+    if (error) throw error;
+    return data || [];
+  }
+
+  static async createSeason(seasonData: Omit<SeasonConfig, 'id' | 'created_at' | 'updated_at'>): Promise<SeasonConfig> {
+    const { data, error } = await supabase
+      .from('seasons')
+      .insert(seasonData)
+      .select()
+      .single();
+
+    if (error) throw error;
+    return data;
+  }
+
+  static async updateSeason(id: string, seasonData: Partial<SeasonConfig>): Promise<SeasonConfig> {
+    const { data, error } = await supabase
+      .from('seasons')
+      .update({ ...seasonData, updated_at: new Date().toISOString() })
+      .eq('id', id)
+      .select()
+      .single();
+
+    if (error) throw error;
+    return data;
+  }
+
+  static async deleteSeason(id: string): Promise<void> {
+    const { error } = await supabase
+      .from('seasons')
+      .delete()
+      .eq('id', id);
+
+    if (error) throw error;
+  }
+
+  // Pack Type Management
+  static async getAllPackTypeConfigs(): Promise<PackTypeConfig[]> {
+    const { data, error } = await supabase
+      .from('pack_types')
+      .select('*')
+      .order('price', { ascending: true });
+
+    if (error) throw error;
+    return data || [];
+  }
+
+  static async createPackTypeConfig(packData: Omit<PackTypeConfig, 'id' | 'created_at' | 'updated_at'>): Promise<PackTypeConfig> {
+    const { data, error } = await supabase
+      .from('pack_types')
+      .insert(packData)
+      .select()
+      .single();
+
+    if (error) throw error;
+    return data;
+  }
+
+  static async updatePackTypeConfig(id: string, packData: Partial<PackTypeConfig>): Promise<PackTypeConfig> {
+    const { data, error } = await supabase
+      .from('pack_types')
+      .update({ ...packData, updated_at: new Date().toISOString() })
+      .eq('id', id)
+      .select()
+      .single();
+
+    if (error) throw error;
+    return data;
+  }
+
+  static async deletePackTypeConfig(id: string): Promise<void> {
+    const { error } = await supabase
+      .from('pack_types')
+      .delete()
+      .eq('id', id);
+
+    if (error) throw error;
   }
 } 

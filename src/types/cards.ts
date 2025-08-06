@@ -136,6 +136,28 @@ export interface CoinEarningMethod {
   unit: 'minute' | 'hour' | 'action' | 'goal';
 }
 
+// New interfaces for settings management
+export interface SeasonConfig {
+  id: string;
+  name: string;
+  image_url: string;
+  is_active: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface PackTypeConfig {
+  id: string;
+  name: string;
+  description: string;
+  price: number;
+  card_count: number;
+  rarity_weights: Record<CardRarity, number>;
+  is_active: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
 export const RARITY_COLORS: Record<CardRarity, { color: string; bg: string }> = {
   Common: { color: 'text-gray-700', bg: 'bg-gray-100' },
   Uncommon: { color: 'text-green-700', bg: 'bg-green-100' },

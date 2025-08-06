@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { CardService } from '../../services/cardService';
-import { Card, PackType, BEDWARS_KITS, SEASONS, CLASSES, PACK_TYPES, HOLO_TYPES } from '../../types/cards';
+import { Card, PackType, BEDWARS_KITS, CLASSES, HOLO_TYPES, SeasonConfig } from '../../types/cards';
 import CardComponent from '../cards/CardComponent';
+import CardSettingsModal from './CardSettingsModal';
 import { 
   Plus, 
   Save, 
@@ -58,12 +59,14 @@ interface CardData {
 const CardManagementPanel: React.FC = () => {
   const [cards, setCards] = useState<Card[]>([]);
   const [packTypes, setPackTypes] = useState<PackType[]>([]);
+  const [seasons, setSeasons] = useState<SeasonConfig[]>([]);
   const [showBuilder, setShowBuilder] = useState(false);
   const [editingCard, setEditingCard] = useState<Card | null>(null);
   const [previewMode, setPreviewMode] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [activeTab, setActiveTab] = useState<'cards' | 'packs' | 'stats'>('cards');
   const [showImportModal, setShowImportModal] = useState(false);
+  const [showSettingsModal, setShowSettingsModal] = useState(false);
   
   const [formData, setFormData] = useState<CardData>({
     kit_name: '',
@@ -108,12 +111,14 @@ const CardManagementPanel: React.FC = () => {
 
   const loadData = async () => {
     try {
-      const [cardsData, packTypesData] = await Promise.all([
+      const [cardsData, packTypesData, seasonsData] = await Promise.all([
         CardService.getAllCards(),
-        CardService.getAllPackTypes()
+        CardService.getAllPackTypes(),
+        CardService.getAllSeasons()
       ]);
       setCards(cardsData);
       setPackTypes(packTypesData);
+      setSeasons(seasonsData);
     } catch (error) {
       console.error('Error loading data:', error);
     }
@@ -291,24 +296,33 @@ const CardManagementPanel: React.FC = () => {
           </div>
         </div>
         
-        {activeTab === 'cards' && (
-          <div className="flex gap-2">
-            <button
-              onClick={() => setShowImportModal(true)}
-              className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg flex items-center gap-2 transition-colors"
-            >
-              <Plus size={18} />
-              Import Cards
-            </button>
-            <button
-              onClick={() => setShowBuilder(true)}
-              className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg flex items-center gap-2 transition-colors"
-            >
-              <Plus size={18} />
-              Create New Card
-            </button>
-          </div>
-        )}
+        <div className="flex gap-2">
+          <button
+            onClick={() => setShowSettingsModal(true)}
+            className="bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 rounded-lg flex items-center gap-2 transition-colors"
+          >
+            <Settings size={18} />
+            Settings
+          </button>
+          {activeTab === 'cards' && (
+            <>
+              <button
+                onClick={() => setShowImportModal(true)}
+                className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg flex items-center gap-2 transition-colors"
+              >
+                <Plus size={18} />
+                Import Cards
+              </button>
+              <button
+                onClick={() => setShowBuilder(true)}
+                className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg flex items-center gap-2 transition-colors"
+              >
+                <Plus size={18} />
+                Create New Card
+              </button>
+            </>
+          )}
+        </div>
       </div>
 
       {/* Card Builder Modal */}
@@ -374,8 +388,8 @@ const CardManagementPanel: React.FC = () => {
                             className="w-full p-2 border border-gray-600 rounded bg-gray-700 text-white"
                           >
                             <option value="">Select Season</option>
-                            {SEASONS.map(season => (
-                              <option key={season} value={season}>{season}</option>
+                            {seasons.map(season => (
+                              <option key={season.name} value={season.name}>{season.name}</option>
                             ))}
                           </select>
                         </div>
@@ -437,8 +451,8 @@ const CardManagementPanel: React.FC = () => {
                             className="w-full p-2 border border-gray-600 rounded bg-gray-700 text-white"
                           >
                             <option value="">Select Pack</option>
-                            {PACK_TYPES.map(pack => (
-                              <option key={pack} value={pack}>{pack}</option>
+                            {packTypes.map(pack => (
+                              <option key={pack.name} value={pack.name}>{pack.name}</option>
                             ))}
                           </select>
                         </div>
@@ -1003,6 +1017,12 @@ const CardManagementPanel: React.FC = () => {
           </button>
         </div>
       </div>
+
+      {/* Settings Modal */}
+      <CardSettingsModal 
+        isOpen={showSettingsModal}
+        onClose={() => setShowSettingsModal(false)}
+      />
     </div>
   );
 };
