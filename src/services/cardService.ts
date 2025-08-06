@@ -651,4 +651,26 @@ export class CardService {
 
     if (error) throw error;
   }
+
+  // Kit Management
+  static async getAllKits(): Promise<{ id: string; name: string; image_url: string; type: string }[]> {
+    const { data, error } = await supabase
+      .from('kits')
+      .select('id, name, image_url, type')
+      .order('name', { ascending: true });
+
+    if (error) throw error;
+    return data || [];
+  }
+
+  static async getKitById(id: string): Promise<{ id: string; name: string; image_url: string; type: string } | null> {
+    const { data, error } = await supabase
+      .from('kits')
+      .select('id, name, image_url, type')
+      .eq('id', id)
+      .single();
+
+    if (error) throw error;
+    return data;
+  }
 } 

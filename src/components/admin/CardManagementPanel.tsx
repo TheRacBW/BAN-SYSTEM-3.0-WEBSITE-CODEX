@@ -58,12 +58,14 @@ interface CardData {
   image_hue?: number;
   image_saturation?: number;
   image_lightness?: number;
+  selected_kit_id?: string; // New field for kit selection
 }
 
 const CardManagementPanel: React.FC = () => {
   const [cards, setCards] = useState<Card[]>([]);
   const [packTypes, setPackTypes] = useState<PackType[]>([]);
   const [seasons, setSeasons] = useState<SeasonConfig[]>([]);
+  const [kits, setKits] = useState<{ id: string; name: string; image_url: string; type: string }[]>([]);
   const [showBuilder, setShowBuilder] = useState(false);
   const [editingCard, setEditingCard] = useState<Card | null>(null);
   const [previewMode, setPreviewMode] = useState(false);
@@ -119,14 +121,16 @@ const CardManagementPanel: React.FC = () => {
 
   const loadData = async () => {
     try {
-      const [cardsData, packTypesData, seasonsData] = await Promise.all([
+      const [cardsData, packTypesData, seasonsData, kitsData] = await Promise.all([
         CardService.getAllCards(),
         CardService.getAllPackTypes(),
-        CardService.getAllSeasons()
+        CardService.getAllSeasons(),
+        CardService.getAllKits()
       ]);
       setCards(cardsData);
       setPackTypes(packTypesData);
       setSeasons(seasonsData);
+      setKits(kitsData);
     } catch (error) {
       console.error('Error loading data:', error);
     }
@@ -134,6 +138,19 @@ const CardManagementPanel: React.FC = () => {
 
   const handleInputChange = (field: keyof CardData, value: any) => {
     setFormData(prev => ({ ...prev, [field]: value }));
+  };
+
+  const handleKitSelection = (kitId: string) => {
+    const selectedKit = kits.find(kit => kit.id === kitId);
+    if (selectedKit) {
+      setFormData(prev => ({
+        ...prev,
+        selected_kit_id: kitId,
+        kit_name: selectedKit.name,
+        class_type: selectedKit.type,
+        image_url: selectedKit.image_url
+      }));
+    }
   };
 
   const handleSaveCard = async () => {
@@ -189,7 +206,8 @@ const CardManagementPanel: React.FC = () => {
       image_scale: 1,
       image_hue: 0,
       image_saturation: 100,
-      image_lightness: 100
+      image_lightness: 100,
+      selected_kit_id: undefined
     });
     setEditingCard(null);
     setShowBuilder(false);
@@ -369,17 +387,40 @@ const CardManagementPanel: React.FC = () => {
                       <h3 className="font-semibold text-lg border-b border-gray-600 pb-2 text-white">Basic Info</h3>
                       
                       <div>
-                        <label className="block text-sm font-medium mb-1 text-gray-300">Kit Name</label>
-                        <select
-                          value={formData.kit_name}
-                          onChange={(e) => handleInputChange('kit_name', e.target.value)}
-                          className="w-full p-2 border border-gray-600 rounded bg-gray-700 text-white"
-                        >
-                          <option value="">Select Kit</option>
-                          {BEDWARS_KITS.map(kit => (
-                            <option key={kit} value={kit}>{kit}</option>
-                          ))}
-                        </select>
+                        <label className="block text-sm font-medium mb-1 text-gray-300">Kit Selection</label>
+                        <div className="space-y-2">
+                          <select
+                            value={formData.selected_kit_id || ''}
+                            onChange={(e) => {
+                              if (e.target.value) {
+                                handleKitSelection(e.target.value);
+                              } else {
+                                handleInputChange('selected_kit_id', undefined);
+                                handleInputChange('kit_name', '');
+                                handleInputChange('class_type', '');
+                                handleInputChange('image_url', '');
+                              }
+                            }}
+                            className="w-full p-2 border border-gray-600 rounded bg-gray-700 text-white"
+                          >
+                            <option value="">Select from Kit Management</option>
+                            {kits.map(kit => (
+                              <option key={kit.id} value={kit.id}>{kit.name} ({kit.type})</option>
+                            ))}
+                          </select>
+                          
+                          <div className="text-xs text-gray-400">
+                            Or enter custom kit name:
+                          </div>
+                          
+                          <input
+                            type="text"
+                            value={formData.kit_name}
+                            onChange={(e) => handleInputChange('kit_name', e.target.value)}
+                            placeholder="Enter custom kit name"
+                            className="w-full p-2 border border-gray-600 rounded bg-gray-700 text-white placeholder-gray-400"
+                          />
+                        </div>
                       </div>
 
                       <div>
@@ -410,16 +451,23 @@ const CardManagementPanel: React.FC = () => {
 
                         <div>
                           <label className="block text-sm font-medium mb-1 text-gray-300">Class</label>
-                          <select
-                            value={formData.class_type}
-                            onChange={(e) => handleInputChange('class_type', e.target.value)}
-                            className="w-full p-2 border border-gray-600 rounded bg-gray-700 text-white"
-                          >
-                            <option value="">Select Class</option>
-                            {CLASSES.map(cls => (
-                              <option key={cls} value={cls}>{cls}</option>
-                            ))}
-                          </select>
+                          <div className="space-y-1">
+                            <select
+                              value={formData.class_type}
+                              onChange={(e) => handleInputChange('class_type', e.target.value)}
+                              className="w-full p-2 border border-gray-600 rounded bg-gray-700 text-white"
+                            >
+                              <option value="">Select Class</option>
+                              {CLASSES.map(cls => (
+                                <option key={cls} value={cls}>{cls}</option>
+                              ))}
+                            </select>
+                            {formData.selected_kit_id && (
+                              <div className="text-xs text-gray-400">
+                                Auto-filled from kit selection. You can override this.
+                              </div>
+                            )}
+                          </div>
                         </div>
                       </div>
 
@@ -537,13 +585,20 @@ const CardManagementPanel: React.FC = () => {
                       
                       <div>
                         <label className="block text-sm font-medium mb-1 text-gray-300">Image URL</label>
-                        <input
-                          type="url"
-                          value={formData.image_url}
-                          onChange={(e) => handleInputChange('image_url', e.target.value)}
-                          placeholder="https://..."
-                          className="w-full p-2 border border-gray-600 rounded bg-gray-700 text-white placeholder-gray-400"
-                        />
+                        <div className="space-y-1">
+                          <input
+                            type="url"
+                            value={formData.image_url}
+                            onChange={(e) => handleInputChange('image_url', e.target.value)}
+                            placeholder="https://..."
+                            className="w-full p-2 border border-gray-600 rounded bg-gray-700 text-white placeholder-gray-400"
+                          />
+                          {formData.selected_kit_id && (
+                            <div className="text-xs text-gray-400">
+                              Auto-filled from kit selection. You can override this for skin variants.
+                            </div>
+                          )}
+                        </div>
                       </div>
 
                       <div>
