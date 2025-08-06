@@ -234,7 +234,7 @@ const CardComponent: React.FC<CardComponentProps> = ({
                 <img 
                   src={card.image_url} 
                   alt={card.kit_name} 
-                  className="object-cover rounded-lg shadow-lg"
+                  className="object-cover rounded-lg"
                   style={{
                     width: `${card.image_width || 144}px`,
                     height: `${card.image_height || 144}px`,
