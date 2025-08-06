@@ -239,6 +239,7 @@ const CardComponent: React.FC<CardComponentProps> = ({
                     width: `${card.image_width || 144}px`,
                     height: `${card.image_height || 144}px`,
                     transform: `translate(${card.image_position_x || 0}px, ${card.image_position_y || 0}px) rotate(${card.image_rotation || 0}deg) scale(${card.image_scale || 1})`,
+                    filter: `hue-rotate(${card.image_hue || 0}deg) saturate(${(card.image_saturation || 100) / 100}) brightness(${(card.image_lightness || 100) / 100})`,
                   }}
                   onError={(e) => {
                     console.log('Image failed to load:', card.image_url);

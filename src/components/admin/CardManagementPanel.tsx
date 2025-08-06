@@ -3,6 +3,7 @@ import { CardService } from '../../services/cardService';
 import { Card, PackType, BEDWARS_KITS, CLASSES, HOLO_TYPES, SeasonConfig } from '../../types/cards';
 import CardComponent from '../cards/CardComponent';
 import CardSettingsModal from './CardSettingsModal';
+import './CardManagementPanel.css';
 import { 
   Plus, 
   Save, 
@@ -54,6 +55,9 @@ interface CardData {
   image_height?: number;
   image_rotation?: number;
   image_scale?: number;
+  image_hue?: number;
+  image_saturation?: number;
+  image_lightness?: number;
 }
 
 const CardManagementPanel: React.FC = () => {
@@ -102,7 +106,10 @@ const CardManagementPanel: React.FC = () => {
     image_width: 144,
     image_height: 144,
     image_rotation: 0,
-    image_scale: 1
+    image_scale: 1,
+    image_hue: 0,
+    image_saturation: 100,
+    image_lightness: 100
   });
 
   useEffect(() => {
@@ -178,7 +185,10 @@ const CardManagementPanel: React.FC = () => {
       image_width: 144,
       image_height: 144,
       image_rotation: 0,
-      image_scale: 1
+      image_scale: 1,
+      image_hue: 0,
+      image_saturation: 100,
+      image_lightness: 100
     });
     setEditingCard(null);
     setShowBuilder(false);
@@ -219,7 +229,10 @@ const CardManagementPanel: React.FC = () => {
       image_width: card.image_width || 144,
       image_height: card.image_height || 144,
       image_rotation: card.image_rotation || 0,
-      image_scale: card.image_scale || 1
+      image_scale: card.image_scale || 1,
+      image_hue: card.image_hue || 0,
+      image_saturation: card.image_saturation || 100,
+      image_lightness: card.image_lightness || 100
     });
     setEditingCard(card);
     setShowBuilder(true);
@@ -646,6 +659,48 @@ const CardManagementPanel: React.FC = () => {
                               min="0.1"
                               max="3"
                               step="0.1"
+                            />
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="space-y-4">
+                        <h4 className="font-medium text-md border-b border-gray-600 pb-1 text-white">Image Color Adjustments</h4>
+                        
+                        <div className="space-y-4">
+                          <div>
+                            <label className="block text-sm font-medium mb-2 text-gray-300">Hue: {formData.image_hue || 0}°</label>
+                            <input
+                              type="range"
+                              min="-180"
+                              max="180"
+                              value={formData.image_hue || 0}
+                              onChange={(e) => handleInputChange('image_hue', parseInt(e.target.value) || 0)}
+                              className="w-full h-2 bg-gray-700 rounded-lg appearance-none cursor-pointer slider"
+                            />
+                          </div>
+                          
+                          <div>
+                            <label className="block text-sm font-medium mb-2 text-gray-300">Saturation: {formData.image_saturation || 100}%</label>
+                            <input
+                              type="range"
+                              min="0"
+                              max="200"
+                              value={formData.image_saturation || 100}
+                              onChange={(e) => handleInputChange('image_saturation', parseInt(e.target.value) || 100)}
+                              className="w-full h-2 bg-gray-700 rounded-lg appearance-none cursor-pointer slider"
+                            />
+                          </div>
+                          
+                          <div>
+                            <label className="block text-sm font-medium mb-2 text-gray-300">Lightness: {formData.image_lightness || 100}%</label>
+                            <input
+                              type="range"
+                              min="0"
+                              max="200"
+                              value={formData.image_lightness || 100}
+                              onChange={(e) => handleInputChange('image_lightness', parseInt(e.target.value) || 100)}
+                              className="w-full h-2 bg-gray-700 rounded-lg appearance-none cursor-pointer slider"
                             />
                           </div>
                         </div>

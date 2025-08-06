@@ -39,6 +39,9 @@ export interface Card {
   image_height?: number;
   image_rotation?: number;
   image_scale?: number;
+  image_hue?: number;
+  image_saturation?: number;
+  image_lightness?: number;
   created_at: string;
   updated_at: string;
 }
