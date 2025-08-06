@@ -155,10 +155,13 @@ const CardManagementPanel: React.FC = () => {
 
   const handleSaveCard = async () => {
     try {
+      // Destructure formData to exclude selected_kit_id, as it's a frontend-only field
+      const { selected_kit_id, ...cardDataToSave } = formData;
+
       if (editingCard) {
-        await CardService.updateCard(editingCard.id, formData);
+        await CardService.updateCard(editingCard.id, cardDataToSave);
       } else {
-        await CardService.createCard(formData);
+        await CardService.createCard(cardDataToSave);
       }
       resetForm();
       await loadData();
@@ -251,7 +254,8 @@ const CardManagementPanel: React.FC = () => {
       image_scale: card.image_scale || 1,
       image_hue: card.image_hue || 0,
       image_saturation: card.image_saturation || 100,
-      image_lightness: card.image_lightness || 100
+      image_lightness: card.image_lightness || 100,
+      selected_kit_id: undefined // Reset kit selection when editing
     });
     setEditingCard(card);
     setShowBuilder(true);
