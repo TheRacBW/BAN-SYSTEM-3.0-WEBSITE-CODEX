@@ -253,6 +253,13 @@
   opacity: 0;
 }
 
+/* Holo mask specific styles */
+.card-holo-mask[data-holo-type] {
+  /* Ensure mask works properly */
+  mask-origin: border-box;
+  -webkit-mask-origin: border-box;
+}
+
 .card-shine[data-holo-type="basic"] {
   background: radial-gradient(
     farthest-corner circle at var(--mx) var(--my),
