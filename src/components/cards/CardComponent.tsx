@@ -213,7 +213,7 @@ const CardComponent: React.FC<CardComponentProps> = ({
                 <img 
                   src={card.image_url} 
                   alt={card.kit_name} 
-                  className="w-36 h-36 object-cover rounded-lg border-2 border-white/50 shadow-lg"
+                  className="w-36 h-36 object-cover rounded-lg shadow-lg"
                   onError={(e) => {
                     console.log('Image failed to load:', card.image_url);
                     e.currentTarget.style.display = 'none';
@@ -227,7 +227,7 @@ const CardComponent: React.FC<CardComponentProps> = ({
               ) : null}
               
               {/* Fallback when no image URL or image fails to load */}
-              <div className={`w-36 h-36 bg-white/20 rounded-lg border-2 border-white/50 flex items-center justify-center ${card.image_url ? 'hidden' : ''}`}>
+              <div className={`w-36 h-36 bg-white/20 rounded-lg flex items-center justify-center ${card.image_url ? 'hidden' : ''}`}>
                 <Image size={32} className="text-white/60" />
                 {card.image_url && (
                   <div className="absolute bottom-2 left-2 right-2 text-xs text-white bg-red-500/80 p-1 rounded">
