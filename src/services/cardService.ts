@@ -91,6 +91,27 @@ export class CardService {
     return data;
   }
 
+  static async updatePackType(id: string, packData: Partial<PackType>): Promise<PackType> {
+    const { data, error } = await supabase
+      .from('pack_types')
+      .update(packData)
+      .eq('id', id)
+      .select()
+      .single();
+
+    if (error) throw error;
+    return data;
+  }
+
+  static async deletePackType(id: string): Promise<void> {
+    const { error } = await supabase
+      .from('pack_types')
+      .delete()
+      .eq('id', id);
+
+    if (error) throw error;
+  }
+
   // User Coins
   static async getUserCoins(userId: string): Promise<UserCoins | null> {
     const { data, error } = await supabase

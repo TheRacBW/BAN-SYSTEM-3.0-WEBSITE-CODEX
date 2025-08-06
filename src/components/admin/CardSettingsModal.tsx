@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { CardService } from '../../services/cardService';
-import { SeasonConfig, PackTypeConfig, CardRarity } from '../../types/cards';
+import { SeasonConfig, PackType, CardRarity } from '../../types/cards';
 import { 
   X, 
   Plus, 
@@ -21,7 +21,7 @@ interface CardSettingsModalProps {
 const CardSettingsModal: React.FC<CardSettingsModalProps> = ({ isOpen, onClose }) => {
   const [activeTab, setActiveTab] = useState<'seasons' | 'packTypes'>('seasons');
   const [seasons, setSeasons] = useState<SeasonConfig[]>([]);
-  const [packTypes, setPackTypes] = useState<PackTypeConfig[]>([]);
+  const [packTypes, setPackTypes] = useState<PackType[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -48,7 +48,7 @@ const CardSettingsModal: React.FC<CardSettingsModalProps> = ({ isOpen, onClose }
     } as Record<CardRarity, number>,
     is_active: true
   });
-  const [editingPack, setEditingPack] = useState<PackTypeConfig | null>(null);
+  const [editingPack, setEditingPack] = useState<PackType | null>(null);
 
   useEffect(() => {
     if (isOpen) {
@@ -62,7 +62,7 @@ const CardSettingsModal: React.FC<CardSettingsModalProps> = ({ isOpen, onClose }
     try {
       const [seasonsData, packTypesData] = await Promise.all([
         CardService.getAllSeasons(),
-        CardService.getAllPackTypeConfigs()
+        CardService.getAllPackTypes()
       ]);
       setSeasons(seasonsData);
       setPackTypes(packTypesData);
@@ -139,9 +139,9 @@ const CardSettingsModal: React.FC<CardSettingsModalProps> = ({ isOpen, onClose }
 
     try {
       if (editingPack) {
-        await CardService.updatePackTypeConfig(editingPack.id, packForm);
+        await CardService.updatePackType(editingPack.id, packForm);
       } else {
-        await CardService.createPackTypeConfig(packForm);
+        await CardService.createPackType(packForm);
       }
       
       await loadData();
@@ -154,11 +154,11 @@ const CardSettingsModal: React.FC<CardSettingsModalProps> = ({ isOpen, onClose }
     }
   };
 
-  const handleEditPack = (pack: PackTypeConfig) => {
+  const handleEditPack = (pack: PackType) => {
     setEditingPack(pack);
     setPackForm({
       name: pack.name,
-      description: pack.description,
+      description: pack.description || '',
       price: pack.price,
       card_count: pack.card_count,
       rarity_weights: pack.rarity_weights,
@@ -172,7 +172,7 @@ const CardSettingsModal: React.FC<CardSettingsModalProps> = ({ isOpen, onClose }
     setLoading(true);
     setError(null);
     try {
-      await CardService.deletePackTypeConfig(id);
+      await CardService.deletePackType(id);
       await loadData();
     } catch (err) {
       setError('Failed to delete pack type');
@@ -522,7 +522,7 @@ const CardSettingsModal: React.FC<CardSettingsModalProps> = ({ isOpen, onClose }
                           <Package className="w-5 h-5 text-blue-400" />
                           <div>
                             <div className="text-white font-medium">{pack.name}</div>
-                            <div className="text-sm text-gray-400">{pack.description}</div>
+                            <div className="text-sm text-gray-400">{pack.description || 'No description'}</div>
                           </div>
                         </div>
                         <div className="flex items-center space-x-4 text-sm">
