@@ -133,7 +133,7 @@
   background-size: 100% 100%, 150% 150%;
   background-position: center, var(--posx) var(--posy);
   mix-blend-mode: color-dodge;
-  clip-path: inset(22% 8% 33% 8%);
+  clip-path: inset(12% 4% 18% 4%);
 }
 
 .card-holo-mask[data-holo-type="rare_holo"] {
@@ -284,7 +284,7 @@
   background-size: 100% 100%, 150% 150%;
   background-position: center, var(--posx) var(--posy);
   mix-blend-mode: color-dodge;
-  clip-path: inset(22% 8% 33% 8%);
+  clip-path: inset(12% 4% 18% 4%);
 }
 
 .card-shine[data-holo-type="rare_holo"] {
