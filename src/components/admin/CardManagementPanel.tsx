@@ -371,6 +371,18 @@ const CardManagementPanel: React.FC = () => {
                         </div>
                       </div>
 
+                      <div className="flex items-center space-x-4">
+                        <label className="flex items-center text-gray-300">
+                          <input
+                            type="checkbox"
+                            checked={formData.show_season_overlay}
+                            onChange={(e) => handleInputChange('show_season_overlay', e.target.checked)}
+                            className="mr-2 bg-gray-700 border-gray-600"
+                          />
+                          <span>Show Season Overlay</span>
+                        </label>
+                      </div>
+
                       <div className="grid grid-cols-2 gap-2">
                         <div>
                           <label className="block text-sm font-medium mb-1 text-gray-300">Rarity</label>
@@ -423,19 +435,46 @@ const CardManagementPanel: React.FC = () => {
                         </label>
 
                         {formData.is_holo && (
-                          <div>
-                            <label className="block text-xs font-medium mb-1 text-gray-300">Holo Type</label>
-                            <select
-                              value={formData.holo_type}
-                              onChange={(e) => handleInputChange('holo_type', e.target.value)}
-                              className="text-xs p-1 border border-gray-600 rounded bg-gray-700 text-white"
-                            >
-                              {HOLO_TYPES.map(type => (
-                                <option key={type.name} value={type.name}>
-                                  {type.label}
-                                </option>
-                              ))}
-                            </select>
+                          <div className="space-y-2">
+                            <div>
+                              <label className="block text-xs font-medium mb-1 text-gray-300">Holo Type</label>
+                              <select
+                                value={formData.holo_type}
+                                onChange={(e) => handleInputChange('holo_type', e.target.value)}
+                                className="text-xs p-1 border border-gray-600 rounded bg-gray-700 text-white"
+                              >
+                                {HOLO_TYPES.map(type => (
+                                  <option key={type.name} value={type.name}>
+                                    {type.label}
+                                  </option>
+                                ))}
+                              </select>
+                            </div>
+                            
+                            <div>
+                              <label className="flex items-center text-gray-300">
+                                <input
+                                  type="checkbox"
+                                  checked={formData.has_holo_mask}
+                                  onChange={(e) => handleInputChange('has_holo_mask', e.target.checked)}
+                                  className="mr-2 bg-gray-700 border-gray-600"
+                                />
+                                <span className="text-xs">Use Holo Mask</span>
+                              </label>
+                            </div>
+                            
+                            {formData.has_holo_mask && (
+                              <div>
+                                <label className="block text-xs font-medium mb-1 text-gray-300">Holo Mask URL</label>
+                                <input
+                                  type="url"
+                                  value={formData.holo_mask_url}
+                                  onChange={(e) => handleInputChange('holo_mask_url', e.target.value)}
+                                  placeholder="https://... (mask image URL)"
+                                  className="w-full text-xs p-1 border border-gray-600 rounded bg-gray-700 text-white placeholder-gray-400"
+                                />
+                              </div>
+                            )}
                           </div>
                         )}
                       </div>
@@ -597,21 +636,35 @@ const CardManagementPanel: React.FC = () => {
                         </label>
 
                         {formData.has_border && (
-                          <div>
-                            <label className="block text-sm font-medium mb-1 text-gray-300">Border Color</label>
-                            <div className="flex gap-2">
-                              <input
-                                type="color"
-                                value={formData.border_color}
-                                onChange={(e) => handleInputChange('border_color', e.target.value)}
-                                className="w-12 h-10 border border-gray-600 rounded bg-gray-700"
-                              />
-                              <input
-                                type="text"
-                                value={formData.border_color}
-                                onChange={(e) => handleInputChange('border_color', e.target.value)}
-                                className="flex-1 p-2 border border-gray-600 rounded bg-gray-700 text-white"
-                              />
+                          <div className="space-y-2">
+                            <div>
+                              <label className="block text-sm font-medium mb-1 text-gray-300">Border Color</label>
+                              <div className="flex gap-2">
+                                <input
+                                  type="color"
+                                  value={formData.border_color}
+                                  onChange={(e) => handleInputChange('border_color', e.target.value)}
+                                  className="w-12 h-10 border border-gray-600 rounded bg-gray-700"
+                                />
+                                <input
+                                  type="text"
+                                  value={formData.border_color}
+                                  onChange={(e) => handleInputChange('border_color', e.target.value)}
+                                  className="flex-1 p-2 border border-gray-600 rounded bg-gray-700 text-white"
+                                />
+                              </div>
+                            </div>
+                            
+                            <div>
+                              <label className="flex items-center text-gray-300">
+                                <input
+                                  type="checkbox"
+                                  checked={formData.border_behind_holo}
+                                  onChange={(e) => handleInputChange('border_behind_holo', e.target.checked)}
+                                  className="mr-2 bg-gray-700 border-gray-600"
+                                />
+                                <span className="text-sm">Border Behind Holo</span>
+                              </label>
                             </div>
                           </div>
                         )}
