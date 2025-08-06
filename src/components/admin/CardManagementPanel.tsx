@@ -71,6 +71,7 @@ const CardManagementPanel: React.FC = () => {
   const [activeTab, setActiveTab] = useState<'cards' | 'packs' | 'stats'>('cards');
   const [showImportModal, setShowImportModal] = useState(false);
   const [showSettingsModal, setShowSettingsModal] = useState(false);
+  const [showImageControls, setShowImageControls] = useState(false);
   
   const [formData, setFormData] = useState<CardData>({
     kit_name: '',
@@ -563,19 +564,31 @@ const CardManagementPanel: React.FC = () => {
                         </div>
                       </div>
 
-                      <div>
-                        <label className="block text-sm font-medium mb-1 text-gray-300">Background Image URL (Optional)</label>
-                        <input
-                          type="url"
-                          value={formData.background_image_url}
-                          onChange={(e) => handleInputChange('background_image_url', e.target.value)}
-                          placeholder="https://... (appears behind main image)"
-                          className="w-full p-2 border border-gray-600 rounded bg-gray-700 text-white placeholder-gray-400"
-                        />
-                      </div>
+                                             <div>
+                         <label className="block text-sm font-medium mb-1 text-gray-300">Background Image URL (Optional)</label>
+                         <input
+                           type="url"
+                           value={formData.background_image_url}
+                           onChange={(e) => handleInputChange('background_image_url', e.target.value)}
+                           placeholder="https://... (appears behind main image)"
+                           className="w-full p-2 border border-gray-600 rounded bg-gray-700 text-white placeholder-gray-400"
+                         />
+                       </div>
 
-                      <div className="space-y-4">
-                        <h4 className="font-medium text-md border-b border-gray-600 pb-1 text-white">Image Positioning & Sizing</h4>
+                       <div className="flex items-center justify-between">
+                         <h4 className="font-medium text-md border-b border-gray-600 pb-1 text-white">Image Controls</h4>
+                         <button
+                           type="button"
+                           onClick={() => setShowImageControls(!showImageControls)}
+                           className="text-sm bg-gray-600 hover:bg-gray-700 text-white px-3 py-1 rounded flex items-center gap-1 transition-colors"
+                         >
+                           {showImageControls ? 'Hide' : 'Show'} Image Controls
+                         </button>
+                       </div>
+
+                       {showImageControls && (
+                         <div className="space-y-4">
+                           <h4 className="font-medium text-md border-b border-gray-600 pb-1 text-white">Image Positioning & Sizing</h4>
                         
                         <div className="grid grid-cols-2 gap-4">
                           <div>
@@ -662,49 +675,50 @@ const CardManagementPanel: React.FC = () => {
                             />
                           </div>
                         </div>
-                      </div>
 
-                      <div className="space-y-4">
-                        <h4 className="font-medium text-md border-b border-gray-600 pb-1 text-white">Image Color Adjustments</h4>
-                        
                         <div className="space-y-4">
-                          <div>
-                            <label className="block text-sm font-medium mb-2 text-gray-300">Hue: {formData.image_hue || 0}°</label>
-                            <input
-                              type="range"
-                              min="-180"
-                              max="180"
-                              value={formData.image_hue || 0}
-                              onChange={(e) => handleInputChange('image_hue', parseInt(e.target.value) || 0)}
-                              className="w-full h-2 bg-gray-700 rounded-lg appearance-none cursor-pointer slider"
-                            />
-                          </div>
+                          <h4 className="font-medium text-md border-b border-gray-600 pb-1 text-white">Image Color Adjustments</h4>
                           
-                          <div>
-                            <label className="block text-sm font-medium mb-2 text-gray-300">Saturation: {formData.image_saturation || 100}%</label>
-                            <input
-                              type="range"
-                              min="0"
-                              max="200"
-                              value={formData.image_saturation || 100}
-                              onChange={(e) => handleInputChange('image_saturation', parseInt(e.target.value) || 100)}
-                              className="w-full h-2 bg-gray-700 rounded-lg appearance-none cursor-pointer slider"
-                            />
-                          </div>
-                          
-                          <div>
-                            <label className="block text-sm font-medium mb-2 text-gray-300">Lightness: {formData.image_lightness || 100}%</label>
-                            <input
-                              type="range"
-                              min="0"
-                              max="200"
-                              value={formData.image_lightness || 100}
-                              onChange={(e) => handleInputChange('image_lightness', parseInt(e.target.value) || 100)}
-                              className="w-full h-2 bg-gray-700 rounded-lg appearance-none cursor-pointer slider"
-                            />
+                          <div className="space-y-4">
+                            <div>
+                              <label className="block text-sm font-medium mb-2 text-gray-300">Hue: {formData.image_hue || 0}°</label>
+                              <input
+                                type="range"
+                                min="-180"
+                                max="180"
+                                value={formData.image_hue || 0}
+                                onChange={(e) => handleInputChange('image_hue', parseInt(e.target.value) || 0)}
+                                className="w-full h-2 bg-gray-700 rounded-lg appearance-none cursor-pointer slider"
+                              />
+                            </div>
+                            
+                            <div>
+                              <label className="block text-sm font-medium mb-2 text-gray-300">Saturation: {formData.image_saturation || 100}%</label>
+                              <input
+                                type="range"
+                                min="0"
+                                max="200"
+                                value={formData.image_saturation || 100}
+                                onChange={(e) => handleInputChange('image_saturation', parseInt(e.target.value) || 100)}
+                                className="w-full h-2 bg-gray-700 rounded-lg appearance-none cursor-pointer slider"
+                              />
+                            </div>
+                            
+                            <div>
+                              <label className="block text-sm font-medium mb-2 text-gray-300">Lightness: {formData.image_lightness || 100}%</label>
+                              <input
+                                type="range"
+                                min="0"
+                                max="200"
+                                value={formData.image_lightness || 100}
+                                onChange={(e) => handleInputChange('image_lightness', parseInt(e.target.value) || 100)}
+                                className="w-full h-2 bg-gray-700 rounded-lg appearance-none cursor-pointer slider"
+                              />
+                            </div>
                           </div>
                         </div>
                       </div>
+                    )}
 
                       <div className="grid grid-cols-3 gap-2">
                         <div>
