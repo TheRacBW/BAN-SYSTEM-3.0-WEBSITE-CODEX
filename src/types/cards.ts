@@ -33,6 +33,12 @@ export interface Card {
   holo_mask_url?: string;
   card_frame_color: string;
   text_theme: TextTheme;
+  image_position_x?: number;
+  image_position_y?: number;
+  image_width?: number;
+  image_height?: number;
+  image_rotation?: number;
+  image_scale?: number;
   created_at: string;
   updated_at: string;
 }

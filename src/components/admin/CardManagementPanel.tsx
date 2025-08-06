@@ -47,6 +47,12 @@ interface CardData {
   holo_mask_url?: string;
   card_frame_color: string;
   text_theme: 'dark' | 'light';
+  image_position_x?: number;
+  image_position_y?: number;
+  image_width?: number;
+  image_height?: number;
+  image_rotation?: number;
+  image_scale?: number;
 }
 
 const CardManagementPanel: React.FC = () => {
@@ -87,7 +93,13 @@ const CardManagementPanel: React.FC = () => {
     has_holo_mask: false,
     holo_mask_url: '',
     card_frame_color: '#1f2937',
-    text_theme: 'light'
+    text_theme: 'light',
+    image_position_x: 0,
+    image_position_y: 0,
+    image_width: 144,
+    image_height: 144,
+    image_rotation: 0,
+    image_scale: 1
   });
 
   useEffect(() => {
@@ -155,7 +167,13 @@ const CardManagementPanel: React.FC = () => {
       has_holo_mask: false,
       holo_mask_url: '',
       card_frame_color: '#1f2937',
-      text_theme: 'light'
+      text_theme: 'light',
+      image_position_x: 0,
+      image_position_y: 0,
+      image_width: 144,
+      image_height: 144,
+      image_rotation: 0,
+      image_scale: 1
     });
     setEditingCard(null);
     setShowBuilder(false);
@@ -190,7 +208,13 @@ const CardManagementPanel: React.FC = () => {
       has_holo_mask: card.has_holo_mask,
       holo_mask_url: card.holo_mask_url,
       card_frame_color: card.card_frame_color,
-      text_theme: card.text_theme
+      text_theme: card.text_theme,
+      image_position_x: card.image_position_x || 0,
+      image_position_y: card.image_position_y || 0,
+      image_width: card.image_width || 144,
+      image_height: card.image_height || 144,
+      image_rotation: card.image_rotation || 0,
+      image_scale: card.image_scale || 1
     });
     setEditingCard(card);
     setShowBuilder(true);
@@ -521,6 +545,96 @@ const CardManagementPanel: React.FC = () => {
                           placeholder="https://... (appears behind main image)"
                           className="w-full p-2 border border-gray-600 rounded bg-gray-700 text-white placeholder-gray-400"
                         />
+                      </div>
+
+                      <div className="space-y-4">
+                        <h4 className="font-medium text-md border-b border-gray-600 pb-1 text-white">Image Positioning & Sizing</h4>
+                        
+                        <div className="grid grid-cols-2 gap-4">
+                          <div>
+                            <label className="block text-sm font-medium mb-1 text-gray-300">Position X (px)</label>
+                            <input
+                              type="number"
+                              value={formData.image_position_x}
+                              onChange={(e) => handleInputChange('image_position_x', parseFloat(e.target.value) || 0)}
+                              placeholder="0"
+                              className="w-full p-2 border border-gray-600 rounded bg-gray-700 text-white"
+                              step="1"
+                            />
+                          </div>
+                          
+                          <div>
+                            <label className="block text-sm font-medium mb-1 text-gray-300">Position Y (px)</label>
+                            <input
+                              type="number"
+                              value={formData.image_position_y}
+                              onChange={(e) => handleInputChange('image_position_y', parseFloat(e.target.value) || 0)}
+                              placeholder="0"
+                              className="w-full p-2 border border-gray-600 rounded bg-gray-700 text-white"
+                              step="1"
+                            />
+                          </div>
+                        </div>
+
+                        <div className="grid grid-cols-2 gap-4">
+                          <div>
+                            <label className="block text-sm font-medium mb-1 text-gray-300">Width (px)</label>
+                            <input
+                              type="number"
+                              value={formData.image_width}
+                              onChange={(e) => handleInputChange('image_width', parseFloat(e.target.value) || 144)}
+                              placeholder="144"
+                              className="w-full p-2 border border-gray-600 rounded bg-gray-700 text-white"
+                              min="50"
+                              max="300"
+                              step="1"
+                            />
+                          </div>
+                          
+                          <div>
+                            <label className="block text-sm font-medium mb-1 text-gray-300">Height (px)</label>
+                            <input
+                              type="number"
+                              value={formData.image_height}
+                              onChange={(e) => handleInputChange('image_height', parseFloat(e.target.value) || 144)}
+                              placeholder="144"
+                              className="w-full p-2 border border-gray-600 rounded bg-gray-700 text-white"
+                              min="50"
+                              max="300"
+                              step="1"
+                            />
+                          </div>
+                        </div>
+
+                        <div className="grid grid-cols-2 gap-4">
+                          <div>
+                            <label className="block text-sm font-medium mb-1 text-gray-300">Rotation (degrees)</label>
+                            <input
+                              type="number"
+                              value={formData.image_rotation}
+                              onChange={(e) => handleInputChange('image_rotation', parseFloat(e.target.value) || 0)}
+                              placeholder="0"
+                              className="w-full p-2 border border-gray-600 rounded bg-gray-700 text-white"
+                              min="-180"
+                              max="180"
+                              step="1"
+                            />
+                          </div>
+                          
+                          <div>
+                            <label className="block text-sm font-medium mb-1 text-gray-300">Scale</label>
+                            <input
+                              type="number"
+                              value={formData.image_scale}
+                              onChange={(e) => handleInputChange('image_scale', parseFloat(e.target.value) || 1)}
+                              placeholder="1"
+                              className="w-full p-2 border border-gray-600 rounded bg-gray-700 text-white"
+                              min="0.1"
+                              max="3"
+                              step="0.1"
+                            />
+                          </div>
+                        </div>
                       </div>
 
                       <div className="grid grid-cols-3 gap-2">
