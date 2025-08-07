@@ -44,7 +44,7 @@ const UserPrivilegeEditor: React.FC<Props> = ({ userId, onClose, onUpdated }) =>
     total_coins: number;
     coins_from_time: number;
     last_activity: string;
-    active_sessions: number;
+    last_coin_award_time?: string;
   } | null>(null);
   const [loadingTimeStats, setLoadingTimeStats] = useState(false);
   
@@ -384,11 +384,9 @@ const UserPrivilegeEditor: React.FC<Props> = ({ userId, onClose, onUpdated }) =>
                       </span>
                     </div>
                     <div>
-                      <span className="text-gray-400">Active Sessions:</span>
-                      <span className={`ml-2 font-medium ${
-                        userTimeStats.active_sessions > 0 ? 'text-green-400' : 'text-gray-400'
-                      }`}>
-                        {userTimeStats.active_sessions}
+                      <span className="text-gray-400">Last Coin Award:</span>
+                      <span className="text-green-400 ml-2 font-medium">
+                        {userTimeStats.last_coin_award_time ? new Date(userTimeStats.last_coin_award_time).toLocaleString() : 'Never'}
                       </span>
                     </div>
                   </div>
@@ -402,9 +400,9 @@ const UserPrivilegeEditor: React.FC<Props> = ({ userId, onClose, onUpdated }) =>
                   
                   <div className="text-xs text-gray-500 bg-[#1a1f26] p-2 rounded">
                     <div className="font-medium mb-1">Reward System:</div>
-                    <div>• 30 coins awarded every 30 minutes of active time</div>
-                    <div>• Time tracking is website-wide, not page-specific</div>
-                    <div>• Activity updates every 5 minutes to minimize egress</div>
+                    <div>• 5 coins awarded every 5 minutes if user is on the site</div>
+                    <div>• Simple checkpoint system - no complex session tracking</div>
+                    <div>• Minimal database usage for better performance</div>
                   </div>
                 </div>
               ) : (

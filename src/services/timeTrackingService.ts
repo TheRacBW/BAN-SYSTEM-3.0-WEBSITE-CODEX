@@ -5,44 +5,28 @@ export interface UserTimeStats {
   total_coins: number;
   coins_from_time: number;
   last_activity: string;
-  active_sessions: number;
+  last_coin_award_time?: string;
 }
 
-export interface SessionData {
-  id: string;
-  user_id: string;
-  session_start: string;
-  session_end?: string;
-  duration_seconds?: number;
-  coins_earned?: number;
-  is_active: boolean;
+export interface CheckpointResult {
+  coins_awarded: number;
+  total_coins: number;
+  total_time_seconds: number;
   last_activity: string;
 }
 
 export class TimeTrackingService {
-  private static currentSessionId: string | null = null;
-  private static lastActivityUpdate: number = 0;
   private static activityInterval: NodeJS.Timeout | null = null;
-  private static readonly ACTIVITY_UPDATE_INTERVAL = 5 * 60 * 1000; // 5 minutes
-  private static readonly SESSION_CHECK_INTERVAL = 30 * 60 * 1000; // 30 minutes
+  private static readonly CHECKPOINT_INTERVAL = 5 * 60 * 1000; // 5 minutes
 
   // Start tracking time for the current user
   static async startTracking(userId: string): Promise<void> {
     try {
-      // End any existing session first
-      await this.endCurrentSession();
+      // Set up periodic checkpoint checks
+      this.startCheckpointMonitoring();
       
-      // Start new session using database function
-      const { data, error } = await supabase
-        .rpc('start_user_session', { user_uuid: userId });
-      
-      if (error) throw error;
-      
-      this.currentSessionId = data;
-      this.lastActivityUpdate = Date.now();
-      
-      // Start activity monitoring
-      this.startActivityMonitoring();
+      // Initial presence update
+      await this.updatePresence(userId);
       
       console.log('Time tracking started for user:', userId);
     } catch (error) {
@@ -50,50 +34,42 @@ export class TimeTrackingService {
     }
   }
 
-  // End the current session and award coins
-  static async endCurrentSession(): Promise<void> {
-    if (!this.currentSessionId) return;
-    
+  // End tracking (cleanup)
+  static async endTracking(): Promise<void> {
+    this.stopCheckpointMonitoring();
+    console.log('Time tracking ended');
+  }
+
+  // Update user presence and potentially award coins
+  static async updatePresence(userId: string): Promise<CheckpointResult | null> {
     try {
-      // End session using database function
-      const { error } = await supabase
-        .rpc('end_user_session', { session_uuid: this.currentSessionId });
+      const { data, error } = await supabase
+        .rpc('update_user_presence_and_award_coins', { user_uuid: userId });
       
       if (error) throw error;
       
-      this.currentSessionId = null;
-      this.stopActivityMonitoring();
+      const result = data?.[0];
+      if (result && result.coins_awarded > 0) {
+        console.log(`Awarded ${result.coins_awarded} coins to user ${userId}`);
+      }
       
-      console.log('Time tracking session ended');
+      return result || null;
     } catch (error) {
-      console.error('Error ending time tracking session:', error);
+      console.error('Error updating presence:', error);
+      return null;
     }
   }
 
-  // Update user activity (called periodically)
-  static async updateActivity(): Promise<void> {
-    if (!this.currentSessionId) return;
+  // Start checkpoint monitoring
+  private static startCheckpointMonitoring(): void {
+    // Clear any existing interval
+    this.stopCheckpointMonitoring();
     
-    try {
-      const { error } = await supabase
-        .from('user_session_time')
-        .update({ last_activity: new Date().toISOString() })
-        .eq('id', this.currentSessionId);
-      
-      if (error) throw error;
-      
-      this.lastActivityUpdate = Date.now();
-    } catch (error) {
-      console.error('Error updating activity:', error);
-    }
-  }
-
-  // Start activity monitoring
-  private static startActivityMonitoring(): void {
-    // Update activity every 5 minutes
+    // Set up periodic checkpoint checks every 5 minutes
     this.activityInterval = setInterval(() => {
-      this.updateActivity();
-    }, this.ACTIVITY_UPDATE_INTERVAL);
+      // This will be called by the TimeTrackingProvider with the current user ID
+      console.log('Checkpoint interval reached');
+    }, this.CHECKPOINT_INTERVAL);
     
     // Set up page visibility and focus events
     document.addEventListener('visibilitychange', this.handleVisibilityChange.bind(this));
@@ -104,8 +80,8 @@ export class TimeTrackingService {
     window.addEventListener('beforeunload', this.handleBeforeUnload.bind(this));
   }
 
-  // Stop activity monitoring
-  private static stopActivityMonitoring(): void {
+  // Stop checkpoint monitoring
+  private static stopCheckpointMonitoring(): void {
     if (this.activityInterval) {
       clearInterval(this.activityInterval);
       this.activityInterval = null;
@@ -119,40 +95,43 @@ export class TimeTrackingService {
 
   // Handle page visibility changes
   private static handleVisibilityChange(): void {
-    if (document.hidden) {
-      // Page is hidden, update activity
-      this.updateActivity();
-    } else {
-      // Page is visible again, update activity
-      this.updateActivity();
-    }
+    // Update presence when page visibility changes
+    console.log('Page visibility changed:', document.hidden ? 'hidden' : 'visible');
   }
 
   // Handle window focus
   private static handleWindowFocus(): void {
-    this.updateActivity();
+    console.log('Window focused');
   }
 
   // Handle window blur
   private static handleWindowBlur(): void {
-    this.updateActivity();
+    console.log('Window blurred');
   }
 
   // Handle before unload
   private static handleBeforeUnload(): void {
-    // End session when user leaves the page
-    this.endCurrentSession();
+    console.log('Page unloading');
   }
 
   // Get user time statistics
   static async getUserTimeStats(userId: string): Promise<UserTimeStats | null> {
     try {
       const { data, error } = await supabase
-        .rpc('get_user_time_stats', { user_uuid: userId });
+        .rpc('get_user_time_and_coin_stats', { user_uuid: userId });
       
       if (error) throw error;
       
-      return data?.[0] || null;
+      const result = data?.[0];
+      if (!result) return null;
+      
+      return {
+        total_time_seconds: result.total_time_seconds || 0,
+        total_coins: result.total_coins || 0,
+        coins_from_time: result.coins_from_time || 0,
+        last_activity: result.last_activity,
+        last_coin_award_time: result.last_coin_award_time
+      };
     } catch (error) {
       console.error('Error getting user time stats:', error);
       return null;
@@ -160,29 +139,22 @@ export class TimeTrackingService {
   }
 
   // Get all user time statistics (for admin)
-  static async getAllUserTimeStats(): Promise<Array<{ user_id: string } & UserTimeStats>> {
+  static async getAllUserTimeStats(): Promise<Array<{ user_id: string; email?: string; username?: string } & UserTimeStats>> {
     try {
       const { data, error } = await supabase
-        .from('user_coins')
-        .select(`
-          user_id,
-          total_time_spent_seconds,
-          coins,
-          coins_from_time,
-          last_updated,
-          users!inner(email, username)
-        `)
-        .order('total_time_spent_seconds', { ascending: false });
+        .rpc('get_all_users_time_and_coin_stats');
       
       if (error) throw error;
       
       return data?.map(item => ({
         user_id: item.user_id,
-        total_time_seconds: item.total_time_spent_seconds || 0,
-        total_coins: item.coins || 0,
+        email: item.email,
+        username: item.username,
+        total_time_seconds: item.total_time_seconds || 0,
+        total_coins: item.total_coins || 0,
         coins_from_time: item.coins_from_time || 0,
-        last_activity: item.last_updated,
-        active_sessions: 0 // This would need a separate query for active sessions
+        last_activity: item.last_activity,
+        last_coin_award_time: item.last_coin_award_time
       })) || [];
     } catch (error) {
       console.error('Error getting all user time stats:', error);
@@ -190,54 +162,14 @@ export class TimeTrackingService {
     }
   }
 
-  // Get current session info
-  static async getCurrentSession(userId: string): Promise<SessionData | null> {
-    try {
-      const { data, error } = await supabase
-        .from('user_session_time')
-        .select('*')
-        .eq('user_id', userId)
-        .eq('is_active', true)
-        .single();
-      
-      if (error) throw error;
-      
-      return data;
-    } catch (error) {
-      console.error('Error getting current session:', error);
-      return null;
-    }
-  }
-
   // Force update coins for a user (admin function)
   static async forceUpdateUserCoins(userId: string): Promise<void> {
     try {
-      const { error } = await supabase
-        .rpc('update_user_coins_from_time', { user_uuid: userId });
-      
-      if (error) throw error;
+      // This will trigger a presence update and potentially award coins
+      await this.updatePresence(userId);
     } catch (error) {
       console.error('Error forcing coin update:', error);
       throw error;
-    }
-  }
-
-  // Get session history for a user
-  static async getSessionHistory(userId: string, limit: number = 50): Promise<SessionData[]> {
-    try {
-      const { data, error } = await supabase
-        .from('user_session_time')
-        .select('*')
-        .eq('user_id', userId)
-        .order('session_start', { ascending: false })
-        .limit(limit);
-      
-      if (error) throw error;
-      
-      return data || [];
-    } catch (error) {
-      console.error('Error getting session history:', error);
-      return [];
     }
   }
 
@@ -256,9 +188,9 @@ export class TimeTrackingService {
     }
   }
 
-  // Calculate coins from time
+  // Calculate coins from time (for display purposes)
   static calculateCoinsFromTime(seconds: number): number {
-    // 30 coins every 30 minutes (1800 seconds)
-    return Math.floor(seconds / 1800) * 30;
+    // 5 coins every 5 minutes (300 seconds)
+    return Math.floor(seconds / 300) * 5;
   }
 } 

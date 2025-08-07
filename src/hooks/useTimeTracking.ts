@@ -8,93 +8,89 @@ export const useTimeTracking = () => {
   const [isTracking, setIsTracking] = useState(false);
   const [lastUpdate, setLastUpdate] = useState<Date | null>(null);
 
-  // Start time tracking for the current user
   const startTracking = useCallback(async () => {
     if (!user?.id) return;
-
+    
     try {
-      await TimeTrackingService.startTracking(user.id);
       setIsTracking(true);
-      setLastUpdate(new Date());
-      console.log('Time tracking started');
+      await TimeTrackingService.startTracking(user.id);
+      await loadTimeStats();
     } catch (error) {
-      console.error('Failed to start time tracking:', error);
+      console.error('Error starting time tracking:', error);
     }
   }, [user?.id]);
 
-  // End time tracking for the current user
   const endTracking = useCallback(async () => {
-    if (!user?.id) return;
-
     try {
-      await TimeTrackingService.endCurrentSession();
+      await TimeTrackingService.endTracking();
       setIsTracking(false);
-      setLastUpdate(new Date());
-      console.log('Time tracking ended');
     } catch (error) {
-      console.error('Failed to end time tracking:', error);
+      console.error('Error ending time tracking:', error);
     }
-  }, [user?.id]);
+  }, []);
 
-  // Load user time statistics
   const loadTimeStats = useCallback(async () => {
     if (!user?.id) return;
-
+    
     try {
       const stats = await TimeTrackingService.getUserTimeStats(user.id);
       setTimeStats(stats);
+      setLastUpdate(new Date());
     } catch (error) {
-      console.error('Failed to load time stats:', error);
+      console.error('Error loading time stats:', error);
     }
   }, [user?.id]);
 
-  // Force update coins (for admin use)
   const forceUpdateCoins = useCallback(async (userId: string) => {
     try {
       await TimeTrackingService.forceUpdateUserCoins(userId);
       await loadTimeStats();
     } catch (error) {
-      console.error('Failed to force update coins:', error);
+      console.error('Error forcing coin update:', error);
     }
   }, [loadTimeStats]);
 
-  // Initialize time tracking when user logs in
+  // Start tracking when user is authenticated
   useEffect(() => {
-    if (user?.id) {
+    if (user?.id && !isTracking) {
       startTracking();
-      loadTimeStats();
-    } else {
+    }
+  }, [user?.id, isTracking, startTracking]);
+
+  // Cleanup when user logs out
+  useEffect(() => {
+    if (!user?.id && isTracking) {
       endTracking();
     }
-  }, [user?.id, startTracking, endTracking, loadTimeStats]);
+  }, [user?.id, isTracking, endTracking]);
 
-  // Clean up when component unmounts
+  // Periodic presence updates every 5 minutes
   useEffect(() => {
-    const handleBeforeUnload = () => {
-      if (user?.id) {
-        TimeTrackingService.endCurrentSession();
+    if (!user?.id || !isTracking) return;
+
+    const interval = setInterval(async () => {
+      try {
+        const result = await TimeTrackingService.updatePresence(user.id);
+        if (result && result.coins_awarded > 0) {
+          // Refresh stats when coins are awarded
+          await loadTimeStats();
+        }
+      } catch (error) {
+        console.error('Error during periodic presence update:', error);
       }
-    };
-
-    window.addEventListener('beforeunload', handleBeforeUnload);
-    return () => {
-      window.removeEventListener('beforeunload', handleBeforeUnload);
-      if (user?.id) {
-        TimeTrackingService.endCurrentSession();
-      }
-    };
-  }, [user?.id]);
-
-  // Refresh time stats periodically
-  useEffect(() => {
-    if (!user?.id) return;
-
-    const interval = setInterval(() => {
-      loadTimeStats();
-    }, 5 * 60 * 1000); // Refresh every 5 minutes
+    }, 5 * 60 * 1000); // 5 minutes
 
     return () => clearInterval(interval);
-  }, [user?.id, loadTimeStats]);
+  }, [user?.id, isTracking, loadTimeStats]);
+
+  // Cleanup on unmount
+  useEffect(() => {
+    return () => {
+      if (isTracking) {
+        endTracking();
+      }
+    };
+  }, [isTracking, endTracking]);
 
   return {
     timeStats,
@@ -103,6 +99,6 @@ export const useTimeTracking = () => {
     startTracking,
     endTracking,
     loadTimeStats,
-    forceUpdateCoins,
+    forceUpdateCoins
   };
 }; 
