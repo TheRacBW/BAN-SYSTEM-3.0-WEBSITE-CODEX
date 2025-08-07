@@ -2,8 +2,9 @@ import React, { useEffect, useState } from "react";
 import { supabase } from "../../lib/supabase";
 import { TrustLevel, TRUST_LEVEL_CONFIGS } from "../../types/trustLevels";
 import { FaDiscord, FaCheck, FaTimes } from "react-icons/fa";
-import { Shield } from "lucide-react";
+import { Shield, Clock, Coins, RefreshCw } from "lucide-react";
 import { useAuth } from "../../context/AuthContext";
+import { TimeTrackingService } from "../../services/timeTrackingService";
 
 interface User {
   id: string;
@@ -38,6 +39,14 @@ const UserPrivilegeEditor: React.FC<Props> = ({ userId, onClose, onUpdated }) =>
     reason: '',
     duration: 24
   });
+  const [userTimeStats, setUserTimeStats] = useState<{
+    total_time_seconds: number;
+    total_coins: number;
+    coins_from_time: number;
+    last_activity: string;
+    active_sessions: number;
+  } | null>(null);
+  const [loadingTimeStats, setLoadingTimeStats] = useState(false);
   
   // Check if current user is therac (only admin who can see Discord data)
   const canViewDiscordData = currentUserProfile?.username === "therac";
@@ -117,6 +126,9 @@ const UserPrivilegeEditor: React.FC<Props> = ({ userId, onClose, onUpdated }) =>
         
         setUserRestrictions(restrictionsResult.data || []);
         setUserReportStats(statsResult.data);
+        
+        // Fetch user time and coin stats
+        await loadUserTimeStats();
       } catch (error) {
         console.error("Error fetching user data:", error);
       } finally {
@@ -146,6 +158,33 @@ const UserPrivilegeEditor: React.FC<Props> = ({ userId, onClose, onUpdated }) =>
   const formatDiscordDate = (dateString: string | null) => {
     if (!dateString) return "Never";
     return new Date(dateString).toLocaleDateString();
+  };
+
+  const loadUserTimeStats = async () => {
+    if (!userId) return;
+    
+    setLoadingTimeStats(true);
+    try {
+      const stats = await TimeTrackingService.getUserTimeStats(userId);
+      setUserTimeStats(stats);
+    } catch (error) {
+      console.error('Error loading user time stats:', error);
+    } finally {
+      setLoadingTimeStats(false);
+    }
+  };
+
+  const forceUpdateUserCoins = async () => {
+    if (!userId) return;
+    
+    try {
+      await TimeTrackingService.forceUpdateUserCoins(userId);
+      await loadUserTimeStats();
+      alert('User coins updated successfully!');
+    } catch (error) {
+      console.error('Error updating user coins:', error);
+      alert('Failed to update user coins. Please try again.');
+    }
   };
 
   const addRestriction = async () => {
@@ -279,6 +318,102 @@ const UserPrivilegeEditor: React.FC<Props> = ({ userId, onClose, onUpdated }) =>
                   <span className="text-white">{formatDiscordDate(userData.discord_verified_at)}</span>
                 </div>
               </div>
+            </div>
+
+            {/* Time & Coin Statistics Section */}
+            <div className="mb-6 p-4 bg-[#2a323c] rounded-lg border border-[#3a4250]">
+              <div className="flex items-center justify-between mb-3">
+                <h4 className="text-lg font-semibold text-gray-200 flex items-center gap-2">
+                  <Clock className="w-5 h-5" />
+                  Time & Coin Statistics
+                </h4>
+                <div className="flex gap-2">
+                  <button
+                    onClick={loadUserTimeStats}
+                    disabled={loadingTimeStats}
+                    className="btn btn-sm btn-outline"
+                    title="Refresh stats"
+                  >
+                    <RefreshCw className={`w-4 h-4 ${loadingTimeStats ? 'animate-spin' : ''}`} />
+                  </button>
+                  <button
+                    onClick={forceUpdateUserCoins}
+                    className="btn btn-sm btn-primary"
+                    title="Force update coins from time spent"
+                  >
+                    <Coins className="w-4 h-4" />
+                    Update Coins
+                  </button>
+                </div>
+              </div>
+              
+              {loadingTimeStats ? (
+                <div className="text-center py-4 text-gray-400">
+                  <RefreshCw className="w-6 h-6 animate-spin mx-auto mb-2" />
+                  Loading statistics...
+                </div>
+              ) : userTimeStats ? (
+                <div className="space-y-4">
+                  <div className="grid grid-cols-2 gap-4 text-sm">
+                    <div className="p-3 bg-[#323a45] rounded">
+                      <div className="flex items-center gap-2 mb-1">
+                        <Clock className="w-4 h-4 text-blue-400" />
+                        <span className="text-gray-400 font-medium">Total Time</span>
+                      </div>
+                      <div className="text-white text-lg font-semibold">
+                        {TimeTrackingService.formatDuration(userTimeStats.total_time_seconds)}
+                      </div>
+                    </div>
+                    
+                    <div className="p-3 bg-[#323a45] rounded">
+                      <div className="flex items-center gap-2 mb-1">
+                        <Coins className="w-4 h-4 text-yellow-400" />
+                        <span className="text-gray-400 font-medium">Total Coins</span>
+                      </div>
+                      <div className="text-white text-lg font-semibold">
+                        {userTimeStats.total_coins.toLocaleString()}
+                      </div>
+                    </div>
+                  </div>
+                  
+                  <div className="grid grid-cols-2 gap-4 text-sm">
+                    <div>
+                      <span className="text-gray-400">Coins from Time:</span>
+                      <span className="text-yellow-400 ml-2 font-medium">
+                        {userTimeStats.coins_from_time.toLocaleString()}
+                      </span>
+                    </div>
+                    <div>
+                      <span className="text-gray-400">Active Sessions:</span>
+                      <span className={`ml-2 font-medium ${
+                        userTimeStats.active_sessions > 0 ? 'text-green-400' : 'text-gray-400'
+                      }`}>
+                        {userTimeStats.active_sessions}
+                      </span>
+                    </div>
+                  </div>
+                  
+                  <div className="text-sm">
+                    <span className="text-gray-400">Last Activity:</span>
+                    <span className="text-white ml-2">
+                      {userTimeStats.last_activity ? new Date(userTimeStats.last_activity).toLocaleString() : 'Never'}
+                    </span>
+                  </div>
+                  
+                  <div className="text-xs text-gray-500 bg-[#1a1f26] p-2 rounded">
+                    <div className="font-medium mb-1">Reward System:</div>
+                    <div>• 30 coins awarded every 30 minutes of active time</div>
+                    <div>• Time tracking is website-wide, not page-specific</div>
+                    <div>• Activity updates every 5 minutes to minimize egress</div>
+                  </div>
+                </div>
+              ) : (
+                <div className="text-center py-4 text-gray-400">
+                  <Clock className="w-8 h-8 mx-auto mb-2 opacity-50" />
+                  <div>No time statistics available</div>
+                  <div className="text-xs mt-1">User may not have any recorded activity</div>
+                </div>
+              )}
             </div>
 
             {/* Report Restrictions Section */}

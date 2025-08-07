@@ -10,6 +10,7 @@ import Footer from './components/Footer';
 import { CacheStatusIndicator } from './components/auth';
 import FloatingAdminPanel from './components/FloatingAdminPanel';
 import AdminAudioManager from './components/AdminAudioManager';
+import TimeTrackingProvider from './components/TimeTrackingProvider';
 import HomePage from './pages/HomePage';
 import CreateStrategyPage from './pages/CreateStrategyPage';
 import TrendingPage from './pages/TrendingPage';
@@ -33,31 +34,33 @@ function App() {
           <BanProvider>
             <KitProvider>
               <AdminAvailabilityProvider>
-                <div className="min-h-screen flex flex-col">
-                  <Header />
-                  
-                  <main className="flex-grow container mx-auto px-4 py-6">
-                    <Routes>
-                      <Route path="/" element={<div className="text-center py-20 text-2xl font-bold">Home coming soon!</div>} />
-                      <Route path="/strat-picker" element={<StratPickerPage />} />
-                      <Route path="/dashboard" element={<DashboardPage />} />
-                      <Route path="/admin" element={<AdminPage />} />
-                      <Route path="/admin/migration" element={<AdminMigrationPage />} />
-                      <Route path="/auth" element={<AuthPage />} />
-                      <Route path="/settings" element={<SettingsPage />} />
-                      <Route path="/players" element={<PlayersPage />} />
-                      <Route path="/leaderboard" element={<LeaderboardPage />} />
-                      <Route path="/mmr-calculator" element={<MMRCalculatorPage />} />
-                      <Route path="/report" element={<ReportPage />} />
-                      <Route path="/cards" element={<PackOpeningPage />} />
-                    </Routes>
-                  </main>
-                  
-                  <Footer />
-                  <CacheStatusIndicator />
-                  <FloatingAdminPanel />
-                  <AdminAudioManager />
-                </div>
+                <TimeTrackingProvider>
+                  <div className="min-h-screen flex flex-col">
+                    <Header />
+                    
+                    <main className="flex-grow container mx-auto px-4 py-6">
+                      <Routes>
+                        <Route path="/" element={<div className="text-center py-20 text-2xl font-bold">Home coming soon!</div>} />
+                        <Route path="/strat-picker" element={<StratPickerPage />} />
+                        <Route path="/dashboard" element={<DashboardPage />} />
+                        <Route path="/admin" element={<AdminPage />} />
+                        <Route path="/admin/migration" element={<AdminMigrationPage />} />
+                        <Route path="/auth" element={<AuthPage />} />
+                        <Route path="/settings" element={<SettingsPage />} />
+                        <Route path="/players" element={<PlayersPage />} />
+                        <Route path="/leaderboard" element={<LeaderboardPage />} />
+                        <Route path="/mmr-calculator" element={<MMRCalculatorPage />} />
+                        <Route path="/report" element={<ReportPage />} />
+                        <Route path="/cards" element={<PackOpeningPage />} />
+                      </Routes>
+                    </main>
+                    
+                    <Footer />
+                    <CacheStatusIndicator />
+                    <FloatingAdminPanel />
+                    <AdminAudioManager />
+                  </div>
+                </TimeTrackingProvider>
               </AdminAvailabilityProvider>
             </KitProvider>
           </BanProvider>

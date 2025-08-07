@@ -420,58 +420,87 @@ export class CardService {
     }
   }
 
-  // Session Time Tracking
+  // Enhanced Session Time Tracking
   static async startSession(userId: string): Promise<UserSessionTime> {
     const { data, error } = await supabase
-      .from('user_session_time')
-      .insert({
-        user_id: userId,
-        session_start: new Date().toISOString()
-      })
-      .select()
-      .single();
+      .rpc('start_user_session', { user_uuid: userId });
 
     if (error) throw error;
-    return data;
+    
+    // Get the created session
+    const { data: session, error: fetchError } = await supabase
+      .from('user_session_time')
+      .select('*')
+      .eq('id', data)
+      .single();
+
+    if (fetchError) throw fetchError;
+    return session;
   }
 
   static async endSession(sessionId: string): Promise<UserSessionTime> {
-    const sessionEnd = new Date();
-    
-    const { data: session, error: fetchError } = await supabase
+    const { error } = await supabase
+      .rpc('end_user_session', { session_uuid: sessionId });
+
+    if (error) throw error;
+
+    // Get the updated session
+    const { data, error: fetchError } = await supabase
       .from('user_session_time')
       .select('*')
       .eq('id', sessionId)
       .single();
 
     if (fetchError) throw fetchError;
+    return data;
+  }
 
-    const sessionStart = new Date(session.session_start);
-    const durationSeconds = Math.floor((sessionEnd.getTime() - sessionStart.getTime()) / 1000);
-    
-    // Calculate coins earned (1 coin per 5 minutes)
-    const coinsEarned = Math.floor(durationSeconds / 300);
-
+  // Get user time statistics
+  static async getUserTimeStats(userId: string): Promise<{
+    total_time_seconds: number;
+    total_coins: number;
+    coins_from_time: number;
+    last_activity: string;
+    active_sessions: number;
+  } | null> {
     const { data, error } = await supabase
-      .from('user_session_time')
-      .update({
-        session_end: sessionEnd.toISOString(),
-        duration_seconds: durationSeconds,
-        coins_earned: coinsEarned
-      })
-      .eq('id', sessionId)
-      .select()
-      .single();
+      .rpc('get_user_time_stats', { user_uuid: userId });
+
+    if (error) throw error;
+    return data?.[0] || null;
+  }
+
+  // Get all user time statistics (for admin)
+  static async getAllUserTimeStats(): Promise<Array<{
+    user_id: string;
+    total_time_seconds: number;
+    total_coins: number;
+    coins_from_time: number;
+    last_activity: string;
+    active_sessions: number;
+  }>> {
+    const { data, error } = await supabase
+      .from('user_coins')
+      .select(`
+        user_id,
+        total_time_spent_seconds,
+        coins,
+        coins_from_time,
+        last_updated,
+        users!inner(email, username)
+      `)
+      .order('total_time_spent_seconds', { ascending: false });
 
     if (error) throw error;
 
-    // Add coins to user if any were earned
-    if (coinsEarned > 0) {
-      await this.addCoins(session.user_id, coinsEarned);
-      await this.updateGoalProgress(session.user_id, 'daily_time', durationSeconds);
-    }
-
-    return data;
+    return data?.map(item => ({
+      user_id: item.user_id,
+      total_time_seconds: item.total_time_spent_seconds || 0,
+      total_coins: item.coins || 0,
+      coins_from_time: item.coins_from_time || 0,
+      last_activity: item.last_updated,
+      active_sessions: 0
+    })) || [];
   }
 
   // Analytics
