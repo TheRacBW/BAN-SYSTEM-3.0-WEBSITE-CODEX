@@ -14,6 +14,12 @@ export const useTimeTracking = () => {
     try {
       setIsTracking(true);
       await TimeTrackingService.startTracking(user.id);
+      
+      // Test the presence update immediately
+      console.log('Testing presence update on start...');
+      const result = await TimeTrackingService.updatePresence(user.id);
+      console.log('Initial presence update result:', result);
+      
       await loadTimeStats();
     } catch (error) {
       console.error('Error starting time tracking:', error);
@@ -68,10 +74,14 @@ export const useTimeTracking = () => {
   useEffect(() => {
     if (!user?.id || !isTracking) return;
 
+    console.log(`Setting up periodic presence updates for user ${user.id}`);
+    
     const interval = setInterval(async () => {
       try {
+        console.log('Periodic presence update triggered');
         const result = await TimeTrackingService.updatePresence(user.id);
         if (result && result.coins_awarded > 0) {
+          console.log('Coins awarded, refreshing stats');
           // Refresh stats when coins are awarded
           await loadTimeStats();
         }

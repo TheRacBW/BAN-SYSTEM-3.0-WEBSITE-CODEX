@@ -7,14 +7,10 @@ import {
   Coins, 
   Package, 
   Trophy, 
-  Clock, 
-  Users, 
   Settings, 
   Sparkles,
   ChevronRight,
   ChevronLeft,
-  Play,
-  Pause,
   RotateCcw
 } from 'lucide-react';
 import './PackOpeningPage.css';
@@ -30,26 +26,12 @@ const PackOpeningPage: React.FC = () => {
   const [showOpenedCards, setShowOpenedCards] = useState(false);
   const [activeTab, setActiveTab] = useState<'packs' | 'inventory' | 'goals' | 'stats'>('packs');
   const [selectedPack, setSelectedPack] = useState<PackType | null>(null);
-  const [sessionTime, setSessionTime] = useState(0);
-  const [sessionActive, setSessionActive] = useState(false);
-  const [sessionId, setSessionId] = useState<string | null>(null);
 
   useEffect(() => {
     if (user) {
       loadData();
-      startSession();
     }
   }, [user]);
-
-  useEffect(() => {
-    let interval: NodeJS.Timeout;
-    if (sessionActive) {
-      interval = setInterval(() => {
-        setSessionTime(prev => prev + 1);
-      }, 1000);
-    }
-    return () => clearInterval(interval);
-  }, [sessionActive]);
 
   const loadData = async () => {
     if (!user) return;
@@ -71,31 +53,7 @@ const PackOpeningPage: React.FC = () => {
     }
   };
 
-  const startSession = async () => {
-    if (!user) return;
-    
-    try {
-      const session = await CardService.startSession(user.id);
-      setSessionId(session.id);
-      setSessionActive(true);
-    } catch (error) {
-      console.error('Error starting session:', error);
-    }
-  };
 
-  const endSession = async () => {
-    if (!sessionId) return;
-    
-    try {
-      await CardService.endSession(sessionId);
-      setSessionActive(false);
-      setSessionTime(0);
-      setSessionId(null);
-      await loadData(); // Refresh coins
-    } catch (error) {
-      console.error('Error ending session:', error);
-    }
-  };
 
   const openPack = async (packType: PackType) => {
     if (!user || openingPack) return;
@@ -137,12 +95,7 @@ const PackOpeningPage: React.FC = () => {
     }
   };
 
-  const formatTime = (seconds: number) => {
-    const hours = Math.floor(seconds / 3600);
-    const minutes = Math.floor((seconds % 3600) / 60);
-    const secs = seconds % 60;
-    return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
-  };
+
 
   const getGoalProgress = (goal: UserGoal) => {
     const progress = (goal.current_value / goal.target_value) * 100;
@@ -191,29 +144,10 @@ const PackOpeningPage: React.FC = () => {
       {/* Header */}
       <div className="bg-white/10 backdrop-blur-sm border-b border-white/20">
         <div className="container mx-auto px-4 py-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-4">
-              <div className="flex items-center gap-2 bg-yellow-500/20 px-3 py-2 rounded-lg">
-                <Coins className="w-5 h-5 text-yellow-400" />
-                <span className="text-yellow-400 font-bold">{userCoins?.coins || 0}</span>
-              </div>
-              <div className="flex items-center gap-2 bg-blue-500/20 px-3 py-2 rounded-lg">
-                <Clock className="w-4 h-4 text-blue-400" />
-                <span className="text-blue-400">{formatTime(sessionTime)}</span>
-                {sessionActive ? (
-                  <Play className="w-3 h-3 text-green-400" />
-                ) : (
-                  <Pause className="w-3 h-3 text-red-400" />
-                )}
-              </div>
-            </div>
-            <div className="flex items-center gap-2">
-              <button
-                onClick={endSession}
-                className="bg-red-500 hover:bg-red-600 text-white px-3 py-1 rounded text-sm"
-              >
-                End Session
-              </button>
+          <div className="flex items-center justify-center">
+            <div className="flex items-center gap-2 bg-yellow-500/20 px-3 py-2 rounded-lg">
+              <Coins className="w-5 h-5 text-yellow-400" />
+              <span className="text-yellow-400 font-bold">{userCoins?.coins || 0}</span>
             </div>
           </div>
         </div>
@@ -460,9 +394,9 @@ const PackOpeningPage: React.FC = () => {
               </div>
 
               <div className="bg-white/10 backdrop-blur-sm rounded-xl p-6 border border-white/20 text-center">
-                <Clock className="w-8 h-8 text-green-400 mx-auto mb-2" />
-                <div className="text-2xl font-bold text-white">{formatTime(sessionTime)}</div>
-                <div className="text-gray-300 text-sm">Session Time</div>
+                <Trophy className="w-8 h-8 text-green-400 mx-auto mb-2" />
+                <div className="text-2xl font-bold text-white">{userGoals.filter(g => g.is_completed).length}</div>
+                <div className="text-gray-300 text-sm">Goals Completed</div>
               </div>
             </div>
           </div>

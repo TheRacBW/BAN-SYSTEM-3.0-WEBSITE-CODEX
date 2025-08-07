@@ -43,14 +43,22 @@ export class TimeTrackingService {
   // Update user presence and potentially award coins
   static async updatePresence(userId: string): Promise<CheckpointResult | null> {
     try {
+      console.log(`Updating presence for user ${userId}...`);
       const { data, error } = await supabase
         .rpc('update_user_presence_and_award_coins', { user_uuid: userId });
       
-      if (error) throw error;
+      if (error) {
+        console.error('Database error:', error);
+        throw error;
+      }
       
       const result = data?.[0];
+      console.log('Presence update result:', result);
+      
       if (result && result.coins_awarded > 0) {
         console.log(`Awarded ${result.coins_awarded} coins to user ${userId}`);
+      } else {
+        console.log('No coins awarded this time');
       }
       
       return result || null;
@@ -64,12 +72,6 @@ export class TimeTrackingService {
   private static startCheckpointMonitoring(): void {
     // Clear any existing interval
     this.stopCheckpointMonitoring();
-    
-    // Set up periodic checkpoint checks every 5 minutes
-    this.activityInterval = setInterval(() => {
-      // This will be called by the TimeTrackingProvider with the current user ID
-      console.log('Checkpoint interval reached');
-    }, this.CHECKPOINT_INTERVAL);
     
     // Set up page visibility and focus events
     document.addEventListener('visibilitychange', this.handleVisibilityChange.bind(this));
