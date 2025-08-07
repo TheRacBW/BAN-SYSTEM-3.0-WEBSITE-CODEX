@@ -11,7 +11,8 @@ import {
   Sparkles,
   ChevronRight,
   ChevronLeft,
-  RotateCcw
+  RotateCcw,
+  Clock
 } from 'lucide-react';
 import './PackOpeningPage.css';
 

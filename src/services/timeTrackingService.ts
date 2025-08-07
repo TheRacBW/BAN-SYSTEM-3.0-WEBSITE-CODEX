@@ -17,16 +17,26 @@ export interface CheckpointResult {
 
 export class TimeTrackingService {
   private static activityInterval: NodeJS.Timeout | null = null;
-  private static readonly CHECKPOINT_INTERVAL = 5 * 60 * 1000; // 5 minutes
+  private static coinTimer: NodeJS.Timeout | null = null;
+  private static isActive: boolean = false;
+  private static currentUserId: string | null = null;
+  private static readonly COIN_INTERVAL = 5 * 60 * 1000; // 5 minutes
+  private static clientStartTime: number | null = null; // When client timer started
+  private static lastClientAwardTime: number | null = null; // Last client-side award time
 
   // Start tracking time for the current user
   static async startTracking(userId: string): Promise<void> {
     try {
-      // Set up periodic checkpoint checks
-      this.startCheckpointMonitoring();
+      this.currentUserId = userId;
+      this.isActive = true;
+      this.clientStartTime = Date.now();
+      this.lastClientAwardTime = null;
       
-      // Initial presence update
-      await this.updatePresence(userId);
+      // Start the coin timer
+      this.startCoinTimer();
+      
+      // Set up activity monitoring
+      this.startActivityMonitoring();
       
       console.log('Time tracking started for user:', userId);
     } catch (error) {
@@ -36,16 +46,25 @@ export class TimeTrackingService {
 
   // End tracking (cleanup)
   static async endTracking(): Promise<void> {
-    this.stopCheckpointMonitoring();
+    this.stopCoinTimer();
+    this.stopActivityMonitoring();
+    this.isActive = false;
+    this.currentUserId = null;
+    this.clientStartTime = null;
+    this.lastClientAwardTime = null;
     console.log('Time tracking ended');
   }
 
-  // Update user presence and potentially award coins
-  static async updatePresence(userId: string): Promise<CheckpointResult | null> {
+  // Award coins to user
+  static async awardCoins(userId: string, coins: number = 5): Promise<{ total_coins: number; last_coin_award_time: string } | null> {
     try {
-      console.log(`Updating presence for user ${userId}...`);
+      console.log(`Awarding ${coins} coins to user ${userId}...`);
+      
       const { data, error } = await supabase
-        .rpc('update_user_presence_and_award_coins', { user_uuid: userId });
+        .rpc('award_coins_to_user', { 
+          user_uuid: userId, 
+          coins_to_award: coins 
+        });
       
       if (error) {
         console.error('Database error:', error);
@@ -53,67 +72,116 @@ export class TimeTrackingService {
       }
       
       const result = data?.[0];
-      console.log('Presence update result:', result);
+      console.log('Coin award result:', result);
       
-      if (result && result.coins_awarded > 0) {
-        console.log(`Awarded ${result.coins_awarded} coins to user ${userId}`);
+      if (result) {
+        console.log(`Successfully awarded ${coins} coins. Total: ${result.total_coins}`);
+        console.log(`Last coin award time: ${result.last_coin_award_time}`);
       } else {
-        console.log('No coins awarded this time');
+        console.warn('No result returned from award_coins_to_user');
       }
       
       return result || null;
     } catch (error) {
-      console.error('Error updating presence:', error);
+      console.error('Error awarding coins:', error);
       return null;
     }
   }
 
-  // Start checkpoint monitoring
-  private static startCheckpointMonitoring(): void {
-    // Clear any existing interval
-    this.stopCheckpointMonitoring();
+  // Start coin timer
+  private static startCoinTimer(): void {
+    this.stopCoinTimer();
+    
+    console.log('Starting client-side coin timer...');
+    
+    // Start with a fresh 5-minute timer
+    this.setupRegularInterval();
+  }
+
+  // Set up regular 5-minute interval
+  private static setupRegularInterval(): void {
+    this.coinTimer = setInterval(async () => {
+      if (this.isActive && this.currentUserId) {
+        console.log('Client-side coin timer triggered - awarding coins');
+        this.lastClientAwardTime = Date.now();
+        await this.awardCoins(this.currentUserId);
+      } else {
+        console.log('Coin timer triggered but user not active - skipping award');
+      }
+    }, this.COIN_INTERVAL);
+  }
+
+  // Stop coin timer
+  private static stopCoinTimer(): void {
+    if (this.coinTimer) {
+      clearInterval(this.coinTimer);
+      this.coinTimer = null;
+      console.log('Coin timer stopped');
+    }
+  }
+
+  // Start activity monitoring
+  private static startActivityMonitoring(): void {
+    this.stopActivityMonitoring();
     
     // Set up page visibility and focus events
     document.addEventListener('visibilitychange', this.handleVisibilityChange.bind(this));
     window.addEventListener('focus', this.handleWindowFocus.bind(this));
     window.addEventListener('blur', this.handleWindowBlur.bind(this));
-    
-    // Set up beforeunload event
     window.addEventListener('beforeunload', this.handleBeforeUnload.bind(this));
+    
+    // Periodic activity check (every 30 seconds)
+    this.activityInterval = setInterval(() => {
+      this.updateActivityStatus();
+    }, 30000);
   }
 
-  // Stop checkpoint monitoring
-  private static stopCheckpointMonitoring(): void {
-    if (this.activityInterval) {
-      clearInterval(this.activityInterval);
-      this.activityInterval = null;
-    }
-    
+  // Stop activity monitoring
+  private static stopActivityMonitoring(): void {
     document.removeEventListener('visibilitychange', this.handleVisibilityChange.bind(this));
     window.removeEventListener('focus', this.handleWindowFocus.bind(this));
     window.removeEventListener('blur', this.handleWindowBlur.bind(this));
     window.removeEventListener('beforeunload', this.handleBeforeUnload.bind(this));
+    
+    if (this.activityInterval) {
+      clearInterval(this.activityInterval);
+      this.activityInterval = null;
+    }
   }
 
   // Handle page visibility changes
   private static handleVisibilityChange(): void {
-    // Update presence when page visibility changes
-    console.log('Page visibility changed:', document.hidden ? 'hidden' : 'visible');
+    this.updateActivityStatus();
   }
 
   // Handle window focus
   private static handleWindowFocus(): void {
-    console.log('Window focused');
+    this.updateActivityStatus();
   }
 
   // Handle window blur
   private static handleWindowBlur(): void {
-    console.log('Window blurred');
+    this.updateActivityStatus();
   }
 
   // Handle before unload
   private static handleBeforeUnload(): void {
-    console.log('Page unloading');
+    console.log('Page unloading - stopping timer');
+    this.isActive = false;
+  }
+
+  // Check if user is actually viewing the page
+  private static isUserViewing(): boolean {
+    return !document.hidden && document.hasFocus();
+  }
+
+  // Update activity status based on current state
+  private static updateActivityStatus(): void {
+    const shouldBeActive = this.isUserViewing();
+    if (this.isActive !== shouldBeActive) {
+      this.isActive = shouldBeActive;
+      console.log(`Activity status changed: ${this.isActive ? 'Active' : 'Inactive'}`);
+    }
   }
 
   // Get user time statistics
@@ -194,5 +262,22 @@ export class TimeTrackingService {
   static calculateCoinsFromTime(seconds: number): number {
     // 5 coins every 5 minutes (300 seconds)
     return Math.floor(seconds / 300) * 5;
+  }
+
+  // Get client-side timer information
+  static getClientTimerInfo(): { timeUntilNextCoins: number; lastClientAward: string | null } {
+    if (!this.clientStartTime || !this.isActive) {
+      return { timeUntilNextCoins: 300, lastClientAward: null };
+    }
+
+    const now = Date.now();
+    const lastAward = this.lastClientAwardTime || this.clientStartTime;
+    const timeSinceLastAward = now - lastAward;
+    const timeUntilNext = Math.max(0, this.COIN_INTERVAL - timeSinceLastAward);
+
+    return {
+      timeUntilNextCoins: Math.floor(timeUntilNext / 1000), // Convert to seconds
+      lastClientAward: this.lastClientAwardTime ? new Date(this.lastClientAwardTime).toLocaleTimeString() : null
+    };
   }
 } 

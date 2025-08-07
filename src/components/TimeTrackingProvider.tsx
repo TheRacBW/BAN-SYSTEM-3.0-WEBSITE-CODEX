@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useTimeTracking } from '../hooks/useTimeTracking';
 
@@ -9,6 +9,7 @@ interface TimeTrackingProviderProps {
 const TimeTrackingProvider: React.FC<TimeTrackingProviderProps> = ({ children }) => {
   const { user } = useAuth();
   const { timeStats, isTracking, startTracking, endTracking } = useTimeTracking();
+  const [showTrackingPopup, setShowTrackingPopup] = useState(false);
 
   // Start tracking when user is authenticated
   useEffect(() => {
@@ -24,6 +25,19 @@ const TimeTrackingProvider: React.FC<TimeTrackingProviderProps> = ({ children })
     }
   }, [user?.id, isTracking, endTracking]);
 
+  // Show temporary popup when tracking starts
+  useEffect(() => {
+    if (isTracking && user) {
+      setShowTrackingPopup(true);
+      // Hide popup after 3 seconds
+      const timer = setTimeout(() => {
+        setShowTrackingPopup(false);
+      }, 3000);
+      
+      return () => clearTimeout(timer);
+    }
+  }, [isTracking, user]);
+
   // Cleanup on unmount
   useEffect(() => {
     return () => {
@@ -36,10 +50,13 @@ const TimeTrackingProvider: React.FC<TimeTrackingProviderProps> = ({ children })
   return (
     <>
       {children}
-      {/* Optional: Show a subtle indicator when time tracking is active */}
-      {isTracking && user && (
-        <div className="fixed bottom-4 right-4 bg-green-500 text-white px-2 py-1 rounded text-xs opacity-75">
-          Time tracking active
+      {/* Temporary popup when time tracking starts */}
+      {showTrackingPopup && (
+        <div className="fixed bottom-4 right-4 bg-green-500 text-white px-3 py-2 rounded-lg text-sm shadow-lg animate-pulse">
+          <div className="flex items-center gap-2">
+            <div className="w-2 h-2 bg-white rounded-full animate-ping"></div>
+            Time tracking active
+          </div>
         </div>
       )}
     </>

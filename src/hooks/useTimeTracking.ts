@@ -15,11 +15,7 @@ export const useTimeTracking = () => {
       setIsTracking(true);
       await TimeTrackingService.startTracking(user.id);
       
-      // Test the presence update immediately
-      console.log('Testing presence update on start...');
-      const result = await TimeTrackingService.updatePresence(user.id);
-      console.log('Initial presence update result:', result);
-      
+      // Load initial stats
       await loadTimeStats();
     } catch (error) {
       console.error('Error starting time tracking:', error);
@@ -70,25 +66,20 @@ export const useTimeTracking = () => {
     }
   }, [user?.id, isTracking, endTracking]);
 
-  // Periodic presence updates every 5 minutes
+  // Refresh stats periodically to show updated coin count
   useEffect(() => {
     if (!user?.id || !isTracking) return;
 
-    console.log(`Setting up periodic presence updates for user ${user.id}`);
+    console.log(`Setting up periodic stats refresh for user ${user.id}`);
     
     const interval = setInterval(async () => {
       try {
-        console.log('Periodic presence update triggered');
-        const result = await TimeTrackingService.updatePresence(user.id);
-        if (result && result.coins_awarded > 0) {
-          console.log('Coins awarded, refreshing stats');
-          // Refresh stats when coins are awarded
-          await loadTimeStats();
-        }
+        console.log('Refreshing time stats...');
+        await loadTimeStats();
       } catch (error) {
-        console.error('Error during periodic presence update:', error);
+        console.error('Error refreshing time stats:', error);
       }
-    }, 5 * 60 * 1000); // 5 minutes
+    }, 30 * 1000); // Refresh every 30 seconds
 
     return () => clearInterval(interval);
   }, [user?.id, isTracking, loadTimeStats]);
