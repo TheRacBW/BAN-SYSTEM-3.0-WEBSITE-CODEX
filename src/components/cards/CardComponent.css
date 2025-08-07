@@ -74,7 +74,7 @@
 }
 
 .pokemon-card.active .card-shine[data-holo-type="radiant"] {
-  opacity: 0.3;
+  opacity: 0.7;
 }
 
 .pokemon-card.active .card-shine[data-holo-type="galaxy"] {
@@ -94,7 +94,7 @@
 }
 
 .pokemon-card.active .card-holo-mask[data-holo-type="radiant"] {
-  opacity: 0.3;
+  opacity: 0.7;
 }
 
 .pokemon-card.active .card-holo-mask[data-holo-type="galaxy"] {
