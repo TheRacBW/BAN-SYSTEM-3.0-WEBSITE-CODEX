@@ -495,7 +495,7 @@ const CardManagementPanel: React.FC = () => {
                             onChange={(e) => {
                               const rarity = e.target.value as CardData['rarity'];
                               handleInputChange('rarity', rarity);
-                              if (['Epic', 'Legendary'].includes(rarity) && !formData.is_holo) {
+                              if (['Rare', 'Epic', 'Legendary'].includes(rarity) && !formData.is_holo) {
                                 handleInputChange('is_holo', true);
                               }
                             }}

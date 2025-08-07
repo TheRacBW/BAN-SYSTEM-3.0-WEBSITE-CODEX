@@ -60,7 +60,7 @@ const CardComponent: React.FC<CardComponentProps> = ({
   const [transform, setTransform] = useState({ rx: 0, ry: 0, scale: 1 });
   const [seasons, setSeasons] = useState<SeasonConfig[]>([]);
   
-  const canHaveHolo = ['Epic', 'Legendary'].includes(card.rarity) && card.is_holo;
+  const canHaveHolo = ['Rare', 'Epic', 'Legendary'].includes(card.rarity) && card.is_holo;
   const textColors = getTextColors(card.text_theme);
 
   // Load seasons from database
