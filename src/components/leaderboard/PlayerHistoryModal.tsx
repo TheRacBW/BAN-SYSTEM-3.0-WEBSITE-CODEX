@@ -6,11 +6,13 @@ import PlayerHistoryChart from './PlayerHistoryChart';
 import { useState } from 'react';
 import PlayerRankPositionChart from './PlayerRankPositionChart';
 import * as FaIcons from 'react-icons/fa';
+import { getLadderScore } from '../../utils/rankingSystem';
 
 const PlayerHistoryModal: React.FC<PlayerHistoryModalProps> = ({ username, isVisible, onClose }) => {
   const { data, stats, loading, error } = usePlayerHistory(username, isVisible);
 
   const [activeTab, setActiveTab] = useState<'rp' | 'rank'>('rp');
+  const [showDroppedPlayers, setShowDroppedPlayers] = useState(true);
 
   if (!isVisible) return null;
 
@@ -136,10 +138,63 @@ const PlayerHistoryModal: React.FC<PlayerHistoryModalProps> = ({ username, isVis
                 <span>Joined Leaderboard:</span>
                 <span className="font-bold text-white">{joinedDate}</span>
               </div>
+              {/* Toggle button for RP History tab only */}
+              {activeTab === 'rp' && (
+                <div className="flex flex-col items-end ml-auto">
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={() => setShowDroppedPlayers(!showDroppedPlayers)}
+                      className={`px-3 py-1 text-xs rounded-full transition-all duration-200 font-medium flex items-center gap-1 ${
+                        showDroppedPlayers
+                          ? 'bg-blue-500 text-white hover:bg-blue-600'
+                          : 'bg-gray-600 text-gray-300 hover:bg-gray-500'
+                      }`}
+                      title={showDroppedPlayers ? 'Hide dropped from Top 200' : 'Show dropped from Top 200'}
+                    >
+                      <span>{showDroppedPlayers ? '👁️' : '👁️‍🗨️'}</span>
+                      <span>{showDroppedPlayers ? 'Hide' : 'Show'} Dropped</span>
+                    </button>
+                    {data && data.length > 0 && !showDroppedPlayers && (() => {
+                      const getDisplayRank = (entry: RPChangeEntry) => entry.new_rank_title || entry.new_calculated_rank || 'Unknown';
+                      
+                      const droppedCount = data.filter(entry => {
+                        const ladderScore = getLadderScore(getDisplayRank(entry), entry.new_rp);
+                        return ladderScore < 5000;
+                      }).length;
+                      
+                      return droppedCount > 0 ? (
+                        <span className="text-xs text-orange-400">
+                          {droppedCount} hidden
+                        </span>
+                      ) : null;
+                    })()}
+                  </div>
+                  {/* Disclaimer appears below the button when showing dropped players */}
+                  {data && data.length > 0 && showDroppedPlayers && (() => {
+                    const getDisplayRank = (entry: RPChangeEntry) => entry.new_rank_title || entry.new_calculated_rank || 'Unknown';
+                    
+                    const droppedCount = data.filter(entry => {
+                      const ladderScore = getLadderScore(getDisplayRank(entry), entry.new_rp);
+                      return ladderScore < 5000;
+                    }).length;
+                    
+                    return droppedCount > 0 ? (
+                      <div className="text-xs text-yellow-400 flex items-center gap-1 mt-1">
+                        <FaIcons.FaInfoCircle className="w-3 h-3" />
+                        <span>Drops may be due to data issues or name changes</span>
+                      </div>
+                    ) : null;
+                  })()}
+                </div>
+              )}
             </div>
             {/* Tab content: show the selected graph */}
             {activeTab === 'rp' ? (
-              <PlayerHistoryChart data={data} />
+              <PlayerHistoryChart 
+                data={data} 
+                showDroppedPlayers={showDroppedPlayers}
+                onToggleDropped={() => setShowDroppedPlayers(!showDroppedPlayers)}
+              />
             ) : (
               <PlayerRankPositionChart data={data} />
             )}

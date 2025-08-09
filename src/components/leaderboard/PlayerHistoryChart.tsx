@@ -188,11 +188,32 @@ function mapDataToWeightedX(segments: DaySegment[]) {
   });
 }
 
-const PlayerHistoryChart: React.FC<{ data: RPChangeEntry[]; stats?: any }> = ({ data, stats }) => {
+interface PlayerHistoryChartProps {
+  data: RPChangeEntry[];
+  stats?: any;
+  showDroppedPlayers?: boolean;
+  onToggleDropped?: () => void;
+}
+
+const PlayerHistoryChart: React.FC<PlayerHistoryChartProps> = ({ 
+  data, 
+  stats, 
+  showDroppedPlayers = true,
+  onToggleDropped 
+}) => {
+  
   if (!data || data.length === 0) return null;
 
+  // Filter data based on toggle setting
+  const filteredData = showDroppedPlayers 
+    ? data 
+    : data.filter(entry => {
+        const ladderScore = getLadderScore(getDisplayRank(entry), entry.new_rp);
+        return ladderScore >= 5000; // Keep only ranked players (ladder score >= 5000)
+      });
+
   // --- Dynamic segment calculation ---
-  const segments = buildSegments(data);
+  const segments = buildSegments(filteredData);
   const chartData = mapDataToWeightedX(segments).map(d => ({
     ...d,
     displayRank: getDisplayRank(d),
@@ -203,15 +224,68 @@ const PlayerHistoryChart: React.FC<{ data: RPChangeEntry[]; stats?: any }> = ({ 
   // Defensive check for allSameY: only true if at least two points
   const allSameY = chartData.length > 1 && chartData.every(pt => pt.ladderScore === chartData[0].ladderScore);
 
-  // Calculate min/max for Y-axis with 10% padding to avoid cutoff from outliers
-  const minLadder = Math.min(...chartData.map(e => e.ladderScore));
-  const maxLadder = Math.max(...chartData.map(e => e.ladderScore));
-  const yPadding = Math.max(10, (maxLadder - minLadder) * 0.1);
-  let yMin = minLadder - yPadding;
-  let yMax = maxLadder + yPadding;
+  // Calculate min/max for Y-axis with adaptive scaling for extreme drops
+  const ladderScores = chartData.map(e => e.ladderScore);
+  const minLadder = Math.min(...ladderScores);
+  const maxLadder = Math.max(...ladderScores);
+  
+  // Detect extreme drops (likely "dropped from top 200" scenarios)
+  // Top 200 players have ladder scores in 20,000+ range, while dropped players have raw RP (0-3000)
+  // Only apply special handling if toggle is on and we have extreme drops
+  const hasExtremeDrop = showDroppedPlayers && 
+    ladderScores.some(score => score > 15000) && 
+    ladderScores.some(score => score < 5000);
+  
+  let yMin: number, yMax: number;
+  if (hasExtremeDrop) {
+    // For extreme drops, use moderated scaling to reduce visual impact
+    const rankedScores = ladderScores.filter(score => score >= 15000);
+    const droppedScores = ladderScores.filter(score => score < 5000);
+    
+    if (rankedScores.length > 0 && droppedScores.length > 0) {
+      const rankedMin = Math.min(...rankedScores);
+      const rankedMax = Math.max(...rankedScores);
+      const droppedMin = Math.min(...droppedScores);
+      const droppedMax = Math.max(...droppedScores);
+      
+      // Instead of extreme compression, just moderate the drop
+      const rankedRange = rankedMax - rankedMin;
+      const moderatedDropDistance = Math.max(rankedRange * 0.3, 1000); // Drop is 30% of ranked range, minimum 1000 points
+      
+      yMax = rankedMax + (rankedRange * 0.1); // 10% padding above ranked scores
+      yMin = rankedMin - moderatedDropDistance; // Moderate drop below ranked range
+      
+      // Remap dropped scores to a more reasonable position
+      const droppedRange = droppedMax - droppedMin;
+      const droppedVisualRange = Math.min(moderatedDropDistance * 0.6, droppedRange); // Use up to 60% of drop space
+      const droppedBasePosition = yMin + (moderatedDropDistance * 0.2); // Start 20% from bottom
+      
+      chartData.forEach(point => {
+        if (point.ladderScore < 5000) {
+          if (droppedRange > 0) {
+            const normalizedPosition = (point.ladderScore - droppedMin) / droppedRange;
+            point.ladderScore = droppedBasePosition + (droppedVisualRange * normalizedPosition);
+          } else {
+            // All dropped scores are the same, place in middle of dropped area
+            point.ladderScore = droppedBasePosition + (droppedVisualRange * 0.5);
+          }
+        }
+      });
+    } else {
+      // Fallback to standard scaling
+      const yPadding = Math.max(10, (maxLadder - minLadder) * 0.1);
+      yMin = minLadder - yPadding;
+      yMax = maxLadder + yPadding;
+    }
+  } else {
+    // Standard scaling for normal cases
+    const yPadding = Math.max(10, (maxLadder - minLadder) * 0.1);
+    yMin = minLadder - yPadding;
+    yMax = maxLadder + yPadding;
+  }
 
-  // Find all unique rank zones in the data
-  const usedZones = RANK_ZONES.filter(zone => data.some(e => e.new_rp >= zone.min && e.new_rp <= zone.max));
+  // Find all unique rank zones in the filtered data
+  const usedZones = RANK_ZONES.filter(zone => filteredData.some(e => e.new_rp >= zone.min && e.new_rp <= zone.max));
   const gradientIds = usedZones.reduce((acc, zone) => {
     acc[zone.name] = `rank-gradient-${zone.name}`;
     return acc;
@@ -234,7 +308,7 @@ const PlayerHistoryChart: React.FC<{ data: RPChangeEntry[]; stats?: any }> = ({ 
     stops.push({ color: getRankColor(lastPt.displayRank), offset: '100%' });
   }
 
-  // Calculate rank positions from actual chart data
+  // Calculate rank positions from actual chart data with adaptive scaling support
   const calculateRankPositions = (chartData: ChartDataPoint[]) => {
     const rankPositions = new Map<string, number>();
     chartData.forEach((entry: ChartDataPoint) => {
@@ -247,17 +321,30 @@ const PlayerHistoryChart: React.FC<{ data: RPChangeEntry[]; stats?: any }> = ({ 
     return rankPositions;
   };
 
-  const useRankBasedYAxis = (chartData: ChartDataPoint[]) => {
+  const useRankBasedYAxis = (chartData: ChartDataPoint[], hasExtremeDrop: boolean) => {
     const rankPositions = calculateRankPositions(chartData);
     // Convert to array and sort by ladderScore value
-    const rankTicks = Array.from(rankPositions.entries())
+    let rankTicks = Array.from(rankPositions.entries())
       .map(([rank, value]) => ({ value, label: rank }))
       .sort((a, b) => a.value - b.value);
+    
+    // For extreme drops, filter out potentially misleading ticks in the compressed range
+    if (hasExtremeDrop) {
+      // Only show ticks for actual ranks that make sense in their position
+      rankTicks = rankTicks.filter(tick => {
+        // Keep ranked ticks (above 15000) and only key dropped ticks
+        if (tick.value >= 15000) return true;
+        // For compressed range, only show a few representative ticks
+        const rank = tick.label.toLowerCase();
+        return rank.includes('bronze') || rank.includes('silver') || rank === '[not in top 200]' || rank.includes('dropped');
+      });
+    }
+    
     return rankTicks;
   };
 
   // Custom tick formatter for Y-axis
-  const rankTicks = useRankBasedYAxis(chartData);
+  const rankTicks = useRankBasedYAxis(chartData, hasExtremeDrop);
   const formatYAxisTick = (value: number) => {
     const closestRank = rankTicks.find(tick => Math.abs(tick.value - value) < 10);
     return closestRank ? closestRank.label : '';
@@ -369,7 +456,7 @@ const PlayerHistoryChart: React.FC<{ data: RPChangeEntry[]; stats?: any }> = ({ 
           />
         </LineChart>
       </ResponsiveContainer>
-      <div className="absolute top-2 right-4 text-xs text-gray-500">{data.length} entries</div>
+      <div className="absolute top-2 right-4 text-xs text-gray-500">{filteredData.length} entries</div>
     </div>
   );
 };
