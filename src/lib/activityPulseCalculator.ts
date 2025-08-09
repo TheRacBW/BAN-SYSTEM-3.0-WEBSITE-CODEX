@@ -12,9 +12,13 @@ interface UserStatus {
   is_in_game?: boolean;
   in_bedwars?: boolean;
   last_updated?: string;
-  // Note: These activity fields likely don't exist in your DB
+  // Activity fields from database
   daily_minutes_today?: number;
+  daily_minutes_yesterday?: number;
   weekly_average?: number;
+  activity_trend?: 'increasing' | 'decreasing' | 'stable';
+  peak_hours_start?: number;
+  peak_hours_end?: number;
   session_start_time?: string;
 }
 
@@ -29,61 +33,56 @@ interface ActivityPulseData {
   peakHoursEnd?: number;
 }
 
-// Simple session storage for tracking online sessions (browser memory only)
-const sessionTracker = new Map<string, { startTime: number; totalToday: number }>();
+// Note: Removed browser memory session tracking as it was unreliable and caused inaccurate data
+// Now using database values directly for consistency and accuracy
 
 export const calculateActivityPulse = (userStatus: UserStatus): ActivityPulseData => {
   const now = new Date();
-  const userId = userStatus.user_id;
-  const isCurrentlyOnline = Boolean(userStatus.is_online || userStatus.is_in_game || userStatus.in_bedwars);
   
-  // Get or create session tracking
-  let sessionData = sessionTracker.get(userId);
-  if (!sessionData) {
-    sessionData = { startTime: 0, totalToday: 0 };
-    sessionTracker.set(userId, sessionData);
-  }
-
+  // Only count meaningful activity: in_bedwars or is_in_game (not just online)
+  const isCurrentlyActive = Boolean(userStatus.is_in_game || userStatus.in_bedwars);
+  
+  // Use database values directly instead of browser memory
+  // This avoids issues with page refreshes and provides consistent data
   let dailyMinutesToday = 0;
   let weeklyAverage = 0;
 
-  if (isCurrentlyOnline) {
-    // User is online - calculate session time
-    const lastUpdated = userStatus.last_updated ? new Date(userStatus.last_updated) : now;
-    
-    // If this is a new session, start tracking
-    if (sessionData.startTime === 0) {
-      sessionData.startTime = lastUpdated.getTime();
-    }
-    
-    // Calculate current session duration
-    const sessionMinutes = Math.max(0, (now.getTime() - sessionData.startTime) / 60000);
-    dailyMinutesToday = Math.round(sessionData.totalToday + sessionMinutes);
-    
-    // Estimate weekly average based on current session (very rough)
-    weeklyAverage = Math.max(15, dailyMinutesToday * 0.7); // Conservative estimate
+  if (userStatus.daily_minutes_today !== undefined) {
+    dailyMinutesToday = userStatus.daily_minutes_today;
+  }
+  
+  if (userStatus.weekly_average !== undefined) {
+    weeklyAverage = userStatus.weekly_average;
   } else {
-    // User is offline
-    if (sessionData.startTime > 0) {
-      // They were online before, finalize the session
-      const lastUpdated = userStatus.last_updated ? new Date(userStatus.last_updated) : now;
-      const sessionMinutes = Math.max(0, (lastUpdated.getTime() - sessionData.startTime) / 60000);
-      sessionData.totalToday += sessionMinutes;
-      sessionData.startTime = 0; // Reset session
-    }
+    // Fallback to a more realistic estimate if no weekly data exists
+    // Use yesterday's data plus today's data to estimate weekly average
+    const yesterdayMinutes = userStatus.daily_minutes_yesterday || 0;
+    const totalRecentMinutes = dailyMinutesToday + yesterdayMinutes;
     
-    dailyMinutesToday = sessionData.totalToday;
-    weeklyAverage = dailyMinutesToday; // For offline users, assume this is their pattern
+    // Conservative estimate: assume this 2-day pattern represents the week
+    weeklyAverage = Math.min(300, Math.max(15, totalRecentMinutes / 2)); // Cap at 5 hours/day average
   }
 
-  // Determine activity trend based on current vs estimated average
+  // Cap daily minutes to realistic maximum (12 hours = 720 minutes)
+  // This prevents unrealistic 24+ hour calculations
+  dailyMinutesToday = Math.min(720, Math.max(0, dailyMinutesToday));
+  weeklyAverage = Math.min(300, Math.max(0, weeklyAverage)); // Cap at 5 hours/day average
+
+  // Determine activity trend based on recent activity patterns
   let activityTrend: 'increasing' | 'decreasing' | 'stable' = 'stable';
-  if (isCurrentlyOnline) {
-    activityTrend = 'increasing'; // Online users are trending up
-  } else if (dailyMinutesToday > weeklyAverage * 1.2) {
-    activityTrend = 'increasing';
-  } else if (dailyMinutesToday < weeklyAverage * 0.8) {
-    activityTrend = 'decreasing';
+  
+  // Use database trend if available (more accurate than frontend calculation)
+  if (userStatus.activity_trend) {
+    activityTrend = userStatus.activity_trend;
+  } else {
+    // Fallback calculation only if no database trend exists
+    const yesterdayMinutes = userStatus.daily_minutes_yesterday || 0;
+    
+    if (dailyMinutesToday > yesterdayMinutes * 1.3) {
+      activityTrend = 'increasing';
+    } else if (dailyMinutesToday < yesterdayMinutes * 0.7 && yesterdayMinutes > 0) {
+      activityTrend = 'decreasing';
+    }
   }
 
   // Get current time period
@@ -98,9 +97,9 @@ export const calculateActivityPulse = (userStatus: UserStatus): ActivityPulseDat
     activityTrend,
     preferredTimePeriod,
     lastOnlineTimestamp: userStatus.last_updated,
-    isCurrentlyOnline,
-    peakHoursStart: Math.max(0, currentHour - 1),
-    peakHoursEnd: Math.min(23, currentHour + 1)
+    isCurrentlyOnline: isCurrentlyActive, // Use meaningful activity instead of just online
+    peakHoursStart: userStatus.peak_hours_start || Math.max(0, currentHour - 1),
+    peakHoursEnd: userStatus.peak_hours_end || Math.min(23, currentHour + 1)
   };
 };
 
@@ -116,7 +115,7 @@ export const calculateAggregatedActivityPulse = (playerAccounts: any[]): Activit
     };
   }
 
-  // Calculate activity for each account
+  // Calculate activity for each account using database values
   const accountActivities = playerAccounts.map(account => {
     const status = account.status || {};
     return calculateActivityPulse({
@@ -125,14 +124,26 @@ export const calculateAggregatedActivityPulse = (playerAccounts: any[]): Activit
       is_online: status.isOnline,
       is_in_game: status.isInGame,
       in_bedwars: status.inBedwars,
-      last_updated: status.lastUpdated
+      last_updated: status.lastUpdated,
+      // Pass through database activity values
+      daily_minutes_today: status.dailyMinutesToday,
+      daily_minutes_yesterday: status.dailyMinutesYesterday,
+      weekly_average: status.weeklyAverage,
+      activity_trend: status.activityTrend,
+      peak_hours_start: status.peakHoursStart,
+      peak_hours_end: status.peakHoursEnd
     });
   });
 
-  // Aggregate results
-  const totalDailyMinutes = accountActivities.reduce((sum, activity) => sum + activity.dailyMinutesToday, 0);
-  const avgWeeklyAverage = accountActivities.reduce((sum, activity) => sum + activity.weeklyAverage, 0) / accountActivities.length;
-  const hasOnlineAccount = accountActivities.some(activity => activity.isCurrentlyOnline);
+  // Aggregate results with realistic caps
+  const totalDailyMinutes = Math.min(720, accountActivities.reduce((sum, activity) => sum + activity.dailyMinutesToday, 0));
+  const avgWeeklyAverage = Math.min(300, accountActivities.reduce((sum, activity) => sum + activity.weeklyAverage, 0) / Math.max(1, accountActivities.length));
+  
+  // Check if any account has meaningful activity (in_bedwars or is_in_game)
+  const hasMeaningfulActivity = playerAccounts.some(account => {
+    const status = account.status || {};
+    return status.inBedwars || status.isInGame;
+  });
   
   // Use most optimistic trend
   let aggregatedTrend: 'increasing' | 'decreasing' | 'stable' = 'stable';
@@ -153,12 +164,12 @@ export const calculateAggregatedActivityPulse = (playerAccounts: any[]): Activit
     .sort((a, b) => new Date(b!).getTime() - new Date(a!).getTime());
 
   return {
-    dailyMinutesToday: totalDailyMinutes,
+    dailyMinutesToday: Math.round(totalDailyMinutes),
     weeklyAverage: Math.round(avgWeeklyAverage),
     activityTrend: aggregatedTrend,
     preferredTimePeriod,
     lastOnlineTimestamp: lastOnlineTimestamps[0],
-    isCurrentlyOnline: hasOnlineAccount,
+    isCurrentlyOnline: hasMeaningfulActivity, // Use meaningful activity instead of just online
     peakHoursStart: accountActivities[0]?.peakHoursStart,
     peakHoursEnd: accountActivities[0]?.peakHoursEnd
   };
@@ -174,13 +185,5 @@ const getMostCommon = (arr: string[]): string => {
   return Object.keys(counts).reduce((a, b) => counts[a] > counts[b] ? a : b);
 };
 
-// Clean up old session data (call periodically)
-export const cleanupSessionData = () => {
-  // Remove sessions older than 24 hours
-  const oneDayAgo = Date.now() - (24 * 60 * 60 * 1000);
-  for (const [userId, data] of sessionTracker.entries()) {
-    if (data.startTime < oneDayAgo && data.startTime > 0) {
-      sessionTracker.delete(userId);
-    }
-  }
-}; 
+// Note: Session cleanup no longer needed as we use database values directly
+// This provides more accurate and persistent tracking across page refreshes 

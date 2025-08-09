@@ -173,9 +173,15 @@ export const calculateWeeklyStats = (todayMinutes: number, existingStatus: any):
   const yesterdayMinutes = existingStatus?.daily_minutes_yesterday || 0;
   const previousAverage = existingStatus?.weekly_average || 0;
   
-  // Simple 7-day rolling calculation (you'd improve this with actual daily history)
-  const estimatedWeeklyTotal = (todayMinutes + yesterdayMinutes) * 3.5; // Rough estimate
-  const newAverage = estimatedWeeklyTotal / 7;
+  // Cap input minutes to realistic values
+  const cappedTodayMinutes = Math.min(720, Math.max(0, todayMinutes)); // Max 12 hours/day
+  const cappedYesterdayMinutes = Math.min(720, Math.max(0, yesterdayMinutes));
+  
+  // More conservative weekly calculation based on recent 2-day pattern
+  // Instead of multiplying by 3.5, use a more realistic approach
+  const recentAverage = (cappedTodayMinutes + cappedYesterdayMinutes) / 2;
+  const estimatedWeeklyTotal = recentAverage * 7;
+  const newAverage = Math.min(300, recentAverage); // Cap average at 5 hours/day
   
   let trend: 'increasing' | 'decreasing' | 'stable' = 'stable';
   if (newAverage > previousAverage * 1.2) trend = 'increasing';
@@ -352,13 +358,26 @@ export const updateActivityPulseData = async (userId: number, currentStatus: Use
     const lastUpdate = new Date(existingStatus.last_updated);
     const minutesSinceUpdate = Math.min(30, Math.max(0, (now.getTime() - lastUpdate.getTime()) / 60000));
     
-    updateData.daily_minutes_today = (updateData.daily_minutes_today || 0) + minutesSinceUpdate;
+    // Only add time if user is in meaningful activity (in_bedwars or is_in_game)
+    const isMeaningfulActivity = currentStatus.inBedwars || currentStatus.isInGame;
     
-    // Update activity distribution
-    const currentDistribution = existingStatus?.activity_distribution || {};
-    const hourKey = currentHour.toString();
-    currentDistribution[hourKey] = (currentDistribution[hourKey] || 0) + minutesSinceUpdate;
-    updateData.activity_distribution = currentDistribution;
+    if (isMeaningfulActivity) {
+      updateData.daily_minutes_today = (updateData.daily_minutes_today || 0) + minutesSinceUpdate;
+      
+      // Cap daily minutes to realistic maximum (12 hours = 720 minutes)
+      updateData.daily_minutes_today = Math.min(720, updateData.daily_minutes_today);
+    } else {
+      // Just maintain current daily minutes without adding time for being merely online
+      updateData.daily_minutes_today = updateData.daily_minutes_today || 0;
+    }
+    
+    // Update activity distribution (only for meaningful activity)
+    if (isMeaningfulActivity) {
+      const currentDistribution = existingStatus?.activity_distribution || {};
+      const hourKey = currentHour.toString();
+      currentDistribution[hourKey] = (currentDistribution[hourKey] || 0) + minutesSinceUpdate;
+      updateData.activity_distribution = currentDistribution;
+    }
   }
 
   // Update preferred time period based on current activity
