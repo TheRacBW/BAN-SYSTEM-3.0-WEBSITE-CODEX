@@ -135,9 +135,15 @@ export const calculateAggregatedActivityPulse = (playerAccounts: any[]): Activit
     });
   });
 
-  // Aggregate results with realistic caps
-  const totalDailyMinutes = Math.min(720, accountActivities.reduce((sum, activity) => sum + activity.dailyMinutesToday, 0));
-  const avgWeeklyAverage = Math.min(300, accountActivities.reduce((sum, activity) => sum + activity.weeklyAverage, 0) / Math.max(1, accountActivities.length));
+  // FIXED: Use maximum daily minutes instead of sum (players can't play multiple accounts simultaneously)
+  const maxDailyMinutes = Math.max(...accountActivities.map(activity => activity.dailyMinutesToday), 0);
+  const totalDailyMinutes = Math.min(720, maxDailyMinutes);
+  
+  // Weekly average can be averaged across accounts (represents different play patterns)
+  const validWeeklyAverages = accountActivities.map(activity => activity.weeklyAverage).filter(avg => avg > 0);
+  const avgWeeklyAverage = validWeeklyAverages.length > 0
+    ? Math.min(300, validWeeklyAverages.reduce((sum, avg) => sum + avg, 0) / validWeeklyAverages.length)
+    : 0;
   
   // Check if any account has meaningful activity (in_bedwars or is_in_game)
   const hasMeaningfulActivity = playerAccounts.some(account => {

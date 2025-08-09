@@ -2,6 +2,9 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Import activity level color system */
+@import './styles/activityColors.css';
+
 :root {
   font-synthesis: none;
   text-rendering: optimizeLegibility;

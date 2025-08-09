@@ -1,0 +1,65 @@
+/* Activity Level Color System */
+
+/* Hardcore Player - Purple Theme */
+.activity-hardcore-online {
+  @apply bg-purple-600/80 border border-purple-400/30 text-purple-100;
+}
+
+.activity-hardcore-offline {
+  @apply bg-purple-900/40 border border-purple-500/20 text-purple-300;
+}
+
+/* Very Active - Green Theme */
+.activity-high-online {
+  @apply bg-green-600/80 border border-green-400/30 text-green-100;
+}
+
+.activity-high-offline {
+  @apply bg-green-900/40 border border-green-500/20 text-green-300;
+}
+
+/* Active - Yellow Theme */
+.activity-medium-online {
+  @apply bg-yellow-600/80 border border-yellow-400/30 text-yellow-100;
+}
+
+.activity-medium-offline {
+  @apply bg-yellow-900/40 border border-yellow-500/20 text-yellow-300;
+}
+
+/* Casual Player - Blue Theme */
+.activity-low-online {
+  @apply bg-blue-600/80 border border-blue-400/30 text-blue-100;
+}
+
+.activity-low-offline {
+  @apply bg-blue-900/40 border border-blue-500/20 text-blue-300;
+}
+
+/* Inactive - Gray Theme */
+.activity-inactive {
+  @apply bg-gray-800/40 border border-gray-600/20 text-gray-400;
+}
+
+/* Hover effects for interactive badges */
+.activity-badge-hover {
+  @apply transition-all duration-200 hover:scale-105 hover:shadow-lg;
+}
+
+/* Animation for online status */
+.activity-online-pulse {
+  @apply animate-pulse;
+}
+
+/* Trend indicators */
+.trend-increasing {
+  @apply text-green-400;
+}
+
+.trend-decreasing {
+  @apply text-red-400;
+}
+
+.trend-stable {
+  @apply text-gray-400;
+}

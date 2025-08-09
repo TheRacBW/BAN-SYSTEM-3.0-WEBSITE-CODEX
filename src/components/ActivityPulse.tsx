@@ -1,5 +1,11 @@
 import React from 'react';
-import { TrendingUp, TrendingDown, Minus, Clock } from 'lucide-react';
+import { TrendingUp, TrendingDown, Clock } from 'lucide-react';
+import { 
+  getActivityLevel, 
+  formatDuration as formatDurationUtil, 
+  calculateActivityStreak,
+  getActivityInsights
+} from '../lib/activityPulseUtils';
 
 interface ActivityPulseProps {
   dailyMinutesToday: number;
@@ -41,80 +47,25 @@ const ActivityPulse: React.FC<ActivityPulseProps> = ({
     lastOnlineTimestamp
   });
   
-  // Format duration with exact times
-  const formatDuration = (minutes: number): string => {
-    if (isNaN(minutes) || minutes < 0) return '0m';
-    if (minutes < 1) return '<1m';
-    if (minutes < 60) return `${Math.round(minutes)}m`;
-    
-    const hours = Math.floor(minutes / 60);
-    const mins = Math.round(minutes % 60);
-    return mins > 0 ? `${hours}h ${mins}m` : `${hours}h`;
-  };
+  // Use improved duration formatting from utilities
+  const formatDuration = formatDurationUtil;
 
-  // Get activity level
-  const getActivityLevel = (dailyMinutes: number, weeklyAvg: number, isCurrentlyOnline: boolean) => {
-    // If user is currently online, they cannot be "Inactive"
-    if (isCurrentlyOnline) {
-      // For online users, use higher threshold since they're actively playing
-      const activeMinutes = Math.max(dailyMinutes, weeklyAvg);
-      
-      if (activeMinutes >= 120) return { 
-        level: 'high', 
-        label: 'Very Active', 
-        color: 'text-green-400', 
-        icon: '🔥',
-        bgColor: 'bg-green-500'
-      };
-      if (activeMinutes >= 45) return { 
-        level: 'medium', 
-        label: 'Active', 
-        color: 'text-yellow-400', 
-        icon: '⚡',
-        bgColor: 'bg-yellow-500'
-      };
-      // Even if low historical data, online users get "Active" minimum
-      return { 
-        level: 'active_online', 
-        label: 'Active', 
-        color: 'text-blue-400', 
-        icon: '💧',
-        bgColor: 'bg-blue-500'
-      };
-    }
-    
-    // For offline users, use historical data
-    const activeMinutes = Math.max(dailyMinutes, weeklyAvg);
-    
-    if (activeMinutes >= 120) return { 
-      level: 'high', 
-      label: 'Very Active', 
-      color: 'text-green-400', 
-      icon: '🔥',
-      bgColor: 'bg-green-500'
-    };
-    if (activeMinutes >= 45) return { 
-      level: 'medium', 
-      label: 'Active', 
-      color: 'text-yellow-400', 
-      icon: '⚡',
-      bgColor: 'bg-yellow-500'
-    };
-    if (activeMinutes >= 10) return { 
-      level: 'low', 
-      label: 'Light Activity', 
-      color: 'text-blue-400', 
-      icon: '💧',
-      bgColor: 'bg-blue-500'
-    };
-    return { 
-      level: 'inactive', 
-      label: 'Inactive', 
-      color: 'text-gray-400', 
-      icon: '😴',
-      bgColor: 'bg-gray-400'
-    };
-  };
+  // Use improved activity level calculation from utilities
+  const activityLevel = getActivityLevel(dailyMinutesToday, weeklyAverage, isCurrentlyOnline);
+  
+  // Calculate activity insights and streak
+  const insights = getActivityInsights(
+    dailyMinutesToday,
+    weeklyAverage,
+    activityTrend,
+    preferredTimePeriod
+  );
+  
+  const streakData = calculateActivityStreak(
+    dailyMinutesToday,
+    0, // We don't have yesterday's data in props, so use 0
+    weeklyAverage
+  );
 
   // Format peak hours
   const formatPeakHours = () => {
@@ -181,30 +132,40 @@ const ActivityPulse: React.FC<ActivityPulseProps> = ({
         return 'various times';
     }
   };
-
-  const activityLevel = getActivityLevel(dailyMinutesToday, weeklyAverage, isCurrentlyOnline);
   const peakHours = formatPeakHours();
 
   // Compact version for player cards
   if (compact) {
     return (
       <div className="flex items-center gap-2 text-sm">
-        <div className={`w-2 h-2 rounded-full ${isCurrentlyOnline ? `${activityLevel.bgColor} animate-pulse` : 'bg-gray-400'}`} />
-        <span className={activityLevel.color}>
-          {activityLevel.label}
-        </span>
+        <div className={`
+          inline-flex items-center gap-1.5 px-2 py-1 rounded-md text-xs font-medium
+          ${activityLevel.bgColor} ${activityLevel.color}
+          backdrop-blur-sm shadow-sm
+        `}>
+          <span>{activityLevel.icon}</span>
+          <span>{activityLevel.label}</span>
+        </div>
+        
         {activityTrend !== 'stable' && (
-          <span className="text-xs text-gray-500">
-            {activityTrend === 'increasing' ? '↗' : '↘'}
-          </span>
+          <div className="flex items-center">
+            {activityTrend === 'increasing' ? (
+              <TrendingUp size={12} className="text-green-400" />
+            ) : (
+              <TrendingDown size={12} className="text-red-400" />
+            )}
+          </div>
         )}
+        
+        {isCurrentlyOnline && (
+          <div className="flex items-center gap-1">
+            <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
+            <span className="text-xs text-green-400">Live</span>
+          </div>
+        )}
+        
         {!isCurrentlyOnline && lastSeenStatus && (lastSeenStatus === 'in_bedwars' || lastSeenStatus === 'in_game' || lastSeenStatus === 'online') && (
           <span className="text-xs text-gray-500">• {formatLastSeenWithAccount()}</span>
-        )}
-        {preferredTimePeriod !== 'unknown' && (
-          <span className="text-xs text-gray-400">
-            • {getEstimatedTimeRange(preferredTimePeriod)}
-          </span>
         )}
       </div>
     );
@@ -242,7 +203,7 @@ const ActivityPulse: React.FC<ActivityPulseProps> = ({
         )}
       </div>
 
-      {/* Stats Grid - ALWAYS SHOW */}
+      {/* Enhanced Stats Grid */}
       <div className="grid grid-cols-2 gap-4 text-sm">
         <div className="space-y-1">
           <div className="text-gray-400 flex items-center gap-1">
@@ -252,14 +213,36 @@ const ActivityPulse: React.FC<ActivityPulseProps> = ({
           <div className="font-medium text-white text-lg">
             {formatDuration(dailyMinutesToday)}
           </div>
+          {activityLevel.description && (
+            <div className="text-xs text-gray-500">{activityLevel.description}</div>
+          )}
         </div>
         <div className="space-y-1">
           <div className="text-gray-400">Daily Average</div>
           <div className="font-medium text-white text-lg">
             {formatDuration(weeklyAverage)}
           </div>
+          {streakData.streak > 0 && (
+            <div className="text-xs text-orange-400">
+              🔥 {streakData.streak} day streak
+            </div>
+          )}
         </div>
       </div>
+
+      {/* Activity Insights */}
+      {insights.length > 0 && (
+        <div className="flex flex-wrap gap-1">
+          {insights.slice(0, 3).map((insight, index) => (
+            <span 
+              key={index}
+              className="text-xs bg-gray-700/50 text-gray-300 px-2 py-1 rounded"
+            >
+              {insight}
+            </span>
+          ))}
+        </div>
+      )}
 
       {/* Peak Time & Time Period - ALWAYS SHOW IF AVAILABLE */}
       <div className="pt-2 border-t border-gray-700">

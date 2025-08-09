@@ -1,14 +1,14 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Player, PlayerAccount, AccountRank } from '../types/players';
-import { Kit } from '../types';
 import { useAuth } from '../context/AuthContext';
 import { useKits } from '../context/KitContext';
 import { supabase } from '../lib/supabase';
 import KitCard from './KitCard';
 import RobloxStatus from './RobloxStatus';
 import ActivityPulse from './ActivityPulse';
-import { aggregatePlayerActivity } from '../lib/activityTracking';
-import { formatDuration, getActivityLevel, formatLastSeen } from '../lib/activityPulseUtils';
+import ActivityLevelBadge from './ActivityLevelBadge';
+import { formatLastSeen } from '../lib/activityPulseUtils';
+import { validateAggregatedActivity } from '../lib/activityValidation';
 import { BEDWARS_PLACE_ID, BEDWARS_UNIVERSE_ID } from '../constants/bedwars';
 import { 
   Edit2, 
@@ -30,9 +30,7 @@ import {
   Crown,
   Check,
   Hash,
-  User,
-  TrendingUp,
-  TrendingDown
+  User
 } from 'lucide-react';
 import { useRestrictedUserIds } from '../hooks/useRestrictedUserIds';
 
@@ -168,11 +166,17 @@ interface RobloxProfile {
 
 // Compact Activity Pulse Component for Player Cards
 const CompactActivityPulse: React.FC<{ accounts: PlayerAccount[] }> = ({ accounts }) => {
-  // Calculate aggregated data
-  const totalDailyMinutes = accounts.reduce((sum, acc) => 
-    sum + (acc.status?.dailyMinutesToday || 0), 0);
-  const avgWeeklyAverage = accounts.reduce((sum, acc) => 
-    sum + (acc.status?.weeklyAverage || 0), 0) / accounts.length;
+  // Use validation for accurate activity calculation
+  const validation = validateAggregatedActivity(accounts);
+  const totalDailyMinutes = validation.validatedDailyMinutes;
+  
+  // Weekly average can be averaged (represents different play patterns)
+  const validWeeklyAverages = accounts
+    .map(acc => acc.status?.weeklyAverage || 0)
+    .filter(avg => avg > 0);
+  const avgWeeklyAverage = validWeeklyAverages.length > 0
+    ? validWeeklyAverages.reduce((sum, avg) => sum + avg, 0) / validWeeklyAverages.length
+    : 0;
   const isCurrentlyOnline = accounts.some(acc => 
     acc.status?.isOnline || acc.status?.isInGame || acc.status?.inBedwars);
   const lastOnlineTimestamp = accounts
@@ -180,8 +184,7 @@ const CompactActivityPulse: React.FC<{ accounts: PlayerAccount[] }> = ({ account
     .filter(Boolean)
     .sort((a, b) => new Date(b!).getTime() - new Date(a!).getTime())[0];
   
-  // Get activity level
-  const activityLevel = getActivityLevel(totalDailyMinutes, avgWeeklyAverage);
+  // Activity level will be calculated in the ActivityLevelBadge component
   
   // Get trend indicator
   const hasIncreasing = accounts.some(acc => acc.status?.activityTrend === 'increasing');
@@ -190,36 +193,23 @@ const CompactActivityPulse: React.FC<{ accounts: PlayerAccount[] }> = ({ account
   // Format last seen
   const lastSeen = formatLastSeen(lastOnlineTimestamp);
   
+  // Determine overall trend
+  const overallTrend = hasIncreasing ? 'increasing' : 
+                      (!hasIncreasing && !hasStable) ? 'decreasing' : 'stable';
+
   return (
-    <div className="flex items-center gap-2 text-sm">
-      <div className={`flex items-center gap-1 px-2 py-1 rounded-lg ${activityLevel.bgColor}`}>
-        <span className="text-sm">{activityLevel.icon}</span>
-        <span className={`font-medium ${activityLevel.color}`}>
-          {activityLevel.label}
-        </span>
-      </div>
-      
-      {hasIncreasing && (
-        <div className="flex items-center gap-1">
-          <TrendingUp size={12} className="text-green-400" />
-        </div>
-      )}
-      
-      {!hasIncreasing && !hasStable && (
-        <div className="flex items-center gap-1">
-          <TrendingDown size={12} className="text-red-400" />
-        </div>
-      )}
+    <div className="flex items-center gap-3 text-sm">
+      <ActivityLevelBadge
+        dailyMinutes={totalDailyMinutes}
+        weeklyAverage={avgWeeklyAverage}
+        isCurrentlyOnline={isCurrentlyOnline}
+        activityTrend={overallTrend}
+        compact={true}
+        showTrend={true}
+      />
       
       {!isCurrentlyOnline && lastSeen && (
-        <span className="text-xs text-gray-500">• {lastSeen}</span>
-      )}
-      
-      {isCurrentlyOnline && (
-        <div className="flex items-center gap-1">
-          <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
-          <span className="text-xs text-green-600 dark:text-green-400">Online</span>
-        </div>
+        <span className="text-xs text-gray-400">• {lastSeen}</span>
       )}
     </div>
   );
@@ -1564,10 +1554,26 @@ function PlayerCard({ player, onDelete, isAdmin, isPinned, onPinToggle, showPinI
               <h3 className="text-lg font-semibold mb-4">Activity Overview</h3>
               <div className="bg-gray-50 dark:bg-gray-800/50 rounded-lg p-4">
                 <ActivityPulse
-                  dailyMinutesToday={playerData.accounts.reduce((sum, acc) => 
-                    sum + (acc.status?.dailyMinutesToday || 0), 0)}
-                  weeklyAverage={playerData.accounts.reduce((sum, acc) => 
-                    sum + (acc.status?.weeklyAverage || 0), 0) / playerData.accounts.length}
+                  dailyMinutesToday={(() => {
+                    // Use validation function for accurate daily time calculation
+                    const validation = validateAggregatedActivity(playerData.accounts);
+                    
+                    // Log validation issues in development
+                    if (validation.issues.length > 0) {
+                      console.warn(`Activity validation issues for ${playerData.id}:`, validation.issues);
+                    }
+                    
+                    return validation.validatedDailyMinutes;
+                  })()}
+                  weeklyAverage={(() => {
+                    // Use average weekly average (this is reasonable to average)
+                    const weeklyAverages = playerData.accounts
+                      .map(acc => acc.status?.weeklyAverage || 0)
+                      .filter(avg => avg > 0);
+                    return weeklyAverages.length > 0 
+                      ? weeklyAverages.reduce((sum, avg) => sum + avg, 0) / weeklyAverages.length
+                      : 0;
+                  })()}
                   activityTrend={playerData.accounts.some(acc => acc.status?.activityTrend === 'increasing') ? 'increasing' :
                                playerData.accounts.some(acc => acc.status?.activityTrend === 'stable') ? 'stable' : 'decreasing'}
                   preferredTimePeriod={playerData.accounts[0]?.status?.preferredTimePeriod || 'unknown'}
@@ -1575,7 +1581,7 @@ function PlayerCard({ player, onDelete, isAdmin, isPinned, onPinToggle, showPinI
                     .map(acc => acc.status?.lastSeenTimestamp ? acc.status.lastSeenTimestamp : 
                          (acc.status?.lastUpdated ? new Date(acc.status.lastUpdated).toISOString() : null))
                     .filter(Boolean)
-                    .sort((a, b) => new Date(b!).getTime() - new Date(a!).getTime())[0]}
+                    .sort((a, b) => new Date(b!).getTime() - new Date(a!).getTime())[0] || undefined}
                   isCurrentlyOnline={playerData.accounts.some(acc => 
                     acc.status?.isOnline || acc.status?.isInGame || acc.status?.inBedwars)}
                   detectedTimezone={playerData.accounts[0]?.status?.detectedTimezone}

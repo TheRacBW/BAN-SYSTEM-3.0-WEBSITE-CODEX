@@ -221,9 +221,10 @@ export const aggregatePlayerActivity = (playerAccounts: PlayerAccount[]): {
     };
   }
 
-  // Aggregate daily minutes across accounts
-  const totalDailyMinutes = playerAccounts.reduce((sum, acc) => 
-    sum + (acc.status?.dailyMinutesToday || 0), 0);
+  // FIXED: Use maximum daily minutes instead of sum
+  // Players can't play multiple accounts simultaneously, so sum inflates the time
+  const dailyMinutesArray = playerAccounts.map(acc => acc.status?.dailyMinutesToday || 0);
+  const totalDailyMinutes = Math.max(...dailyMinutesArray, 0);
   
   // Calculate average weekly average
   const avgWeeklyAverage = playerAccounts.length > 0 
